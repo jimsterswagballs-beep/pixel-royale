@@ -50,7 +50,7 @@ export class HUD{
  killfeed(by,v,w,mine,died){
   const wn=w>=0&&WEAPONS[w]?WEAPONS[w].n:w===-1?'Ground Slam':w===-2?'Energy Burst':w===-3?'Shockwave':w===-4?'Chomp':w===-5?'Grenade':w===-9||w===undefined?'The Storm':'Ability';
   const d=el('div','kf'+(mine?' mine':died?' died':''),`<b>${by||'Storm'}</b> <i>${wn}</i> <b>${v}</b>`);const kf=this.q('#killfeed');kf.appendChild(d);while(kf.children.length>5)kf.removeChild(kf.firstChild);setTimeout(()=>d.remove(),6000)}
- hitmarker(kill,head){const h=this.q('#hitm');h.className=(kill?'kill ':'')+(head?'head ':'');void h.offsetWidth;h.className+='show'}
+ hitmarker(kill,head,sh){const h=this.q('#hitm');h.className=(kill?'kill ':'')+(head?'head ':'')+(sh?'sh ':'');void h.offsetWidth;h.className+='show'}
  dmgNumber(pos,d,head,g){const n=el('div','dn'+(head?' hd':''),d);this.q('#dmgnums').appendChild(n);this.dmgNums.push({n,p:pos.clone(),t:0,dx:(Math.random()-.5)*40});setTimeout(()=>{n.remove();this.dmgNums=this.dmgNums.filter(x=>x.n!==n)},900)}
  flashDamage(from,g){const v=this.q('#vig');v.classList.remove('hurt');void v.offsetWidth;v.classList.add('hurt');
   const dd=this.q('#dmgdir');if(from){const me=g.me;const dx=from.x-me.pos.x,dz=from.z-me.pos.z;const ang=Math.atan2(dx,-dz)+me.yaw;dd.style.transform=`rotate(${ang*57.3}deg)`;dd.classList.remove('show');void dd.offsetWidth;dd.classList.add('show')}}
@@ -96,7 +96,7 @@ export class HUD{
    const act=(i===1&&me.auraT>0&&me.cdef.id==='coolguy15')||(i===2&&me.buffT>0&&me.cdef.id==='zach');d.classList.toggle('active',!!act)});
   // crosshair
   const wd=g.curWeapon(me);const c=this.q('#cross');const sp=Math.hypot(me.vel.x,me.vel.z);
-  let gap=6+(wd?wd.sp*600:0)*(me.aiming?.4:1)+sp*.7+me.bloom*250+(g.view.recoilP*220);c.style.setProperty('--g',gap+'px');c.style.opacity=(me.alive&&me.drop===null&&g.view.adsK<.7&&!(wd&&wd.zoom>=3&&g.view.adsK>.3)&&cur&&!(cur.k==='i'))?'1':(cur&&cur.k==='i'&&me.drop===null?'.8':'0');
+  let gap=6+(wd?wd.sp*600:0)*(me.aiming?.4:1)+sp*.7+me.bloom*250+(g.view.recoilP*220);c.style.setProperty('--g',gap+'px');c.classList.toggle('ads',g.view.adsK>.5&&!!wd);c.style.opacity=(me.alive&&me.drop===null&&!(wd&&wd.zoom>=3&&g.view.adsK>.3)&&cur&&!(cur.k==='i'))?'1':(cur&&cur.k==='i'&&me.drop===null?'.8':'0');
   this.q('#scope').style.display=this.scope?'block':'none';
   // vignette storm
   const inS=g.insideStorm(tgt.pos.x,tgt.pos.z);this.q('#vig').classList.toggle('storm',!inS);

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,mulberry32,clamp,lerp} from './data.js';
 import * as W from './world.js';
 import {FX} from './fx.js';
-import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,charTex,wstat,makeWeaponModel,mat,angDiff,lerpAng} from './shared.js';
+import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,charTex,wstat,makeWeaponModel,mat,angDiff,lerpAng,crispMat,makeBusModel} from './shared.js';
 import {movementMethods} from './movement.js';
 import {combatMethods} from './combat.js';
 import {lootMethods} from './loot.js';
@@ -19,16 +19,16 @@ export class Game{
   this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog('#b9dcf5',80,800);
   this.camera=new THREE.PerspectiveCamera(92,1,.08,1600);this.scene.add(this.camera);
   const sky=new THREE.Mesh(new THREE.SphereGeometry(1200,20,12),new THREE.ShaderMaterial({vertexShader:SKY_V,fragmentShader:SKY_F,side:THREE.BackSide,depthWrite:false,fog:false}));sky.renderOrder=-10;sky.frustumCulled=false;this.sky=sky;this.scene.add(sky);
-  this.scene.add(new THREE.HemisphereLight('#d8ecff','#6a7a55',1.05));
-  const sun=new THREE.DirectionalLight('#fff3d6',1.5);sun.position.set(200,300,120);this.scene.add(sun);
+  this.scene.add(new THREE.HemisphereLight('#e4f2ff','#7a8a60',1.4));
+  const sun=new THREE.DirectionalLight('#fff3d6',1.8);sun.position.set(200,300,120);this.scene.add(sun);
   this.vmScene=new THREE.Scene();this.vmCam=new THREE.PerspectiveCamera(58,1,.02,10);this.vmScene.add(new THREE.HemisphereLight('#fff','#778',1.4));const vs=new THREE.DirectionalLight('#fff',1.2);vs.position.set(1,2,1);this.vmScene.add(vs);
   this.fx=new FX(this.scene);this.worldBuilt=false;this.running=false;this.dynamic=new THREE.Group();this.scene.add(this.dynamic);
   this.ents=new Map();this.list=[];this.loot=new Map();this.traps=new Map();this.projs=[];this.pvis=new Map();this.outEvents=[];this.tmpV=new THREE.Vector3();
   this.view={recoilP:0,recoilY:0,kick:0,shake:0,bobT:0,eye:EYE,roll:0,fov:92,adsK:0,equipK:1,reloadK:0,sway:0,flash:0,hitK:0,burgerT:0};
   this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
  }
- ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.worldBuilt=true}}
- renderMenu(dt){this.menuT=(this.menuT||0)+dt;const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderer.autoClear=true;this.renderer.render(this.scene,cam)}
+ ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
+ renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
  peerLeft(pid){const e=this.list.find(x=>x.peer===pid);if(!e)return;e.peer=undefined;if(e.alive){e.bot=true;this.initBot(e);e.ai.state='loot';e.name+=' (bot)'}}
  get settings(){return this.app.settings}
  get me(){return this.ents.get(this.myId)}
@@ -51,7 +51,7 @@ export class Game{
   this.bus={dx:Math.cos(ang),dz:Math.sin(ang),speed:46,len:900,t:0,off,pos:new THREE.Vector3(),y:215};
   this.bus.sx=-this.bus.dx*450-this.bus.dz*off;this.bus.sz=-this.bus.dz*450+this.bus.dx*off;
   this.busPos(0);
-  this.busMesh=new THREE.Group();const bb=new THREE.Mesh(new THREE.BoxGeometry(5,4,16),mat('#3d8bff'));this.busMesh.add(bb);const bl=new THREE.Mesh(new THREE.SphereGeometry(5,12,8),mat('#ffd23d'));bl.position.set(0,8,0);bl.scale.set(1,.8,1.6);this.busMesh.add(bl);const bw=new THREE.Mesh(new THREE.BoxGeometry(14,.4,3),mat('#2a63c8'));bw.position.set(0,-.5,1);this.busMesh.add(bw);this.dynamic.add(this.busMesh);
+  {const bm=makeBusModel();this.busMesh=bm.group;this.busProp=bm.prop;this.dynamic.add(this.busMesh)}
   for(const info of cfg.ents)this.makeEnt(info);
   this.t=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
   this.storm={phase:-1,state:'idle',t:25,cx:0,cz:0,r:480,ocx:0,ocz:0,or:480,tcx:0,tcz:0,tr:480,dmg:0};
@@ -80,14 +80,14 @@ export class Game{
  // ---------- sprites
  makeSprite(e){
   const g=new THREE.Group();const bb=new THREE.Group();g.add(bb);const pivot=new THREE.Group();bb.add(pivot);
-  const geo=new THREE.PlaneGeometry(2.1,2.1);const m=new THREE.MeshBasicMaterial({map:charTex(e.char,'front'),transparent:true,alphaTest:.4,side:THREE.DoubleSide,fog:true});
-  const plane=new THREE.Mesh(geo,m);plane.position.y=.88;pivot.add(plane);
+  const geo=new THREE.PlaneGeometry(2.1,2.1);const m=crispMat(charTex(e.char,'front'));
+  const plane=new THREE.Mesh(geo,m);plane.position.y=.88;plane.layers.set(1);pivot.add(plane);
   const sh=new THREE.Mesh(new THREE.CircleGeometry(.7,16),new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:.32,depthWrite:false}));sh.rotation.x=-Math.PI/2;sh.position.y=.05;g.add(sh);
   const wg=new THREE.Group();g.add(wg);
   const aura=new THREE.Mesh(new THREE.SphereGeometry(1.25,16,12),new THREE.MeshBasicMaterial({color:'#6ec6ff',transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}));aura.position.y=1;aura.visible=false;g.add(aura);
   const cv=document.createElement('canvas');cv.width=256;cv.height=64;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
-  const name=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,transparent:true,depthWrite:false}));name.scale.set(2.8,.7,1);name.position.y=2.45;g.add(name);
-  e.spr={group:g,bb,pivot,plane,mat:m,shadow:sh,wg,aura,name,cv,tex,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
+  const nmat=crispMat(tex);const name=new THREE.Mesh(new THREE.PlaneGeometry(1,1),nmat);name.scale.set(2.8,.7,1);name.position.y=2.45;name.layers.set(1);bb.add(name);
+  e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
   this.dynamic.add(g);this.drawName(e,true)}
  drawName(e,force){
   const s=e.spr;const key=Math.round(e.hp/5)*1000+Math.round(e.sh/5)+(e.ts>0?7:0);if(!force&&key===s.hpKey)return;s.hpKey=key;
@@ -122,7 +122,8 @@ export class Game{
   if(e.slip>0){rz2+=this.t*14;py=.25}
   if(e.drop==='free'){rz2+=view==='side'?.5*flip*-1:0;sy*=.92}
   if(e.shootT>0){e.shootT-=dt;sx*=1-.04*(e.shootT/.12)}
-  if(e.hitT>0){e.hitT-=dt;s.mat.color.setRGB(1,.4,.4)}else s.mat.color.setRGB(1,1,1);
+  if(e.punch>0){e.punch=Math.max(0,e.punch-dt*7);sx*=1+e.punch*.16;sy*=1-e.punch*.12;py+=e.punch*.06}
+  if(e.hitT>0){e.hitT-=dt;if(e.hitT>.09)s.mat.color.setRGB(2.2,2.2,2.2);else s.mat.color.setRGB(1.5,.45,.45)}else s.mat.color.setRGB(1,1,1);
   if(!e.alive){e.deadT+=dt;const k=Math.min(1,e.deadT/.5);rz2=(flip>0?-1:1)*1.45*k;sy*=1-.2*k;s.mat.opacity=clamp(1.6-e.deadT,0,1);s.mat.transparent=true}
   else s.mat.opacity=1;
   if(this.over&&e.id===this.winnerId){const em=e.cos.emote||0;const t=this.t*(em===0?5:em===1?3:4);if(em===0){flip*=Math.cos(t)}else if(em===1){py=Math.abs(Math.sin(t*2))*1.1;rz2=Math.sin(t*2)*.15}else{rz2=(t*2)%6.283;py=.5+Math.sin(t)*.2}}
@@ -132,7 +133,7 @@ export class Game{
   // weapon
   const wi=e.wi;if(wi!==s.wKey){s.wKey=wi;if(s.wModel)s.wg.remove(s.wModel);s.wModel=null;if(wi>=0){const w=Math.floor(wi/10),r=wi%10;s.wModel=makeWeaponModel(w,r);s.wModel.scale.setScalar(.85);s.wModel.position.set(.36,.0,-.12);s.wg.add(s.wModel)}}
   s.wg.visible=e.alive&&e.drop!=='free';s.wg.position.set(0,1.1+(e.crouch?-.3:0)+(e.sliding?-.35:0),0);s.wg.rotation.set(e.pitch,e.yaw,0,'YXZ');
-  const nd=Math.hypot(dx,dz);s.name.visible=e.alive&&nd<70&&e!==camTarget;if(s.name.visible)this.drawName(e)
+  const nd=Math.hypot(dx,dz);s.name.visible=e.alive&&nd<48&&e!==camTarget;if(s.name.visible)this.drawName(e)
   const ss=clamp(1.1+nd*.012,1,2.2);s.name.scale.set(2.8*ss,.7*ss,1);
   s.shadow.visible=e.grounded||!!e.drop===false;
   s.shadow.position.y=W.H(P.x,P.z)-P.y+.06;
@@ -156,12 +157,14 @@ export class Game{
     else if(ev.e)for(const p of ev.e)fx.tracer(o,new THREE.Vector3(...p),'#ddd',.05,.25);
     if(ev.im)for(const p of ev.im){fx.spark(p[0],p[1],p[2],p[3],p[4],p[5],ev.w>=0&&WEAPONS[ev.w].laser?'#ff6bff':'#ffd070')}
     break}
-   case'hit':{const t=this.ents.get(ev.t);if(!t)break;t.hitT=.12;
-    if(ev.by===this.myId&&ev.t!==this.myId){this.hud.hitmarker(false,!!ev.h);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
+   case'hit':{const t=this.ents.get(ev.t);if(!t)break;t.hitT=.16;t.punch=1;
+    {const c=ev.h?'#ffd23d':ev.sh&&!ev.hp?'#5ac8ff':'#ff5a4a';fx.burst(ev.x,ev.y,ev.z,ev.h?16:10,ev.h?7:5,c,.35,10);fx.burst(ev.x,ev.y,ev.z,6,4,'#ffffff',.2,6);
+     if(ev.h)fx.ring(new THREE.Vector3(ev.x,ev.y-.05,ev.z),1.1,'#ffd23d',.3);if(ev.sh&&ev.hp)fx.burst(ev.x,ev.y,ev.z,10,6,'#5ac8ff',.4,6)}
+    if(ev.by===this.myId&&ev.t!==this.myId){this.hud.hitmarker(false,!!ev.h,ev.sh&&!ev.hp);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
     if(ev.t===this.myId){this.hud.flashDamage(ev.by>=0&&this.ents.get(ev.by)?this.ents.get(ev.by).pos:null,this);au.play('hurt');this.view.shake=Math.min(1,this.view.shake+Math.min(.6,ev.d/60));if(me.use){me.use=null;this.hud.toast('Interrupted',"#ff7a7a")}}
     break}
    case'kill':{const v=this.ents.get(ev.v),b=this.ents.get(ev.by);
-    if(v){v.alive=false;v.hp=0;v.deadT=0}
+    if(v){v.alive=false;v.hp=0;v.deadT=0;fx.burst(v.pos.x,v.pos.y+1,v.pos.z,40,9,'#ffd23d',.7,8);fx.burst(v.pos.x,v.pos.y+1,v.pos.z,24,6,'#ff6bd6',.8,6);fx.ring(v.pos,3,'#ffffff',.45)}
     this.hud.killfeed(b?b.name:null,v?v.name:'?',ev.w,ev.by===this.myId,ev.v===this.myId);
     if(ev.by===this.myId&&ev.v!==this.myId){this.hud.hitmarker(true,false);au.play('kill');this.hud.toast('Eliminated '+(v?v.name:''),'#ffd23d')}
     if(ev.v===this.myId){this.onMeDead(ev)}
@@ -199,7 +202,7 @@ export class Game{
  update(dt){
   if(!this.running)return;dt=Math.min(dt,.05);this.t+=dt;
   const me=this.me;
-  this.updateBus(dt);
+  this.updateBus(dt);if(this.decor)this.decor.update(this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
    this.updateBots(dt);this.updateProjs(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.checkWin()}
@@ -212,7 +215,7 @@ export class Game{
  updateBus(dt){
   const b=this.bus;if(b.t*b.speed>b.len+60){this.busMesh.visible=false}else{b.t+=dt;this.busPos(b.t);this.busMesh.position.copy(b.pos);this.busMesh.rotation.y=Math.atan2(-b.dx,-b.dz)+Math.PI;
    // the bus mesh length is along z, rotate so z aligned with dir
-   this.busMesh.rotation.y=Math.atan2(b.dx,b.dz)}
+   this.busMesh.rotation.y=Math.atan2(b.dx,b.dz);if(this.busProp)this.busProp.rotation.z+=dt*30}
   for(const e of this.list)if(e.drop==='bus'){e.pos.copy(b.pos);if(e.local&&b.t*b.speed>b.len-20&&this.role!=='client'){}}
   if(this.state==='bus'&&b.t*b.speed>b.len*.5)this.state='play';
  }
@@ -254,8 +257,24 @@ export class Game{
   this.audio.listener={x:cam.position.x,y:cam.position.y,z:cam.position.z,yaw:fpv?this.me.yaw:(this.specYaw||0)};
   for(const e of this.list)this.updateSprite(e,dt,cam.position);
   const st=this.storm;const inStorm=this.insideStorm(cam.position.x,cam.position.z)===false;this.scene.fog.color.set(inStorm?'#7a4ab0':'#b9dcf5');
-  this.renderer.autoClear=true;this.renderer.render(this.scene,cam);
+  this.renderWorld(cam);
   if(fpv&&this.me.drop===null){this.updateViewmodel(dt);this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.vmScene,this.vmCam);this.renderer.autoClear=true}
+ }
+ renderWorld(cam){
+  const r=this.renderer,pf=this.app.pf||1,use=pf<.99;
+  const db=r.getDrawingBufferSize(this.dbv||(this.dbv=new THREE.Vector2()));
+  let rt=null;
+  if(use){const w=Math.max(8,Math.ceil(db.x*pf)),h=Math.max(8,Math.ceil(db.y*pf));
+   if(!this.rt||this.rt.width!==w||this.rt.height!==h){if(this.rt){this.rt.dispose();this.rt.depthTexture.dispose()}
+    this.rt=new THREE.WebGLRenderTarget(w,h,{minFilter:THREE.NearestFilter,magFilter:THREE.NearestFilter,depthTexture:new THREE.DepthTexture(w,h)});
+    if(!this.quad){this.quadCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);this.quadScene=new THREE.Scene();this.quadMat=new THREE.ShaderMaterial({uniforms:{t:{value:null}},depthTest:false,depthWrite:false,vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',fragmentShader:'uniform sampler2D t;varying vec2 vUv;void main(){gl_FragColor=texture2D(t,vUv);\n#include <colorspace_fragment>\n}'});this.quad=new THREE.Mesh(new THREE.PlaneGeometry(2,2),this.quadMat);this.quad.frustumCulled=false;this.quadScene.add(this.quad)}}
+   rt=this.rt}
+  for(const e of this.list){for(const m of[e.spr.mat,e.spr.nmat]){const u=m.uniforms;u.uUse.value=use?1:0;u.uRes.value.set(db.x,db.y);u.tDepth.value=rt?rt.depthTexture:null;u.uNear.value=cam.near;u.uFar.value=cam.far}}
+  r.autoClear=true;
+  if(!use){cam.layers.enableAll();r.render(this.scene,cam);return}
+  cam.layers.set(0);r.setRenderTarget(rt);r.clear();r.render(this.scene,cam);r.setRenderTarget(null);
+  this.quadMat.uniforms.t.value=rt.texture;r.render(this.quadScene,this.quadCam);
+  cam.layers.set(1);r.autoClear=false;r.render(this.scene,cam);r.autoClear=true;cam.layers.enableAll();
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }

@@ -44,7 +44,7 @@ export const combatMethods={
  fireWeapon(e,slot,wd,c){
   const v=this.view;
   const sp=Math.hypot(e.vel.x,e.vel.z);
-  let spread=wd.sp*(e.aiming?.4:1)*(1+Math.min(sp,9)*.07)*(e.grounded?1:2)*(e.crouch?.75:1)+e.bloom*.5;if(c.aimErr)spread+=c.aimErr;
+  let spread=wd.sp*(e.aiming?.3:1)*(1+Math.min(sp,9)*.05)*(e.grounded?1:2)*(e.crouch?.75:1)+e.bloom*.5;if(c.aimErr)spread+=c.aimErr;
   e.bloom=Math.min(.08,e.bloom+wd.rc*.0022);
   let yaw=e.yaw,pitch=e.pitch;
   if(e.local){yaw+=v.recoilY;pitch+=v.recoilP}
@@ -54,7 +54,8 @@ export const combatMethods={
    if(wd.pellets===1&&spread>0&&e.local&&0)sx=sy=0;
    const yy=yaw+sx,pp=pitch+sy;const cp=Math.cos(pp);dirs.push(-Math.sin(yy)*cp,Math.sin(pp),-Math.cos(yy)*cp)}
   if(e.local){
-   v.recoilP+=wd.rc*.0095*(e.aiming?.7:1)*(1+Math.random()*.3);v.recoilY+=(Math.random()-.5)*wd.rc*.006;v.kick=Math.min(1,v.kick+wd.rc*.05);v.recoilKick=Math.min(1.6,(v.recoilKick||0)+wd.rc*.4);v.flash=.05;v.shake=Math.min(1,v.shake+wd.rc*.03);
+   if(this.t-(v.lastShot||-9)>.45)e.shotIdx=0;e.shotIdx=(e.shotIdx||0)+1;v.lastShot=this.t;const ph=Math.sin(e.shotIdx*1.7)*(1-Math.exp(-e.shotIdx*.4));
+   v.recoilP+=wd.rc*.0085*(e.aiming?.62:1)*(e.shotIdx<4?1.1:.9);v.recoilY+=ph*wd.rc*.0042*(e.aiming?.6:1);v.kick=Math.min(1,v.kick+wd.rc*.04);v.recoilKick=Math.min(1.6,(v.recoilKick||0)+wd.rc*.35);v.flash=.05;v.shake=Math.min(.5,v.shake+wd.rc*.006);
    this.audio.play(wd.quiet?'quiet':wd.laser?'laser':wd.t==='ar'?'ar':wd.t==='smg'?'smg':wd.t==='sg'?'sg':wd.t==='sn'?'sn':wd.t==='pi'?'pi':wd.t==='ex'?'launch':'fun',null,wd.quiet?.7:1);
    if(slot.mag<=0&&this.settings&&e.ammo[wd.ammo]>0&&e.reload<=0){}}
   e.shootT=.12;
@@ -148,12 +149,12 @@ export const combatMethods={
   if(this.role==='client'||!t.alive||t.drop==='bus')return;
   if(by&&by!==t&&(by.bot)){amount*=this.botDmg}
   if(amount<=0)return;
-  let rem=amount;
-  if(t.ts>0){const a=Math.min(t.ts,rem);t.ts-=a;rem-=a}
-  if(rem>0&&t.sh>0){const a=Math.min(t.sh,rem);t.sh-=a;rem-=a}
+  let rem=amount,shHit=0;
+  if(t.ts>0){const a=Math.min(t.ts,rem);t.ts-=a;rem-=a;shHit=1}
+  if(rem>0&&t.sh>0){const a=Math.min(t.sh,rem);t.sh-=a;rem-=a;shHit=1}
   t.hp-=rem;t.lastHit=this.t;t.lastBy=by?by.id:-1;if(t.bot)this.onBotHit&&this.onBotHit(t,by);
   const p=pos||[t.pos.x,t.pos.y+1,t.pos.z];
-  this.emit({k:'hit',t:t.id,by:by?by.id:-1,d:Math.round(amount),h:head?1:0,x:p[0],y:p[1],z:p[2]});
+  this.emit({k:'hit',t:t.id,by:by?by.id:-1,d:Math.round(amount),h:head?1:0,sh:shHit,hp:rem>0?1:0,x:p[0],y:p[1],z:p[2]});
   if(t.hp<=0){t.hp=0;this.killEnt(t,by,wid)}},
  killEnt(t,by,wid){
   if(!t.alive)return;t.alive=false;t.deadT=0;t.use=null;

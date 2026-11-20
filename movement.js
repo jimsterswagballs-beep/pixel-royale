@@ -18,7 +18,7 @@ export const movementMethods={
   const me=this.me,I=this.input,s=this.settings,v=this.view;const active=this.app.inputActive();
   const{dx,dy}=I.takeLook();
   const cur=me.inv[me.cur];const wd=cur&&cur.k==='w'?wstat(cur.w,cur.r):null;
-  if(active){const ads=v.adsK>.3;let k=.0022*s.sens*(ads?s.adsSens/Math.sqrt(wd?wd.zoom:1):s.camSens);if(me.eatT>0)k*=.3;me.yaw-=dx*k;me.pitch=clamp(me.pitch-dy*k*(s.invertY?-1:1),-1.5,1.5)}
+  if(active){const ads=v.adsK>.05;const ratio=Math.tan(this.camera.fov*Math.PI/360)/Math.tan(s.fov*Math.PI/360);let k=.0022*s.sens*s.camSens*ratio*(ads?(1-v.adsK)+v.adsK*s.adsSens:1);if(me.eatT>0)k*=.3;me.yaw-=dx*k;me.pitch=clamp(me.pitch-dy*k*(s.invertY?-1:1),-1.5,1.5)}
   const inp=this.readInput();
   // bus
   if(me.drop==='bus'){
@@ -42,8 +42,8 @@ export const movementMethods={
   const aimHeld=active&&(s.aimToggle?(I.pressed('aim')?(me.aimState=!me.aimState):me.aimState):I.down('aim'));
   this.tickWeapon(me,{fire:active&&I.down('fire'),firePressed:active&&I.pressed('fire'),reload:active&&I.pressed('reload'),aim:!!aimHeld&&!me.use},dt);
   // view recoil recovery
-  v.recoilP*=Math.exp(-7*dt);v.recoilY*=Math.exp(-7*dt);v.kick*=Math.exp(-14*dt);
-  v.adsK=lerp(v.adsK,me.aiming?1:0,1-Math.exp(-14*dt));
+  const firing=this.t-(v.lastShot||-9)<.18;const rec=firing?2.2:9;v.recoilP*=Math.exp(-rec*dt);v.recoilY*=Math.exp(-rec*dt);v.kick*=Math.exp(-14*dt);
+  v.adsT=clamp((v.adsT||0)+(me.aiming?1:-1)*dt/.15,0,1);v.adsK=v.adsT*v.adsT*(3-2*v.adsT);
   v.equipK=Math.min(1,v.equipK+dt*4.5);
   me.wi=cur&&cur.k==='w'?cur.w*10+cur.r:-1;
   // flags
@@ -155,8 +155,8 @@ export const movementMethods={
   cam.rotation.set(pitch,yaw,v.roll,'YXZ');
   const cur=me.inv[me.cur];const wd=cur&&cur.k==='w'?wstat(cur.w,cur.r):null;const z=wd&&wd.zoom>1?wd.zoom:1.0;
   let fov=s.fov+(me.sprinting?5:0)+(me.sliding?7:0)+(me.drop==='free'?10:0);
-  const adsFov=z>1?s.fov/(1+(z-1)*.95):s.fov*.82;fov=lerp(fov,adsFov,v.adsK);
-  cam.fov=lerp(cam.fov,fov,1-Math.exp(-12*dt));
+  const adsFov=z>1?s.fov/(1+(z-1)*.95):s.fov*.8;fov=lerp(fov,adsFov,v.adsK);
+  cam.fov=lerp(cam.fov,fov,1-Math.exp(-18*dt));
   this.hud.scope=z>=3&&v.adsK>.85&&!me.use;
  },
  updateViewmodel(dt){
@@ -171,7 +171,7 @@ export const movementMethods={
   const g=this.vmModel,a=v.adsK;v.sway=lerp(v.sway,0,1-Math.exp(-8*dt));
   const bobx=me.grounded&&!me.sliding?Math.cos(v.bobT)*.012*Math.min(1,sp/7):0,boby=me.grounded&&!me.sliding?Math.abs(Math.sin(v.bobT))*.012*Math.min(1,sp/7):0;
   const lowered=(1-v.equipK)*.35+(me.sprinting?.05:0);
-  g.position.set(lerp(.2,0,a)+bobx,lerp(-.2,-.115,a)-boby-lowered-v.reloadK*.15,lerp(-.42,-.3,a)+v.kick*.06+v.recoilKick*.08||0);
+  g.position.set(lerp(.2,0,a)+bobx,lerp(-.2,-.085,a)-boby-lowered-v.reloadK*.15,lerp(-.42,-.3,a)+v.kick*.06+v.recoilKick*.08||0);
   g.rotation.set(v.recoilKick*.07+v.reloadK*.7+(me.sprinting?.25:0)+(me.sliding?.15:0),(me.sprinting?.4:0)+v.reloadK*.2,v.reloadK*.3-(me.sliding?.15:0));
   v.recoilKick=(v.recoilKick||0)*Math.exp(-16*dt);
   if(this.vmFlash){this.vmFlash.visible=v.flash>0;if(v.flash>0){v.flash-=dt;this.vmFlash.rotation.z=Math.random()*6;this.vmFlash.scale.setScalar(.7+Math.random()*.6)}}

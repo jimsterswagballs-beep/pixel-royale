@@ -94,7 +94,7 @@ export const lootMethods={
    else if(it.k==='i'){const d=ITEMS[it.id];m=new THREE.Mesh(d.kind==='throw'?new THREE.SphereGeometry(.2,10,8):d.kind==='heal'||d.kind==='chug'?new THREE.BoxGeometry(.3,.3,.3):d.kind==='shield'?new THREE.CylinderGeometry(.14,.18,.4,10):d.kind==='grapple'?new THREE.TorusGeometry(.2,.06,6,10):new THREE.BoxGeometry(.5,.12,.5),mat(c,c))}
    else{m=new THREE.Group();for(let i=0;i<3;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.3,.16),mat(c,c));b.position.x=(i-1)*.2;m.add(b)}}
    const inner=new THREE.Group();inner.add(m);inner.position.y=.7;g.add(inner);g.userData.spin=inner;
-   const beam=new THREE.Mesh(new THREE.CylinderGeometry(.28,.28,it.k==='w'?(5+it.r*2):2.5,8,1,true),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.28,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));beam.position.y=(it.k==='w'?(5+it.r*2):2.5)/2;g.add(beam);
+   const beam=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,it.k==='w'?(3+it.r*1.6):2,8,1,true),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.14,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));beam.position.y=(it.k==='w'?(3+it.r*1.6):2)/2;g.add(beam);
    const disc=new THREE.Mesh(new THREE.CircleGeometry(.55,16),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.4,depthWrite:false}));disc.rotation.x=-Math.PI/2;disc.position.y=.04;g.add(disc)}
   g.position.set(l.x,l.y,l.z);return g},
  updateLootVis(dt){

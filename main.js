@@ -34,11 +34,12 @@ class App{
   const s=this.settings;const q={Low:{pr:.6,fx:.4,fog:350},Medium:{pr:.85,fx:.7,fog:550},High:{pr:1,fx:1,fog:800}}[s.quality]||{pr:1,fx:1,fog:800};
   this.q=q;this.audio.setVol(s.master,s.sfx,s.music);if(this.game.fx)this.game.fx.density=q.fx*(s.particles==='Low'?.4:s.particles==='Medium'?.7:1);
   const fogF={Near:.55,Medium:.8,Far:1}[s.dist]||1;this.game.scene.fog.far=q.fog*fogF;this.game.scene.fog.near=this.game.scene.fog.far*.1;this.game.camera.far=1600;
-  this.game.camera.fov=s.fov;if(this.hud.q&&this.hud.root)this.hud.q('#fps').style.display=s.fps?'block':'none';this.resize()}
+  this.game.camera.fov=s.fov;document.documentElement.style.setProperty('--xc',s.xcol);document.documentElement.style.setProperty('--xs',s.xsize);this.canvas.style.filter=`saturate(${s.vib/100}) brightness(${(s.bright||108)/100}) contrast(1.05)`;if(this.hud.q&&this.hud.root)this.hud.q('#fps').style.display=s.fps?'block':'none';this.resize()}
  resize(){
   const s=this.settings;let pr=Math.min(devicePixelRatio||1,2)*this.q.pr*(s.scale/100);
   if(s.res!=='native'){const hgt=parseInt(s.res);pr=Math.min(pr,hgt/innerHeight)}
-  this.renderer.setPixelRatio(Math.max(.25,pr));this.renderer.setSize(innerWidth,innerHeight,false);this.game.resize(innerWidth,innerHeight)}
+  this.pf={Off:1,Slight:.62,Medium:.45,Chunky:.32}[s.pix]||.62;this.canvas.style.imageRendering='auto';
+  this.renderer.setPixelRatio(Math.max(.2,pr));this.renderer.setSize(innerWidth,innerHeight,false);this.game.resize(innerWidth,innerHeight)}
  typing(){const a=document.activeElement;return a&&(a.tagName==='INPUT'&&a.type==='text')}
  gameActive(){return this.playing&&!this.paused}
  inputActive(){return this.playing&&this.input.locked&&!this.paused&&!this.game.over||this.playing&&this.input.locked&&!this.paused&&this.game.over&&false}
@@ -80,14 +81,14 @@ class App{
   setInterval(()=>{if(this.screen==='title')this.updateStage()},1400);
  }
  enter_title(){this.updateStage(true)}
- updateStage(swap){const c=this.profile.char;const img=$('stageImg');this.stageI=(this.stageI+1)%4;const v=swap?'front':this.stageViews[this.stageI];img.src=IMG[c][v];const cd=CHARS.find(x=>x.id===c);$('stageName').textContent=this.profile.name;$('stageRole').textContent=cd.name+' · '+cd.role;
+ updateStage(swap){const c=this.profile.char;const img=$('stageImg');this.stageI=(this.stageI+1)%4;const v='front';img.src=IMG[c][v];const cd=CHARS.find(x=>x.id===c);$('stageName').textContent=this.profile.name;$('stageRole').textContent=cd.name+' · '+cd.role;
   if(swap){const s=$('stage');s.classList.remove('swap');void s.offsetWidth;s.classList.add('swap')}}
  exit(){try{window.close()}catch(e){}this.toast('You can now close this tab. Thanks for playing!');}
  back(btn){const b=h(`<button class="btn red sm">◀ Back</button>`);b.onclick=()=>{this.sfx('ui');this.go('title')};return b}
  charPicker(sel,onPick,compact){
   const box=h(`<div class="cards"></div>`);
   for(const c of CHARS){
-   const d=h(`<div class="card ${sel()===c.id?'sel':''}"><div class="pic"><img src="${IMG[c.id].front}"><img src="${IMG[c.id].side}"><img src="${IMG[c.id].back}"></div><h3>${c.name}</h3><div class="role">${c.role}</div>
+   const d=h(`<div class="card ${sel()===c.id?'sel':''}"><div class="pic"><img src="${IMG[c.id].front}"></div><h3>${c.name}</h3><div class="role">${c.role}</div>
    <div class="stat">HP <i style="width:${c.hp*1.2}px"></i> ${c.hp}</div>${compact?'':c.ab.map((a,i)=>`<div class="abl"><b>${a.n}</b> <small>(${a.cd}s)</small><br>${a.d}</div>`).join('')}</div>`);
    d.onclick=()=>{onPick(c.id);for(const x of box.children)x.classList.remove('sel');d.classList.add('sel');this.sfx('ui')};box.appendChild(d)}
   return box}
@@ -105,7 +106,7 @@ class App{
  refreshChips(box,val){for(const c of box.children)c.classList.toggle('sel',c.textContent===val)}
  enter_offline(){$('offName').value=this.profile.name;$('offBots').value=this.profile.bots;$('botN').textContent=this.profile.bots;this.refreshChips($('offDiff'),this.profile.diff);
   const box=$('offChars');box.innerHTML='';box.appendChild(this.charPicker(()=>this.profile.char,id=>{this.profile.char=id;this.saveProfile()}))}
- buildChars(){const p=$('chars');p.innerHTML=`<div class="panel"><div class="head"><h2>Character Selection</h2><div id="chBack"></div></div><div id="chBox"></div><div class="tip" style="text-align:center">Your 2D hero looks different from the front, side and back – it changes with the camera angle!</div></div>`;$('chBack').appendChild(this.back())}
+ buildChars(){const p=$('chars');p.innerHTML=`<div class="panel"><div class="head"><h2>Character Selection</h2><div id="chBack"></div></div><div id="chBox"></div><div class="tip" style="text-align:center">In-game your hero changes between front, side and back views depending on the camera angle.</div></div>`;$('chBack').appendChild(this.back())}
  enter_chars(){const b=$('chBox');b.innerHTML='';b.appendChild(this.charPicker(()=>this.profile.char,id=>{this.profile.char=id;this.saveProfile()}))}
  buildLocker(){
   const p=$('locker');p.innerHTML=`<div class="panel"><div class="head"><h2>Locker</h2><div id="lkBack"></div></div><div class="row" style="align-items:flex-start;gap:30px"><div style="min-width:260px;text-align:center"><div id="lkPrev" style="height:240px"><img style="height:240px;image-rendering:pixelated"></div><div id="lkName" style="font-family:'Arial Black',Impact,sans-serif;font-size:24px"></div></div>
@@ -133,6 +134,9 @@ class App{
   if(this.stTab==='Graphics'){
    sel('Quality preset','quality',['Low','Medium','High'],'Affects render resolution, particles and fog distance');
    sel('Resolution','res',[['native','Native (window size)'],['1080','1080p'],['900','900p'],['720','720p'],['540','540p']],'Caps the render height – lower = faster');
+   sel('Pixel effect','pix',['Off','Slight','Medium','Chunky'],'Retro chunky-pixel look for the world (characters stay sharp)');
+   slider('Vibrancy','vib',80,180,5,'Colour saturation boost',v=>v+'%');
+   slider('Brightness','bright',80,140,2,'Overall brightness',v=>v+'%');
    slider('Render scale','scale',50,100,5,'Percentage of the chosen resolution',v=>v+'%');
    const fs=h(`<div class="set"><label>Fullscreen<span class="d">Toggle fullscreen mode</span></label><button class="btn sm sec">${document.fullscreenElement?'Exit Fullscreen':'Go Fullscreen'}</button></div>`);fs.querySelector('button').onclick=()=>{if(document.fullscreenElement)document.exitFullscreen();else document.documentElement.requestFullscreen().catch(()=>this.toast('Fullscreen blocked by browser'));setTimeout(()=>this.renderSettings(),300)};body.appendChild(fs);
    slider('Field of view','fov',60,120,1,'',v=>v+'°');
@@ -142,7 +146,7 @@ class App{
   }
   if(this.stTab==='Audio'){slider('Master volume','master',0,100,1,'',v=>v);slider('Sound effects','sfx',0,100,1,'',v=>v);slider('Music','music',0,100,1,'',v=>v)}
   if(this.stTab==='Controls'){slider('Mouse sensitivity','sens',.2,3,.05,'Base look speed',v=>(+v).toFixed(2));slider('Camera sensitivity','camSens',.2,3,.05,'Look speed while not aiming',v=>(+v).toFixed(2));slider('Aim-down-sights sensitivity','adsSens',.2,2,.05,'Multiplier while zoomed',v=>(+v).toFixed(2));tog('Invert Y axis','invertY');tog('Toggle crouch','crouchToggle','Press once to crouch instead of holding');tog('Toggle aim','aimToggle');tog('Auto sprint','autoSprint','Sprint whenever you move forward')}
-  if(this.stTab==='Gameplay'){tog('Hit markers','hitmarkers');tog('Damage numbers','dmgNumbers');slider('Screen shake','shake',0,2,.1,'',v=>(+v).toFixed(1));slider('Head bob','bob',0,2,.1,'',v=>(+v).toFixed(1));tog('Rotate minimap with player','mapRotate')}
+  if(this.stTab==='Gameplay'){sel('Crosshair colour','xcol',[['#ffffff','White'],['#4aff8a','Green'],['#4ad8ff','Cyan'],['#ffd84a','Yellow'],['#ff5a5a','Red'],['#ff7ab8','Pink']]);slider('Crosshair size','xsize',.6,2,.1,'',v=>(+v).toFixed(1));tog('Hit markers','hitmarkers');tog('Damage numbers','dmgNumbers');slider('Screen shake','shake',0,2,.1,'',v=>(+v).toFixed(1));slider('Head bob','bob',0,2,.1,'',v=>(+v).toFixed(1));tog('Rotate minimap with player','mapRotate')}
   if(this.stTab==='Key Bindings')this.renderBinds(body);
  }
  renderBinds(body){
