@@ -8,12 +8,49 @@ function pick(rng,ws){let t=0;for(const w of ws)t+=w;let r=rng()*t;for(let i=0;i
 export function rollRarity(rng,boost=1,min=0){const ws=RARITY.map((r,i)=>i<min?0:r.w*(i>=2?boost:1));return pick(rng,ws)}
 export function rollItem(rng,q=1,min=0){
  const k=rng();
- if(k<.42||min>0&&k<.8){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
- if(k<.62){const types=Object.keys(AMMO);const t=types[pick(rng,[10,8,6,3,1.5])];return{k:'a',t,n:AMMO[t].box}}
+ if(k<.22||min>0&&k<.8){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
+ if(k<.42){const types=Object.keys(AMMO);const t=types[pick(rng,[10,8,6,3,1.5])];return{k:'a',t,n:AMMO[t].box}}
  const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana'];const ws=[9,8,3.5,2.5,.7,2.2,2,2.8,1.4,1.6];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
 export function rollWeapon(rng,q=1,min=0){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
 export function itemName(it){if(it.k==='w')return RARITY[it.r].n+' '+WEAPONS[it.w].n;if(it.k==='i')return ITEMS[it.id].n+(it.n>1?' x'+it.n:'');return AMMO[it.t].n+' Ammo x'+it.n}
 export function itemColor(it){if(it.k==='w')return RARITY[it.r].c;if(it.k==='i')return ITEMS[it.id].col;return AMMO[it.t].c}
+// ---- item pickup visuals: an item that hovers and spins, with a rarity hoop, orbiting sparks, a thin shaft and a pulsing ground ring
+let LOOT_GEO=null;
+function lootGeo(){return LOOT_GEO||(LOOT_GEO={
+ ground:new THREE.TorusGeometry(.5,.025,4,28),
+ hoop:new THREE.TorusGeometry(.5,.02,4,32),
+ spark:new THREE.SphereGeometry(.05,6,5),
+ shaft:new THREE.CylinderGeometry(.045,.045,1,6,1,true)})}
+function glowMat(c,opacity){return new THREE.MeshBasicMaterial({color:c,transparent:true,opacity,depthWrite:false,fog:false,blending:THREE.AdditiveBlending})}
+export function makeItemLootVis(l){
+ const it=l.item,c=itemColor(it),G=lootGeo();let m;
+ if(it.k==='w'){m=makeWeaponModel(it.w,it.r);m.scale.setScalar(1.15);m.rotation.y=Math.PI/2;const bb=new THREE.Box3().setFromObject(m),ctr=bb.getCenter(new THREE.Vector3());m.position.sub(ctr)}
+ else if(it.k==='i'){const d=ITEMS[it.id];m=new THREE.Mesh(d.kind==='throw'?new THREE.SphereGeometry(.2,10,8):d.kind==='heal'||d.kind==='chug'?new THREE.BoxGeometry(.3,.3,.3):d.kind==='shield'?new THREE.CylinderGeometry(.14,.18,.4,10):d.kind==='grapple'?new THREE.TorusGeometry(.2,.06,6,10):new THREE.BoxGeometry(.5,.12,.5),mat(c,c))}
+ else{m=new THREE.Group();for(let i=0;i<3;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.3,.16),mat(c,c));b.position.x=(i-1)*.2;m.add(b)}}
+ const g=new THREE.Group();
+ const tall=it.k==='w'?3+it.r*1.6:2.2;
+ const shaft=new THREE.Mesh(G.shaft,glowMat(c,.2));shaft.scale.set(1,tall,1);shaft.position.y=tall/2;g.add(shaft);
+ const ground=new THREE.Mesh(G.ground,glowMat(c,.5));ground.rotation.x=Math.PI/2;ground.position.y=.05;g.add(ground);
+ const float=new THREE.Group();g.add(float);
+ const spinner=new THREE.Group();spinner.add(m);float.add(spinner);
+ const hr=it.k==='w'?.75:.45;
+ const halo=new THREE.Mesh(G.hoop,glowMat(c,.8));halo.scale.setScalar(hr/.5);float.add(halo);
+ const orbit=new THREE.Group();float.add(orbit);const sparkMat=new THREE.MeshBasicMaterial({color:c,fog:false});
+ for(let k=0;k<3;k++){const s=new THREE.Mesh(G.spark,sparkMat);const a=k/3*Math.PI*2;s.position.set(Math.cos(a)*hr,0,Math.sin(a)*hr);orbit.add(s)}
+ Object.assign(g.userData,{float,spinner,halo,orbit,ground,shaft,phase:l.id*2.399});
+ return g}
+export function animLootMesh(g,dt,t){
+ const u=g.userData,ph=u.phase;
+ u.float.position.y=.95+Math.sin(t*2.2+ph)*.12;   // hover bob
+ u.spinner.rotation.y+=dt*2.4;                       // item spin
+ u.spinner.rotation.z=Math.sin(t*1.3+ph)*.12;        // gentle wobble
+ u.halo.rotation.y-=dt*1.6;                          // hoop counter-spins
+ u.orbit.rotation.y+=dt*2.8;                         // sparks orbit
+ const p=.5+.5*Math.sin(t*3+ph);
+ u.ground.scale.setScalar(.8+p*.35);
+ u.ground.material.opacity=.25+p*.4;
+ u.shaft.material.opacity=.12+p*.12;
+}
 export const lootMethods={
  genLoot(rng){let id=1;this.loot.clear();const seenB=new Set();
   for(const s of W.lootSpots){
@@ -21,8 +58,8 @@ export const lootMethods={
    if(!s.inside&&rng()<.4)continue;
    const n=s.inside?(rng()<.5?2:1):1;
    for(let i=0;i<n;i++){
-    // indoor floor loot: first item is a weapon about half the time so houses reliably have guns
-    const it=s.inside&&i===0&&rng()<.5?rollWeapon(rng,s.q):rollItem(rng,s.q);
+    // indoor floor loot: first item is a weapon a quarter of the time (guns are rarer than before)
+    const it=s.inside&&i===0&&rng()<.25?rollWeapon(rng,s.q):rollItem(rng,s.q);
     const a=rng()*6.283,off=i?.9:0;let x=s.x+Math.cos(a)*off,z=s.z+Math.sin(a)*off,y=s.y;
     if(off&&W.blocked(x,y,z,.3,1,.05)){x=s.x;z=s.z}
     this.addLootObj({id:id++,x,y,z,item:it})}
@@ -61,7 +98,7 @@ export const lootMethods={
   if(Math.hypot(l.x-e.pos.x,l.z-e.pos.z)>4.8||Math.abs(l.y-e.pos.y)>4)return;
   if(l.chest){this.openChest(l);return}
   if(l.ammobox){this.openAmmoBox(l);return}
-  this.loot.delete(l.id);this.emit({k:'lt-',id:l.id});
+  this.removeLoot(l.id);this.emit({k:'lt-',id:l.id});
   if(e.peer!==undefined&&!e.local)this.emit({k:'grant',g:l.item},e.id);else this.applyGrantLocal(e,l.item)},
  applyGrantLocal(e,it){
   if(it.k==='a'){const m=AMMO[it.t].max;const before=e.ammo[it.t];e.ammo[it.t]=Math.min(m,before+it.n);const left=it.n-(e.ammo[it.t]-before);if(left>0&&e.ammo[it.t]>=m&&e.local&&left===it.n)this.hud.toast(AMMO[it.t].n+' ammo full');else if(e.local)this.audio.play('pick');return}
@@ -91,28 +128,23 @@ export const lootMethods={
    for(const l of this.loot.values()){if(!l.item||l.item.k!=='a')continue;const dx=l.x-e.pos.x,dz=l.z-e.pos.z;if(dx*dx+dz*dz>3.2||Math.abs(l.y-e.pos.y)>2.5)continue;
     const it=l.item;if(e.ammo[it.t]>=AMMO[it.t].max)continue;
     // bots/humans only want ammo they can use or always accept
-    this.loot.delete(l.id);this.emit({k:'lt-',id:l.id});if(e.peer!==undefined&&!e.local)this.emit({k:'grant',g:it},e.id);else this.applyGrantLocal(e,it)}}},
+    this.removeLoot(l.id);this.emit({k:'lt-',id:l.id});if(e.peer!==undefined&&!e.local)this.emit({k:'grant',g:it},e.id);else this.applyGrantLocal(e,it)}}},
  // ---- visuals
  makeLootMesh(l){
+  if(!(l.chest||l.ammobox)){const g=makeItemLootVis(l);g.position.set(l.x,l.y,l.z);return g}
   const g=new THREE.Group();
   if(l.chest||l.ammobox){const gold=l.chest;const col=l.supply?'#ff3d3d':l.chest?'#e0a020':'#4a6a3a';
    const b=new THREE.Mesh(new THREE.BoxGeometry(1.1,.6,.7),mat(col));b.position.y=.3;g.add(b);const lid=new THREE.Mesh(new THREE.BoxGeometry(1.14,.25,.74),mat(l.chest?'#ffd23d':'#6a8a4a',l.chest?'#aa7a00':null));lid.position.y=.72;g.add(lid);
    if(l.supply)g.scale.setScalar(1.8);
    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.35,.35,26,8,1,true),new THREE.MeshBasicMaterial({color:l.chest?'#ffd23d':'#8aff6a',transparent:true,opacity:.25,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));beam.position.y=13;g.add(beam);g.userData.chest=true}
-  else{const it=l.item,c=itemColor(it);let m;
-   if(it.k==='w'){m=makeWeaponModel(it.w,it.r);m.scale.setScalar(1.15);m.rotation.y=Math.PI/2;const bb=new THREE.Box3().setFromObject(m),ctr=bb.getCenter(new THREE.Vector3());m.position.sub(ctr)}
-   else if(it.k==='i'){const d=ITEMS[it.id];m=new THREE.Mesh(d.kind==='throw'?new THREE.SphereGeometry(.2,10,8):d.kind==='heal'||d.kind==='chug'?new THREE.BoxGeometry(.3,.3,.3):d.kind==='shield'?new THREE.CylinderGeometry(.14,.18,.4,10):d.kind==='grapple'?new THREE.TorusGeometry(.2,.06,6,10):new THREE.BoxGeometry(.5,.12,.5),mat(c,c))}
-   else{m=new THREE.Group();for(let i=0;i<3;i++){const b=new THREE.Mesh(new THREE.BoxGeometry(.16,.3,.16),mat(c,c));b.position.x=(i-1)*.2;m.add(b)}}
-   const inner=new THREE.Group();inner.add(m);inner.position.y=.7;g.add(inner);g.userData.spin=inner;
-   const beam=new THREE.Mesh(new THREE.CylinderGeometry(.22,.22,it.k==='w'?(3+it.r*1.6):2,8,1,true),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.14,depthWrite:false,fog:false,blending:THREE.AdditiveBlending}));beam.position.y=(it.k==='w'?(3+it.r*1.6):2)/2;g.add(beam);
-   const disc=new THREE.Mesh(new THREE.CircleGeometry(.55,16),new THREE.MeshBasicMaterial({color:c,transparent:true,opacity:.4,depthWrite:false}));disc.rotation.x=-Math.PI/2;disc.position.y=.04;g.add(disc)}
+
   g.position.set(l.x,l.y,l.z);return g},
  updateLootVis(dt){
   this.accum.lv=(this.accum.lv||0)+dt;const cam=this.camera.position;
   if(this.accum.lv>.25){this.accum.lv=0;const R2=(this.settings.dist==='Far'?85:this.settings.dist==='Medium'?65:45)**2;
    for(const l of this.loot.values()){const dx=l.x-cam.x,dz=l.z-cam.z;const near=dx*dx+dz*dz<R2||(l.chest&&dx*dx+dz*dz<(l.supply?40000:3600));
     if(near&&!l.mesh){l.mesh=this.makeLootMesh(l);this.dynamic.add(l.mesh)}else if(!near&&l.mesh){this.dynamic.remove(l.mesh);l.mesh=null}}}
-  for(const l of this.loot.values()){const m=l.mesh;if(!m)continue;const sp=m.userData.spin;if(sp){sp.rotation.y+=dt*1.6;sp.position.y=.75+Math.sin(this.t*2+l.id)*.1}}
+  for(const l of this.loot.values()){if(l.mesh&&l.mesh.userData.float)animLootMesh(l.mesh,dt,this.t)}
   // supply drop visuals
   for(const s of this.supplies){const k=clamp((this.t-s.t0)/9,0,1);
    if(!s.mesh&&k<1){const g=new THREE.Group();const c=new THREE.Mesh(new THREE.BoxGeometry(2,1.4,2),mat('#ff3d3d'));g.add(c);const p=new THREE.Mesh(new THREE.SphereGeometry(3.2,14,8,0,6.283,0,1.6),new THREE.MeshLambertMaterial({color:'#ffd23d',side:THREE.DoubleSide}));p.position.y=4.2;g.add(p);for(const[sx,sz]of[[1,1],[-1,1],[1,-1],[-1,-1]]){const r=new THREE.Mesh(new THREE.CylinderGeometry(.03,.03,4.4,4),mat('#fff'));r.position.set(sx*1.4,2.2,sz*1.4);r.rotation.z=-sx*.35;r.rotation.x=sz*.35;g.add(r)}
