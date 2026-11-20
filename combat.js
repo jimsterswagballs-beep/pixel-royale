@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,clamp,lerp} from './data.js';
+import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,BAL,clamp,lerp} from './data.js';
+import {makeFoodMesh} from './abilities.js';
 import * as W from './world.js';
 import {R,HSTAND,HCROUCH,EYE,wstat} from './shared.js';
 import {PHASES} from './game.js';
@@ -10,8 +11,8 @@ function rayCyl(ox,oy,oz,dx,dy,dz,cx,cy,cz,r,h,maxT){
  else{const b=2*(fx*dx+fz*dz),c=fx*fx+fz*fz-r*r;const disc=b*b-4*a*c;if(disc<0)return Infinity;const s=Math.sqrt(disc);t=(-b-s)/(2*a);if(t<0){if(c<=0)t=0;else return Infinity}}
  if(t>maxT)return Infinity;const y=oy+dy*t;if(y<cy||y>cy+h)return Infinity;return t}
 export const combatMethods={
- packFlags(e){return (e.crouch?1:0)|(e.sliding?2:0)|(e.sprinting?4:0)|(e.grounded?8:0)|(e.drop==='free'?16:0)|(e.drop==='glide'?32:0)|(e.drop==='bus'?64:0)|(e.use||e.eatT>0?128:0)|(e.stun>0?256:0)|(e.auraT>0?512:0)|((e.buffT>0||e.ts>0)?1024:0)|(e.dance>0?2048:0)|(e.slip>0?8192:0)|(e.swim?16384:0)},
- unpackFlags(e,f){e.flags=f;e.crouch=!!(f&1);e.sliding=!!(f&2);e.sprinting=!!(f&4);e.grounded=!!(f&8);e.drop=(f&16)?'free':(f&32)?'glide':(f&64)?'bus':null;e.eatT=(f&128)?1:0;e.stun=(f&256)?1:0;e.auraT=(f&512)?1:0;e.buffT=(f&1024)?1:0;e.dance=(f&2048)?1:0;e.slip=(f&8192)?1:0;e.swim=!!(f&16384)},
+ packFlags(e){return (e.crouch?1:0)|(e.sliding?2:0)|(e.sprinting?4:0)|(e.grounded?8:0)|(e.drop==='free'?16:0)|(e.drop==='glide'?32:0)|(e.drop==='bus'?64:0)|(e.use||e.eatT>0?128:0)|(e.stun>0?256:0)|(e.auraT>0?512:0)|((e.buffT>0||e.ts>0)?1024:0)|(e.dance>0?2048:0)|(e.slip>0?8192:0)|(e.swim?16384:0)|(e.cloakT>0?4096:0)|(e.coldT>0?32768:0)|(e.slowT>0?65536:0)|(e.cookT>0?131072:0)},
+ unpackFlags(e,f){e.flags=f;e.crouch=!!(f&1);e.sliding=!!(f&2);e.sprinting=!!(f&4);e.grounded=!!(f&8);e.drop=(f&16)?'free':(f&32)?'glide':(f&64)?'bus':null;e.eatT=(f&128)?1:0;e.stun=(f&256)?1:0;e.auraT=(f&512)?1:0;e.buffT=(f&1024)?1:0;e.dance=(f&2048)?1:0;e.slip=(f&8192)?1:0;e.swim=!!(f&16384);e.cloakT=(f&4096)?1:0;e.coldT=(f&32768)?1:0;e.slowT=(f&65536)?1:0;e.cookT=(f&131072)?1:0},
  eyeOf(e){return e.pos.y+(e.sliding?.85:e.crouch?1.1:1.65)},
  curWeapon(e){const c=e.inv[e.cur];return c&&c.k==='w'?wstat(c.w,c.r):null},
  hbH(e){return (e.crouch||e.sliding)?HCROUCH:HSTAND},
@@ -19,7 +20,7 @@ export const combatMethods={
  tickWeapon(e,c,dt){
   const slot=e.inv[e.cur];const v=this.view;
   e.fireCd=Math.max(0,e.fireCd-dt);e.equipT=Math.max(0,e.equipT-dt);e.bloom=Math.max(0,e.bloom-dt*.05);
-  if(e.drop||!e.alive||e.stun>0||e.slip>0||e.dance>0||e.eatT>0){e.aiming=false;if(e.use&&(e.slip>0||e.dance>0||e.stun>0))e.use=null;if(e.local)v.reloadK=0;return}
+  if(e.drop||!e.alive||e.stun>0||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0){e.aiming=false;if(e.use&&(e.slip>0||e.dance>0||e.stun>0))e.use=null;if(e.local)v.reloadK=0;return}
   // using item
   if(e.use){e.use.t-=dt;if(e.local)this.hud.useBar&&this.hud.useBar(e.use);
    if(c.cancel||e.inv[e.cur]!==e.use.slot){e.use=null}
@@ -58,7 +59,7 @@ export const combatMethods={
    v.recoilP+=wd.rc*.0085*(e.aiming?.62:1)*(e.shotIdx<4?1.1:.9);v.recoilY+=ph*wd.rc*.0042*(e.aiming?.6:1);v.kick=Math.min(1,v.kick+wd.rc*.04);v.recoilKick=Math.min(1.6,(v.recoilKick||0)+wd.rc*.35);v.flash=.05;v.shake=Math.min(.5,v.shake+wd.rc*.006);
    this.audio.play(wd.quiet?'quiet':wd.laser?'laser':wd.t==='ar'?'ar':wd.t==='smg'?'smg':wd.t==='sg'?'sg':wd.t==='sn'?'sn':wd.t==='pi'?'pi':wd.t==='ex'?'launch':'fun',null,wd.quiet?.7:1);
    if(slot.mag<=0&&this.settings&&e.ammo[wd.ammo]>0&&e.reload<=0){}}
-  e.shootT=.12;
+  e.shootT=.12;this.revealEnt(e);
   if(this.role==='client'&&e.local){this.net.toHost({t:'fire',o,d:dirs,w:e.wi});
    // local tracer prediction
    if(!wd.speed){const origin=new THREE.Vector3(o[0],o[1]-.15,o[2]);const dir=new THREE.Vector3(dirs[0],dirs[1],dirs[2]);const hit=W.rayWorld(o[0],o[1],o[2],dirs[0],dirs[1],dirs[2],wd.range);const t=hit?hit.t:wd.range;const col=wd.laser?'#ff3dff':'#ffe9a0';const n=Math.min(wd.pellets,6);for(let i=0;i<n;i++)this.fx.tracer(origin.clone().add(new THREE.Vector3(.2*Math.cos(e.yaw),0,-.2*Math.sin(e.yaw))),new THREE.Vector3(o[0]+dirs[i*3]*t,o[1]+dirs[i*3+1]*t,o[2]+dirs[i*3+2]*t),col)}
@@ -69,7 +70,7 @@ export const combatMethods={
   const ox=o[0],oy=o[1],oz=o[2];
   if(wd.speed){ // projectile weapon
    const dx=dirs[0],dy=dirs[1],dz=dirs[2];
-   this.spawnProj(sh,ox+dx*.6,oy-.12+dy*.6,oz+dz*.6,dx*wd.speed,dy*wd.speed,dz*wd.speed,wd,wi);
+   const cm=this.dmgMulOf(sh);this.spawnProj(sh,ox+dx*.6,oy-.12+dy*.6,oz+dz*.6,dx*wd.speed,dy*wd.speed,dz*wd.speed,cm===1?wd:Object.assign({},wd,{dmg:wd.dmg*cm}),wi);
    this.emit({k:'sh',i:sh.id,w:wi>=0?Math.floor(wi/10):-1,o:[ox,oy-.1,oz]});return}
   const ends=[],imps=[];const n=wd.pellets;let didHit=new Set();
   for(let p=0;p<n;p++){
@@ -78,11 +79,12 @@ export const combatMethods={
    let bestT=maxT,bestE=null,head=false;
    for(const t of this.list){if(t===sh||!t.alive||t.drop==='bus')continue;const h=this.hbH(t);
     const tt=rayCyl(ox,oy,oz,dx,dy,dz,t.pos.x,t.pos.y,t.pos.z,.46,h,bestT);if(tt<bestT){bestT=tt;bestE=t;const hy=oy+dy*tt;head=hy>t.pos.y+h-.5}}
+   if(!bestE&&wh)this.onWorldHit(sh,wh,wd,ox+dx*bestT,oy+dy*bestT,oz+dz*bestT);
    const ex=ox+dx*bestT,ey=oy+dy*bestT,ez=oz+dz*bestT;if(p<8)ends.push([ex,ey,ez]);
    if(bestE){
     let dmg=wd.dmg*(wd.pellets>1?1:1);const fall=wd.pellets>1||wd.t==='smg'?clamp(1.25-bestT/wd.range,.35,1):1;dmg*=fall;if(head)dmg*=wd.head;
     const acc=didHit.has(bestE)?didHit.get?0:0:0;
-    this.damage(bestE,dmg*sh.dmgMul||dmg,sh,wi,head,[ex,ey,ez],wd.pellets>1);
+    this.damage(bestE,dmg*this.dmgMulOf(sh),sh,wi,head,[ex,ey,ez],wd.pellets>1);
     if(wd.kb){this.emit({k:'st',i:bestE.id,s:'kb',vx:dx*wd.kb,vy:wd.kb*.3,vz:dz*wd.kb},bestE.id)}
     if(wd.sp2==='confetti'&&Math.random()<.35)this.emit({k:'st',i:bestE.id,s:'dance',t:1.2},bestE.id);
     didHit.add(bestE)}
@@ -91,13 +93,13 @@ export const combatMethods={
   this.emit({k:'sh',i:sh.id,w:wi>=0?Math.floor(wi/10):-1,o:[ox,oy-.12,oz],e:ends,im:imps});
  },
  doSwing(e,wd){
-  const slot=e.inv[e.cur];if(e.local)this.view.kick=.6,this.view.recoilKick=1.2;e.shootT=.15;
+  const slot=e.inv[e.cur];if(e.local)this.view.kick=.6,this.view.recoilKick=1.2;e.shootT=.15;this.revealEnt(e);
   if(this.role==='client'&&e.local){this.net.toHost({t:'melee',w:e.wi,y:e.yaw,p:e.pitch,o:[e.pos.x,this.eyeOf(e),e.pos.z]});this.audio.play('melee');return}
   this.hostMelee(e,wd,e.yaw,e.pitch,e.pos.x,this.eyeOf(e),e.pos.z,e.wi)},
  hostMelee(e,wd,yaw,pitch,x,y,z,wi){
   const fx=-Math.sin(yaw),fz=-Math.cos(yaw);let hit=false;
   for(const t of this.list){if(t===e||!t.alive||t.drop==='bus')continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d>wd.range+.5)continue;if(d>.6&&(dx*fx+dz*fz)/d<.45)continue;if(Math.abs(t.pos.y+.9-y)>2)continue;
-   this.damage(t,wd.dmg,e,wi,false,[t.pos.x,t.pos.y+1.2,t.pos.z]);hit=true;
+   this.damage(t,wd.dmg*this.dmgMulOf(e),e,wi,false,[t.pos.x,t.pos.y+1.2,t.pos.z]);hit=true;
    this.emit({k:'st',i:t.id,s:'kb',vx:fx*wd.kb,vy:2,vz:fz*wd.kb},t.id);}
   this.emit({k:'snd',n:'melee',p:[x,y,z]})},
  // ================= items
@@ -108,7 +110,7 @@ export const combatMethods={
    if(it.kind==='heal'&&e.hp>=it.cap){if(e.local)this.hud.toast('Cannot heal above '+it.cap+' with this');return}
    if(it.kind==='shield'&&e.sh>=it.cap){if(e.local)this.hud.toast('Shield is full');return}
    if(it.kind==='chug'&&e.hp>=e.maxHp&&e.sh>=100){return}
-   e.use={t:it.time,dur:it.time,slot,id:slot.id};e.sliding=false;return}
+   const tm=it.time*(e.cdef.id==='jay'?BAL.jay.passive.useTimeMul:1);e.use={t:tm,dur:tm,slot,id:slot.id};e.sliding=false;return}
   if(it.kind==='grapple'){
    const o=[e.pos.x,this.eyeOf(e),e.pos.z];const cp=Math.cos(e.pitch+(e.local?this.view.recoilP:0));const d=[-Math.sin(e.yaw)*cp,Math.sin(e.pitch),-Math.cos(e.yaw)*cp];
    const h=W.rayWorld(o[0],o[1],o[2],d[0],d[1],d[2],70);
@@ -123,7 +125,7 @@ export const combatMethods={
    if(this.role==='client'&&e.local)this.net.toHost({t:'trap',id:slot.id,x,y,z});else this.placeTrap(e,slot.id,x,y,z);return}
   if(it.kind==='throw'){
    const cp=Math.cos(e.pitch+.15);const dx=-Math.sin(e.yaw)*cp,dy=Math.sin(e.pitch+.15),dz=-Math.cos(e.yaw)*cp;const o=[e.pos.x,this.eyeOf(e),e.pos.z];
-   this.consume(e,slot);e.fireCd=.6;e.shootT=.15;
+   this.consume(e,slot);e.fireCd=.6;e.shootT=.15;this.revealEnt(e);
    if(this.role==='client'&&e.local)this.net.toHost({t:'throw',id:slot.id,o,d:[dx,dy,dz]});else this.throwItem(e,slot.id,o,[dx,dy,dz]);return}
  },
  consume(e,slot){slot.n--;if(slot.n<=0){const i=e.inv.indexOf(slot);if(i>0)e.inv[i]=null;if(e.cur===i){e.cur=this.firstWeaponSlot(e);e.equipT=.3;if(e.local)this.view.equipK=0}}},
@@ -131,7 +133,7 @@ export const combatMethods={
   const slot=e.use.slot,it=ITEMS[slot.id];
   this.consume(e,slot);
   let hp=0,sh=0;
-  if(it.kind==='heal'){hp=Math.min(it.hp,it.cap-e.hp)}
+  if(it.kind==='heal'){hp=Math.min(it.hp*this.foodHealMul(e),it.cap-e.hp)}
   else if(it.kind==='shield'){sh=Math.min(it.sh,it.cap-e.sh)}
   else if(it.kind==='chug'){hp=e.maxHp-e.hp;sh=100-e.sh}
   hp=Math.max(0,hp);sh=Math.max(0,sh);
@@ -152,6 +154,7 @@ export const combatMethods={
   let rem=amount,shHit=0;
   if(t.ts>0){const a=Math.min(t.ts,rem);t.ts-=a;rem-=a;shHit=1}
   if(rem>0&&t.sh>0){const a=Math.min(t.sh,rem);t.sh-=a;rem-=a;shHit=1}
+  if(t.cloakT>0&&by&&by!==t)this.revealHost(t);
   t.hp-=rem;t.lastHit=this.t;t.lastBy=by?by.id:-1;if(t.bot)this.onBotHit&&this.onBotHit(t,by);
   const p=pos||[t.pos.x,t.pos.y+1,t.pos.z];
   this.emit({k:'hit',t:t.id,by:by?by.id:-1,d:Math.round(amount),h:head?1:0,sh:shHit,hp:rem>0?1:0,x:p[0],y:p[1],z:p[2]});
@@ -173,8 +176,9 @@ export const combatMethods={
  },
  // ================= abilities
  useAbility(e,i){
-  if(!e.alive||e.drop||e.cd[i]>0||e.stun>0||e.slip>0||e.dance>0||e.eatT>0||e.use)return false;
+  if(!e.alive||e.drop||e.cd[i]>0||e.stun>0||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0||e.use)return false;
   const ab=e.cdef.ab[i];const z=e.cdef.id==='zach';
+  if(e.cdef.hero)return this.useHeroAbility(e,i,ab);
   const net=this.role==='client'&&e.local;
   e.cd[i]=ab.cd;e.sliding=false;
   if(!z){
@@ -193,8 +197,8 @@ export const combatMethods={
   return true},
  findBiteTarget(e,r){const fx=-Math.sin(e.yaw),fz=-Math.cos(e.yaw);let best=null,bd=r;for(const t of this.list){if(t===e||!t.alive||t.drop)continue;const dx=t.pos.x-e.pos.x,dz=t.pos.z-e.pos.z,d=Math.hypot(dx,dz);if(d<bd&&Math.abs(t.pos.y-e.pos.y)<2.2&&(d<.8||(dx*fx+dz*fz)/d>.4)){bd=d;best=t}}return best},
  // host-side authoritative effects
- abilityEffect(e,i,x,y,z,yaw){
-  const cid=e.cdef.id;
+ abilityEffect(e,i,x,y,z,yaw,extra){
+  const cid=e.cdef.id;if(e.cdef.hero){this.heroEffect(e,i,x,y,z,yaw,extra);return}
   if(cid==='coolguy15'&&i===2){
    const bx=x,bz=z;this.emit({k:'burst',x:bx,y,z:bz});
    for(const t of this.list){if(t===e||!t.alive||t.drop==='bus')continue;const dx=t.pos.x-bx,dz=t.pos.z-bz,d=Math.hypot(dx,dz);if(d<4.5&&Math.abs(t.pos.y-y)<3){this.damage(t,14,e,-2,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*16,vy:5,vz:dz/l*16},t.id)}}}
@@ -217,13 +221,14 @@ export const combatMethods={
   for(let i=0;i<16;i++){const a=i/16*6.2832;this.spawnProj(e,x,y+.9,z,Math.cos(a)*22,0,Math.sin(a)*22,wd,-3)}},
  // timers on abilities run for every shooter (host side) – eat heal / bite resolution
  abilityTick(e,dt){
+  this.heroTick(e,dt);
   if(e.eatHeal&&e.eatT<=0){e.eatHeal=false;const h=e.maxHp*.2;this.healEnt(e,Math.min(h,e.maxHp-e.hp),0);this.fx.burst(e.pos.x,e.pos.y+1.2,e.pos.z,20,3,'#6cff8a',.8,-3);if(e.local)this.hud.toast('+'+Math.round(h)+' HP','#8cff9a')}
   if(e.biteTarget!==undefined&&e.biteTarget!==null&&this.t>=e.biteAt&&this.role!=='client'){const t=this.ents.get(e.biteTarget);e.biteTarget=null;if(t&&t.alive){this.damage(t,t.maxHp*.2,e,-4,false);this.emit({k:'bite',t:t.id})}}},
  // ================= projectiles
  spawnProj(owner,x,y,z,vx,vy,vz,wd,wi){
   const id=this.nextProjId++;
   const p={id,owner:owner.id,x,y,z,vx,vy,vz,dmg:wd.dmg,splash:wd.splash||0,grav:wd.grav||0,bounce:wd.bounce||0,fuse:wd.fuse||0,kb:wd.kb||0,sp2:wd.sp2||'',wi,life:wd.life||6,shard:!!wd.shard,
-   direct:!wd.fuse||wd.sp2==='ball',stick:wd.n==='Sticky Bomb Launcher'?1:0,age:0,kind:wd.kind||'',col:wd.col,stuck:null,sx:0,sy:0,sz:0,ex:wd.n&&wd.n.includes('Rocket')};
+   direct:!wd.fuse||wd.sp2==='ball',stick:wd.n==='Sticky Bomb Launcher'?1:0,age:0,kind:wd.kind||'',col:wd.col,stuck:null,sx:0,sy:0,sz:0,ex:wd.n&&wd.n.includes('Rocket'),food:wd.food||'',team:owner.team};
   if(wd.n==='Grenade Launcher'||wd.n==='Sticky Bomb Launcher')p.direct=false;
   if(wd.n==='Potato Cannon'){p.splash=0}
   this.projs.push(p);
@@ -240,7 +245,7 @@ export const combatMethods={
      const dx=nx-p.x,dy=ny-p.y,dz=nz-p.z,dl=Math.hypot(dx,dy,dz)||1e-6;const ux=dx/dl,uy=dy/dl,uz=dz/dl;
      const wh=W.rayWorld(p.x,p.y,p.z,ux,uy,uz,dl);
      let bestT=wh?wh.t:Infinity,bestE=null;
-     for(const t of this.list){if(!t.alive||t.drop==='bus')continue;if(t.id===p.owner&&p.age<.25)continue;if(t.id===p.owner&&!p.shard&&p.direct&&p.age<.5)continue;if(p.shard&&t.id===p.owner)continue;
+     for(const t of this.list){if(!t.alive||t.drop==='bus')continue;if(p.food&&(t.id===p.owner||(p.food!=='burger'&&t.team===p.team)))continue;if(t.id===p.owner&&p.age<.25)continue;if(t.id===p.owner&&!p.shard&&p.direct&&p.age<.5)continue;if(p.shard&&t.id===p.owner)continue;
       const tt=rayCyl(p.x,p.y,p.z,ux,uy,uz,t.pos.x,t.pos.y,t.pos.z,.55,this.hbH(t)+.1,Math.min(dl,bestT));if(tt<bestT){bestT=tt;bestE=t}}
      if(bestE&&(p.direct||p.stick||p.shard)){
       const hx=p.x+ux*bestT,hy=p.y+uy*bestT,hz=p.z+uz*bestT;p.x=hx;p.y=hy;p.z=hz;
@@ -267,16 +272,19 @@ export const combatMethods={
   if(o.circ===false){const d=[Math.abs(x-o.x0),Math.abs(x-o.x1),Math.abs(y-o.y0),Math.abs(y-o.y1),Math.abs(z-o.z0),Math.abs(z-o.z1)];let m=0;for(let i=1;i<6;i++)if(d[i]<d[m])m=i;return[[-1,0,0],[1,0,0],[0,-1,0],[0,1,0],[0,0,-1],[0,0,1]][m]}
   const dx=x-o.x,dz=z-o.z,l=Math.hypot(dx,dz)||1;return[dx/l,0,dz/l]},
  projHitEnt(p,t,ux,uz){
+  if(p.food){this.foodHit(p,t,ux,uz);return}
   const owner=this.ents.get(p.owner);
   if(p.shard){this.damage(t,p.dmg,owner,p.wi,false,[p.x,p.y,p.z]);this.emit({k:'st',i:t.id,s:'kb',vx:ux*p.kb,vy:3,vz:uz*p.kb},t.id);return}
   if(p.splash>0)this.projBoom(p,t);
   else{this.damage(t,p.dmg,owner,p.wi,false,[p.x,p.y,p.z]);this.emit({k:'st',i:t.id,s:'kb',vx:ux*(p.kb||3),vy:2,vz:uz*(p.kb||3)},t.id)}
   if(p.sp2==='potato')this.emit({k:'snd',n:'hit',p:[p.x,p.y,p.z]})},
  projBoom(p,direct){
+  if(p.food){this.foodLand(p,direct);return}
   const owner=this.ents.get(p.owner);
   if(p.splash<=0){return}
   const col=p.sp2==='banana'?'#ffe14a':p.sp2==='ball'?'#3cd0ff':p.sp2==='chicken'?'#fff08a':p.kind==='boogie'?'#ff55ff':'#ff9a3c';
   this.emit({k:'ex',x:p.x,y:p.y,z:p.z,r:p.splash,c:col});
+  this.structBlast(p.x,p.y,p.z,p.splash,p.dmg*1.5);
   for(const t of this.list){if(!t.alive||t.drop==='bus')continue;
    const dx=t.pos.x-p.x,dy=t.pos.y+.9-p.y,dz=t.pos.z-p.z,d=Math.hypot(dx,dy,dz);const rr=p.splash+.5;if(d>rr&&t!==direct)continue;
    if(t!==direct&&d>1.6&&!W.losClear(p.x,p.y+.2,p.z,t.pos.x,t.pos.y+.9,t.pos.z))continue;
@@ -309,19 +317,20 @@ export const combatMethods={
   const col=ev.c||'#fff';let m;
   if(ev.sh){m=new THREE.Mesh(new THREE.OctahedronGeometry(.25),new THREE.MeshBasicMaterial({color:'#8fdcff'}))}
   else if(ev.r){m=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,.7,8),new THREE.MeshLambertMaterial({color:'#ccc'}));b.rotation.x=Math.PI/2;m.add(b);const c=new THREE.Mesh(new THREE.ConeGeometry(.13,.3,8),new THREE.MeshLambertMaterial({color:'#e33'}));c.rotation.x=-Math.PI/2;c.position.z=-.5;m.add(c)}
+  else if(ev.s&&ev.s.startsWith('f_')){m=makeFoodMesh(ev.s)}
   else if(ev.s==='banana'){m=new THREE.Mesh(new THREE.TorusGeometry(.25,.09,6,10,3.5),new THREE.MeshLambertMaterial({color:'#ffe14a'}))}
   else if(ev.s==='chicken'){m=new THREE.Group();const b=new THREE.Mesh(new THREE.SphereGeometry(.3,10,8),new THREE.MeshLambertMaterial({color:'#fff08a'}));b.scale.z=1.4;m.add(b);const h=new THREE.Mesh(new THREE.SphereGeometry(.15,8,6),new THREE.MeshLambertMaterial({color:'#ff5a3a'}));h.position.set(0,.2,-.4);m.add(h)}
   else if(ev.s==='ball'){m=new THREE.Mesh(new THREE.SphereGeometry(.3,12,10),new THREE.MeshBasicMaterial({color:'#3cd0ff'}))}
   else if(ev.s==='potato'){m=new THREE.Mesh(new THREE.SphereGeometry(.2,8,6),new THREE.MeshLambertMaterial({color:'#b08a55'}));m.scale.z=1.3}
   else m=new THREE.Mesh(new THREE.SphereGeometry(.2,10,8),new THREE.MeshLambertMaterial({color:col}));
   m.position.set(ev.x,ev.y,ev.z);this.dynamic.add(m);
-  this.pvis.set(ev.id,{mesh:m,x:ev.x,y:ev.y,z:ev.z,vx:ev.vx,vy:ev.vy,vz:ev.vz,g:ev.g||0,rocket:!!ev.r,col,tr:0,shard:!!ev.sh});
+  this.pvis.set(ev.id,{mesh:m,x:ev.x,y:ev.y,z:ev.z,vx:ev.vx,vy:ev.vy,vz:ev.vz,g:ev.g||0,rocket:!!ev.r,col,tr:0,shard:!!ev.sh,tumble:!!(ev.s&&ev.s.startsWith('f_'))});
   if(ev.r)this.audio.play('launch',new THREE.Vector3(ev.x,ev.y,ev.z))},
  updateProjVis(dt){
   for(const p of this.pvis.values()){
    if(this.role==='client'){p.vy-=p.g*dt;p.x+=p.vx*dt;p.y+=p.vy*dt;p.z+=p.vz*dt}
    else{const sp=this.projs.find(q=>q.id===undefined)}
-   p.mesh.position.set(p.x,p.y,p.z);const sp=Math.hypot(p.vx,p.vy,p.vz);if(p.rocket||p.shard||sp>20){p.mesh.lookAt(p.x+p.vx,p.y+p.vy,p.z+p.vz)}else p.mesh.rotation.x+=dt*8;
+   p.mesh.position.set(p.x,p.y,p.z);const sp=Math.hypot(p.vx,p.vy,p.vz);if(p.tumble){p.mesh.rotation.x+=dt*9;p.mesh.rotation.z+=dt*6}else if(p.rocket||p.shard||sp>20){p.mesh.lookAt(p.x+p.vx,p.y+p.vy,p.z+p.vz)}else p.mesh.rotation.x+=dt*8;
    p.tr-=dt;if(p.tr<=0){p.tr=.03;this.fx.emit(p.x,p.y,p.z,(Math.random()-.5),(Math.random()-.5),(Math.random()-.5),p.rocket?'#ff9a3c':p.col,.35,0)}}
   if(this.role!=='client'){for(const q of this.projs){const p=this.pvis.get(q.id);if(p){p.x=q.x;p.y=q.y;p.z=q.z;p.vx=q.vx;p.vy=q.vy;p.vz=q.vz}}}
  },

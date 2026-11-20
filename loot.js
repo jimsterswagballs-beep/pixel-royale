@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {WEAPONS,ITEMS,RARITY,AMMO,clamp,lerp,mulberry32} from './data.js';
 import * as W from './world.js';
 import {wstat,makeWeaponModel,mat} from './shared.js';
+import {MATS,rollMatItem} from './materials.js';
 const NW=WEAPONS.length;
 const WEAPON_W=WEAPONS.map((w,i)=>i===0?0:(w.t==='ar'?10:w.t==='smg'?8:w.t==='sg'?8:w.t==='sn'?4:w.t==='pi'?7:w.t==='ex'?3.5:w.t==='melee'?1.5:5));
 function pick(rng,ws){let t=0;for(const w of ws)t+=w;let r=rng()*t;for(let i=0;i<ws.length;i++){r-=ws[i];if(r<=0)return i}return ws.length-1}
@@ -19,8 +20,8 @@ export function rollFloorItem(rng,q=1){
  if(k<.42){const types=Object.keys(AMMO);const t=types[pick(rng,[10,8,6,3,1.5])];return{k:'a',t,n:Math.ceil(AMMO[t].box*.7)}}
  const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana'];const ws=[9,8,3,1.5,.4,2.2,2,2.8,1.4,1.6];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
 export function rollWeapon(rng,q=1,min=0){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
-export function itemName(it){if(it.k==='w')return RARITY[it.r].n+' '+WEAPONS[it.w].n;if(it.k==='i')return ITEMS[it.id].n+(it.n>1?' x'+it.n:'');return AMMO[it.t].n+' Ammo x'+it.n}
-export function itemColor(it){if(it.k==='w')return RARITY[it.r].c;if(it.k==='i')return ITEMS[it.id].col;return AMMO[it.t].c}
+export function itemName(it){if(it.k==='m')return MATS[it.t].n+' x'+it.n;if(it.k==='w')return RARITY[it.r].n+' '+WEAPONS[it.w].n;if(it.k==='i')return ITEMS[it.id].n+(it.n>1?' x'+it.n:'');return AMMO[it.t].n+' Ammo x'+it.n}
+export function itemColor(it){if(it.k==='m')return MATS[it.t].c;if(it.k==='w')return RARITY[it.r].c;if(it.k==='i')return ITEMS[it.id].col;return AMMO[it.t].c}
 // ---- floor loot: compact, readable 3D miniatures with distinct silhouettes and animated rarity effects.
 let LOOT_GEO=null;
 function lootGeo(){return LOOT_GEO||(LOOT_GEO={
@@ -41,7 +42,9 @@ function part(g,geo,color,x,y,z,sx=1,sy=1,sz=1,rx=0,ry=0,rz=0,metal=0){
 function addCross(g,x,y,z,color='#fff'){
  part(g,new THREE.BoxGeometry(.13,.48,.1),color,x,y,z,.85,1,1);
  part(g,new THREE.BoxGeometry(.4,.13,.1),color,x,y+.02,z,.95,1,1)}
-function makeFloorItem(it){
+// One builder for every item model. The floor, the hand and anything else that shows an item call this,
+// so the item looks the same before and after pickup.
+export function makeFloorItem(it){
  const g=new THREE.Group(),c=itemColor(it);
  if(it.k==='w'){
   const m=makeWeaponModel(it.w,it.r);m.scale.setScalar(1.02);m.rotation.y=Math.PI/2;
@@ -50,6 +53,9 @@ function makeFloorItem(it){
   part(g,new THREE.BoxGeometry(1.35,.08,.18),'#263247',0,.08,0,1,1,1);
   part(g,new THREE.BoxGeometry(.12,.12,.2),c,-.48,.16,0);
   part(g,new THREE.BoxGeometry(.12,.12,.2),c,.48,.16,0);
+ }else if(it.k==='m'){
+  part(g,new THREE.BoxGeometry(.75,.32,.5),MATS[it.t].c,0,.16,0);
+  part(g,new THREE.BoxGeometry(.52,.2,.36),MATS[it.t].dark,.04,.42,0);
  }else if(it.k==='a'){
   const count=Math.min(5,Math.max(3,Math.ceil(it.n/18)));
   const cols={light:'#f5ce45',med:'#e6a14c',shells:'#e65b52',heavy:'#7cc8ef',rockets:'#9acb70'};
@@ -177,6 +183,7 @@ export const lootMethods={
   this.emit({k:'cho',id:l.id});const rng=Math.random;const items=[];
   if(l.supply){items.push(rollItem(rng,3,3));items.push(rollItem(rng,3,2));items.push({k:'i',id:'bigshield',n:2});items.push({k:'i',id:'medkit',n:2});items.push({k:'a',t:['med','light','heavy'][Math.floor(rng()*3)],n:60})}
   else{let w=rollItem(rng,1.6,1);while(w.k!=='w')w=rollItem(rng,1.6,1);items.push(w);items.push(rollItem(rng,1.4));items.push({k:'a',t:WEAPONS[w.w].ammo||'light',n:AMMO[WEAPONS[w.w].ammo||'light'].box});if(rng()<.6)items.push(rollItem(rng,1.2))}
+  if(rng()<.85)items.push(rollMatItem(rng,l.supply?1.6:1));
   items.forEach((it,i)=>{let x=l.x,z=l.z;const a0=i/items.length*6.283+Math.random()*.5;
    for(let k=0;k<10;k++){const a=a0+k*.7,r=1.5+(k>>2)*.5;const px=l.x+Math.cos(a)*r,pz=l.z+Math.sin(a)*r;if(W.H(px,pz)<2&&l.y>2.5)continue;if(!W.blocked(px,l.y+.1,pz,.3,1,.05)&&Math.abs(W.groundAt(px,pz,l.y+.5,.3,.6)-l.y)<1.2){x=px;z=pz;break}}
    this.spawnLoot(it,x,z,W.groundAt(x,z,l.y+.5,.3,.6)+.1)});
@@ -185,8 +192,8 @@ export const lootMethods={
  // ---- picking up
  updateNearLoot(me){
   let best=null,bd=3.4;const fx=-Math.sin(me.yaw),fz=-Math.cos(me.yaw);
-  for(const l of this.loot.values()){const dx=l.x-me.pos.x,dz=l.z-me.pos.z;if(dx*dx+dz*dz>bd*bd||Math.abs(l.y-me.pos.y)>3)continue;const d=Math.hypot(dx,dz);if(l.item&&l.item.k==='a')continue;
-   const dot=d<.01?1:(dx*fx+dz*fz)/d;const score=d-dot*1.2;if(dot>-.2&&score<bd){bd=score;best=l}}
+  for(const l of this.loot.values()){const dx=l.x-me.pos.x,dz=l.z-me.pos.z,lim=bd*this.lootReach(me,l);if(dx*dx+dz*dz>lim*lim||Math.abs(l.y-me.pos.y)>3)continue;const d=Math.hypot(dx,dz);if(l.item&&l.item.k==='a')continue;
+   const dot=d<.01?1:(dx*fx+dz*fz)/d;const score=d/this.lootReach(me,l)-dot*1.2;if(dot>-.2&&score<bd){bd=score;best=l}}
   this.near=best;this.hud.setPrompt(best?this.lootLabel(best):null,best)},
  lootLabel(l){if(l.chest)return l.supply?'Open Supply Drop':'Open Chest';if(l.ammobox)return 'Open Ammo Box';return itemName(l.item)},
  pickupLocal(me,l){
@@ -194,9 +201,10 @@ export const lootMethods={
   this.hostPick(me,l)},
  hostPick(e,l){
   if(!this.loot.has(l.id)||!e.alive||e.drop)return;
-  if(Math.hypot(l.x-e.pos.x,l.z-e.pos.z)>4.8||Math.abs(l.y-e.pos.y)>4)return;
+  if(Math.hypot(l.x-e.pos.x,l.z-e.pos.z)>4.8*this.lootReach(e,l)||Math.abs(l.y-e.pos.y)>4)return;
   if(l.chest){this.openChest(l);return}
   if(l.ammobox){this.openAmmoBox(l);return}
+  if(l.item&&l.item.k==='m'){this.removeLoot(l.id);this.emit({k:'lt-',id:l.id});this.structAddMats(e,l.item.t,l.item.n);return}
   this.removeLoot(l.id);this.emit({k:'lt-',id:l.id});
   if(e.peer!==undefined&&!e.local)this.emit({k:'grant',g:l.item},e.id);else this.applyGrantLocal(e,l.item)},
  applyGrantLocal(e,it){

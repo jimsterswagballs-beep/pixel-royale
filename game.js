@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,mulberry32,clamp,lerp} from './data.js';
+import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,BAL,mulberry32,clamp,lerp} from './data.js';
+import {heroMethods,makeChefHat} from './abilities.js';
 import * as W from './world.js';
 import {FX} from './fx.js';
 import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,charTex,wstat,makeWeaponModel,mat,angDiff,lerpAng,crispMat,makeBusModel} from './shared.js';
@@ -8,6 +9,7 @@ import {combatMethods} from './combat.js';
 import {lootMethods} from './loot.js';
 import {botMethods} from './bots.js';
 import {netMethods} from './netsync.js';
+import {structMethods} from './structures.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 const SKY_V=`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
@@ -39,7 +41,7 @@ export class Game{
   this.fx=new FX(this.scene);this.fx.cam=this.camera;this.worldBuilt=false;this.running=false;this.dynamic=new THREE.Group();this.scene.add(this.dynamic);
   this.ents=new Map();this.list=[];this.loot=new Map();this.traps=new Map();this.projs=[];this.pvis=new Map();this.outEvents=[];this.tmpV=new THREE.Vector3();
   this.view={recoilP:0,recoilY:0,kick:0,shake:0,bobT:0,eye:EYE,roll:0,fov:92,adsK:0,equipK:1,reloadK:0,sway:0,flash:0,hitK:0,burgerT:0};
-  this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
+  this.vfxInit();this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
  }
  ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
  renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
@@ -51,9 +53,11 @@ export class Game{
   for(const l of this.loot.values())if(l.mesh)this.dynamic.remove(l.mesh);
   for(const t of this.traps.values())if(t.mesh)this.dynamic.remove(t.mesh);
   for(const p of this.pvis.values())this.dynamic.remove(p.mesh);
+  this.clearStructures();
   if(this.busMesh){this.dynamic.remove(this.busMesh);this.busMesh=null}
   if(this.stormMesh){this.dynamic.remove(this.stormMesh);this.stormMesh=null}
   if(this.vmModel){this.vmScene.remove(this.vmModel);this.vmModel=null}
+  this.vfxCleanup();
   this.ents.clear();this.list=[];this.loot.clear();this.traps.clear();this.projs=[];this.pvis.clear();this.outEvents=[];
  }
  start(cfg){
@@ -86,8 +90,10 @@ export class Game{
    inv:[{k:'w',w:0,r:0,mag:0},null,null,null,null,null],cur:0,ammo:{light:0,med:0,shells:0,heavy:0,rockets:0},
    fireCd:0,reload:0,equipT:0,use:null,stun:0,slip:0,dance:0,dazed:0,eatT:0,auraT:0,buffT:0,cd:[0,0,0],dash:null,grap:null,slamming:false,
    hitT:0,shootT:0,landT:0,walkT:0,lastHit:-99,lastBy:-1,padCd:0,airCap:0,wi:-1,bloom:0,deadT:0,spawnT:0,
+   cloakT:0,coldT:0,slowT:0,cookT:0,slowK:.4,coldUntil:0,noCloakUntil:0,slipImm:0,abNext:[0,0,0],anim:'',animT:0,animDur:0,foodBag:null,team:info.team!==undefined?info.team:info.id,
    tgt:{x:0,y:0,z:0,yaw:0,pitch:0},jumpHeld:false,prevFire:false,prevCrouch:false,prevJump:false};
   e.pos.copy(this.bus.pos);e.rpos.copy(e.pos);
+  if(c.id==='jay')e.foodBag=this.shuffledFoods();
   this.ents.set(e.id,e);this.list.push(e);this.makeSprite(e);
   if(e.bot)this.initBot(e,info);
   return e}
@@ -98,10 +104,11 @@ export class Game{
   const plane=new THREE.Mesh(geo,m);plane.position.y=.88;plane.layers.set(1);pivot.add(plane);
   const sh=new THREE.Mesh(new THREE.CircleGeometry(.7,16),new THREE.MeshBasicMaterial({color:0,transparent:true,opacity:.32,depthWrite:false}));sh.rotation.x=-Math.PI/2;sh.position.y=.05;g.add(sh);
   const wg=new THREE.Group();g.add(wg);
+  let hat=null;if(e.char==='jay'){hat=makeChefHat();hat.position.y=1.95;pivot.add(hat)}
   const aura=new THREE.Mesh(new THREE.SphereGeometry(1.25,16,12),new THREE.MeshBasicMaterial({color:'#6ec6ff',transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}));aura.position.y=1;aura.visible=false;g.add(aura);
   const cv=document.createElement('canvas');cv.width=256;cv.height=64;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
   const nmat=crispMat(tex);const name=new THREE.Mesh(new THREE.PlaneGeometry(1,1),nmat);name.scale.set(2.8,.7,1);name.position.y=2.45;name.layers.set(1);bb.add(name);
-  e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
+  e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,hat,cloakK:0,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
   this.dynamic.add(g);this.drawName(e,true)}
  drawName(e,force){
   const s=e.spr;const key=Math.round(e.hp/5)*1000+Math.round(e.sh/5)+(e.ts>0?7:0);if(!force&&key===s.hpKey)return;s.hpKey=key;
@@ -137,19 +144,37 @@ export class Game{
   if(e.drop==='free'){rz2+=view==='side'?.5*flip*-1:0;sy*=.92}
   if(e.shootT>0){e.shootT-=dt;sx*=1-.04*(e.shootT/.12)}
   if(e.punch>0){e.punch=Math.max(0,e.punch-dt*7);sx*=1+e.punch*.16;sy*=1-e.punch*.12;py+=e.punch*.06}
-  if(e.hitT>0){e.hitT-=dt;if(e.hitT>.09)s.mat.color.setRGB(2.2,2.2,2.2);else s.mat.color.setRGB(1.5,.45,.45)}else s.mat.color.setRGB(1,1,1);
+  if(e.hitT>0){e.hitT-=dt;if(e.hitT>.09)s.mat.color.setRGB(2.2,2.2,2.2);else s.mat.color.setRGB(1.5,.45,.45)}else if(e.slowT>0)s.mat.color.setRGB(.7,.9,1.35);else s.mat.color.setRGB(1,1,1);
+  if(e.char==='chillguy'){let gr=0,gg=0,gb=0;if(e.hitT>.09){gr=gg=gb=.7}else if(e.hitT>0){gr=.5}if(e.coldT>0){gg+=.12;gb+=.22}if(e.slowT>0){gg+=.1;gb+=.2}s.mat.glow.setRGB(gr,gg,gb)}
   if(!e.alive){e.deadT+=dt;const k=Math.min(1,e.deadT/.5);rz2=(flip>0?-1:1)*1.45*k;sy*=1-.2*k;s.mat.opacity=clamp(1.6-e.deadT,0,1);s.mat.transparent=true}
   else s.mat.opacity=1;
   if(this.over&&e.id===this.winnerId){const em=e.cos.emote||0;const t=this.t*(em===0?5:em===1?3:4);if(em===0){flip*=Math.cos(t)}else if(em===1){py=Math.abs(Math.sin(t*2))*1.1;rz2=Math.sin(t*2)*.15}else{rz2=(t*2)%6.283;py=.5+Math.sin(t)*.2}}
+  // ---- hero ability animations
+  if(e.animT>0){e.animT=Math.max(0,e.animT-dt);const k=1-e.animT/(e.animDur||.35);
+   if(e.anim==='pan'){if(k<.4){const w=k/.4;rz2+=-.35*w*flip;sy*=1+.06*w}else{const w=(k-.4)/.6;rz2+=lerp(.35,0,w)*flip;sx*=1+.25*(1-w)}}
+   else if(e.anim==='food'){if(k<.3){sy*=1-.2*(k/.3)}else{const w=(k-.3)/.7,sn=Math.sin(w*Math.PI);py+=sn*.35;sy*=1+.15*sn;rz2+=Math.sin(w*18)*.22*(1-w)}}
+   else if(e.anim==='strike'){sx*=1.4;sy*=.82;rz2+=-.45*flip}}
+  if(e.cookT>0){py+=Math.abs(Math.sin(this.t*26))*.12;rz2+=Math.sin(this.t*13)*.1;sx*=1+Math.sin(this.t*26)*.03}
+  if(s.hat)s.hat.visible=e.cookT>0;
+  // ---- cloak (Chill Guy): others see nothing but a faint shimmer when close; a spectated Chill Guy is shown as a ghost
+  {const cl=e.cloakT>0;if(s.wasCl===undefined)s.wasCl=cl;
+   if(cl!==s.wasCl){s.wasCl=cl;if(!cl){this.fx.ring(P,2.2,'#9be0ff',.3);this.fx.burst(P.x,P.y+1,P.z,18,4,'#bff4ff',.5,-1)}}
+   s.cloakK=lerp(s.cloakK||0,cl?1:0,1-Math.exp(-12*dt));
+   if(s.cloakK>.01&&e.alive){const near=clamp((BAL.chill.disappear.shimmerRange-dl)/BAL.chill.disappear.shimmerRange,0,1),base=e===camTarget?.4:0;s.mat.opacity=1-s.cloakK*(1-Math.max(base,near*.3*(.65+.35*Math.sin(this.t*11))))}
+   s.plane.visible=s.mat.opacity>.02;
+   if(dl<60&&e.alive){s.fxT=(s.fxT||0)-dt;if(s.fxT<=0){s.fxT=.07;const rr=Math.random;
+    if(e.coldT>0)this.fx.emit(P.x+(rr()-.5),P.y+.4+rr()*1.4,P.z+(rr()-.5),0,.8,0,'#bff4ff',.6,0,.2,-.5,.5);
+    if(e.slowT>0)this.fx.emit(P.x+(rr()-.5),P.y+.1+rr()*.6,P.z+(rr()-.5),0,.3,0,'#7fe0ff',.5,0,.18,-.5,.6);
+    if(e.cookT>0)this.fx.puff(P.x+(rr()-.5)*.6,P.y+1.9,P.z+(rr()-.5)*.6,0,1.2,0,'#ffffff',.8,.5,1.6,.5,0,.8)}}}
   s.pivot.position.y=bob+py;s.pivot.rotation.z=rz2+tilt;s.pivot.scale.set(sx*flip,sy,1);
   // aura / buffs
-  const aOn=(e.flags&512)||(e.flags&1024);s.aura.visible=!!aOn&&e.alive;if(aOn){s.aura.material.color.set((e.flags&512)?'#5ab8ff':'#ffd84a');s.aura.scale.setScalar(1+Math.sin(this.t*10)*.06)}
+  const aOn=(e.flags&512)||(e.flags&1024)||e.coldT>0;s.aura.visible=!!aOn&&e.alive&&!(s.cloakK>.5);if(aOn){s.aura.material.color.set(e.coldT>0?'#7fe0ff':(e.flags&512)?'#5ab8ff':'#ffd84a');s.aura.scale.setScalar(1+Math.sin(this.t*10)*.06)}
   // weapon
   const wi=e.wi;if(wi!==s.wKey){s.wKey=wi;if(s.wModel)s.wg.remove(s.wModel);s.wModel=null;if(wi>=0){const w=Math.floor(wi/10),r=wi%10;s.wModel=makeWeaponModel(w,r);s.wModel.scale.setScalar(.85);s.wModel.position.set(.36,.0,-.12);s.wg.add(s.wModel)}}
-  s.wg.visible=e.alive&&e.drop!=='free';s.wg.position.set(0,1.1+(e.crouch?-.3:0)+(e.sliding?-.35:0),0);s.wg.rotation.set(e.pitch,e.yaw,0,'YXZ');
-  const nd=Math.hypot(dx,dz);s.name.visible=e.alive&&nd<48&&e!==camTarget;if(s.name.visible)this.drawName(e)
+  s.wg.visible=e.alive&&e.drop!=='free'&&!(s.cloakK>.5&&e!==camTarget);s.wg.position.set(0,1.1+(e.crouch?-.3:0)+(e.sliding?-.35:0),0);s.wg.rotation.set(e.pitch,e.yaw,0,'YXZ');
+  const nd=Math.hypot(dx,dz);s.name.visible=e.alive&&nd<48&&e!==camTarget&&!(s.cloakK>.3);if(s.name.visible)this.drawName(e)
   const ss=clamp(1.1+nd*.012,1,2.2);s.name.scale.set(2.8*ss,.7*ss,1);
-  s.shadow.visible=e.grounded||!!e.drop===false;
+  s.shadow.visible=(e.grounded||!!e.drop===false)&&!(s.cloakK>.5);
   s.shadow.position.y=W.H(P.x,P.z)-P.y+.06;
  }
  viewEnt(){const me=this.me;if(me&&me.alive)return me;let t=this.ents.get(this.spectateId);if(!t||!t.alive){t=this.list.find(e=>e.alive&&e!==me);if(t)this.spectateId=t.id}return t||me}
@@ -200,9 +225,17 @@ export class Game{
    case'bite':{const t=this.ents.get(ev.t);if(t){fx.burst(t.pos.x,t.pos.y+1.2,t.pos.z,25,6,'#ff4a4a',.5,8);au.play('bite',t.pos)}break}
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
+   case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':this.onBuildEvent(ev);break;
    case'end':this.onEnd(ev);break;
    case'snd':au.play(ev.n,ev.p?new THREE.Vector3(...ev.p):null,ev.g||1);break;
    case'quip':break;
+   case'vfx':this.vfx(ev);break;
+   case'zn+':this.addZoneVis(ev);break;
+   case'zn-':this.removeZoneVis(ev.id);break;
+   case'pn+':this.addPanVis(ev);break;
+   case'pn~':this.turnPanVis(ev);break;
+   case'pn-':this.removePanVis(ev);break;
+   case'heal':this.healFx(ev);break;
   }
  }
  onMeDead(ev){
@@ -220,11 +253,12 @@ export class Game{
   this.updateBus(dt);if(this.decor)this.decor.update(this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateBots(dt);this.updateProjs(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.checkWin()}
+   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.checkWin()}
   else{this.updateClientSim(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
-  this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);
+  this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
   this.fx.update(dt);
+  this.structUpdateUI(dt);
   this.netTick(dt);
  }
  updateBus(dt){
@@ -293,4 +327,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,movementMethods,combatMethods,lootMethods,botMethods,netMethods);
+Object.assign(Game.prototype,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);

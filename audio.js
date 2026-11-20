@@ -50,6 +50,18 @@ export class Audio{
    case'slip':this.tone(900,.35,.5,'triangle',dest,200);break;
    case'grapple':this.tone(300,.2,.5,'sawtooth',dest,1200);break;
    case'pad':this.tone(200,.3,.6,'square',dest,1200);break;
+   case'cloak':this.noise(.6,4000,300,.35,'bandpass',dest);this.tone(700,.5,.25,'sine',dest,120);break;
+   case'cold':[1400,1850,2300].forEach((f,i)=>this.tone(f,.35,.25,'sine',dest,f*1.02,i*.06));this.noise(.3,6000,3000,.15,'highpass',dest);break;
+   case'strike':this.noise(.18,6000,800,.6,'bandpass',dest);this.tone(900,.15,.3,'sawtooth',dest,200);break;
+   case'stab':this.noise(.1,5000,1500,.7,'highpass',dest);this.tone(1500,.12,.5,'square',dest,500);this.tone(110,.15,.6,'sine',dest,50);break;
+   case'pan':case'whoosh':this.noise(.2,1800,500,.3,'bandpass',dest);break;
+   case'clang':this.tone(780,.25,.5,'triangle',dest,740);this.tone(1240,.3,.35,'square',dest,1180);this.noise(.05,6000,2000,.3,'highpass',dest);break;
+   case'catch':this.tone(500,.08,.4,'triangle',dest,800);this.noise(.05,3000,1000,.3,'bandpass',dest);break;
+   case'throw':this.tone(250,.25,.45,'triangle',dest,650);this.tone(400,.2,.3,'sine',dest,900,.06);break;
+   case'splat':this.noise(.18,1200,200,.7,'lowpass',dest);this.tone(160,.12,.4,'sine',dest,60);break;
+   case'chop':for(let i=0;i<4;i++){this.noise(.05,3500,800,.4,'bandpass',dest,i*.12);this.tone(300,.04,.2,'square',dest,null,i*.12)}break;
+   case'bell':this.tone(1320,.6,.4,'sine',dest);this.tone(1980,.5,.2,'sine',dest,null,.02);break;
+   case'heal':this.tone(660,.15,.3,'sine',dest,880);this.tone(990,.2,.3,'sine',dest,1320,.1);break;
   }
  }
  startMusic(){if(this.musicOn||!this.ctx)return;this.musicOn=true;const scale=[0,3,5,7,10,12,15,12,10,7,5,3];const bass=[0,0,5,7];

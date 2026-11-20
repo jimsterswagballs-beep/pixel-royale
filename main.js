@@ -6,6 +6,7 @@ import {Audio} from './audio.js';
 import {HUD} from './hud.js';
 import {Net,LocalNet} from './net.js';
 import {IMG} from './shared.js';
+import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
 import {makeBotRoster} from './botnames.js';
 const $=id=>document.getElementById(id);
@@ -88,16 +89,16 @@ class App{
    <div class="pm me"><img id="pmImg" alt=""><div><div class="pn" id="pmName"></div><div class="ps">Party Leader</div></div></div>
    <button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button><button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button><button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button>
   </div>
-  <div class="lb-stage"><div id="stage"><div class="pad"></div><div class="sh"></div><img id="stageImg" alt=""></div><div class="plate"><div id="stageName"></div><div class="sub" id="stageRole"></div></div></div>
-  <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>Loot &amp; Lobby Update</b><small>Rarer floor loot, new menus and more</small></button>
+  <div class="lb-stage"><div id="stage"><div class="cart" id="stageArt"></div><div class="pad"></div><div class="sh"></div><img id="stageImg" alt=""></div><div class="plate"><div id="stageName"></div><div class="sub" id="stageRole"></div></div></div>
+  <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
   <div class="lb-play"><button class="mode" id="modeCard" data-go="offline"><div class="mk">Game mode</div><div class="mt">Battle Royale</div><div class="ms" id="modeSub"></div><div class="mc">Change &rsaquo;</div></button><button class="btn play" id="playBtn">Play</button></div>
-  <div class="hint">WASD move · Shift sprint · C slide · Q/F/V abilities · E loot · M map</div><div class="ver">v1.2 · Lobby update</div>`;
+  <div class="hint">WASD move · Shift sprint · C slide · Q/F/V abilities · E loot · M map</div><div class="ver">v1.3 · Heroes update</div>`;
   for(const b of t.querySelectorAll('[data-go]'))b.onclick=()=>{this.sfx('ui');this.go(b.dataset.go)};
   $('playBtn').onclick=()=>{this.sfx('ui');this.startOffline()};
   setInterval(()=>{if(this.screen==='title')this.updateStage()},1400);
  }
  enter_title(){this.updateStage(true);const P=this.profile;$('modeSub').textContent=(P.bots>0?'Solo vs '+P.bots+' bots':'Free roam – no bots')+' · '+P.diff}
- updateStage(swap){const c=this.profile.char;const img=$('stageImg');img.src=IMG[c].front;const cd=CHARS.find(x=>x.id===c);
+ updateStage(swap){const c=this.profile.char;const img=$('stageImg');img.src=IMG[c].front;$('stageArt').style.backgroundImage=`url('${charArt(c)}')`;const cd=CHARS.find(x=>x.id===c);
   const nm=$('stageName');nm.textContent=this.profile.name;nm.style.color=this.profile.nameColor;$('stageRole').textContent=cd.name+' · '+cd.role;
   $('pmImg').src=IMG[c].front;$('pmName').textContent=this.profile.name;
   if(swap){const s=$('stage');s.classList.remove('swap');void s.offsetWidth;s.classList.add('swap')}}
@@ -107,9 +108,9 @@ class App{
   const d=h(`<div class="tile ${o.sel?'sel':''}" style="--rc:${o.rc}"><div class="tp">${o.pic}</div><div class="tn">${o.label}</div><div class="tick">&#10003;</div></div>`);
   d.onclick=()=>{o.fn();this.sfx('ui')};d.onmouseenter=()=>this.sfx('click');return d}
  charPicker(sel,onPick,compact){
-  const box=h(`<div class="tiles ${compact?'small':''}"></div>`);const rar={coolguy15:4,zach:3};
+  const box=h(`<div class="tiles ${compact?'small':''}"></div>`);const rar={coolguy15:4,zach:3,chillguy:3,jay:4};
   for(const c of CHARS){
-   const t=this.mkTile({rc:RARITY[rar[c.id]||3].c,pic:`<img src="${IMG[c.id].front}" alt="">`,label:c.name,sel:sel()===c.id,fn:()=>{onPick(c.id);for(const x of box.children)x.classList.remove('sel');t.classList.add('sel')}});
+   const t=this.mkTile({rc:RARITY[rar[c.id]||3].c,pic:`<div class="cart" style="background-image:url('${charArt(c.id)}')"></div><img src="${IMG[c.id].front}" alt="">`,label:c.name,sel:sel()===c.id,fn:()=>{onPick(c.id);for(const x of box.children)x.classList.remove('sel');t.classList.add('sel')}});
    box.appendChild(t)}
   return box}
  buildOffline(){
@@ -128,15 +129,15 @@ class App{
  enter_offline(){$('offName').value=this.profile.name;$('offBots').value=this.profile.bots;$('botN').textContent=this.profile.bots;this.refreshChips($('offDiff'),this.profile.diff);$('offArt').src=IMG[this.profile.char].front}
  buildLocker(){
   const p=$('locker');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Locker</h2><div id="lkBack"></div></div>
-  <div class="lk-body"><div class="lk-prev"><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div></div>
+  <div class="lk-body"><div class="lk-prev"><div class="cart" id="lkArt"></div><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div></div>
   <div class="lk-side"><div class="lk-cats" id="lkCats"></div><div id="lkGrid"></div><div class="tip">Cosmetics are saved on this device and visible to other players in multiplayer.</div></div></div></div>`;
   $('lkBack').appendChild(this.back());this.lkTab=this.lkTab||'Outfit';
   for(const c of ['Outfit','Name Color','Sprint Trail','Emote']){const b=h(`<button class="cat">${c}</button>`);b.onclick=()=>{this.lkTab=c;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
  }
  enter_locker(){
   const P=this.profile,g=$('lkGrid');for(const b of $('lkCats').children)b.classList.toggle('on',b.textContent===this.lkTab);
-  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[P.char].front;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;$('lkRole').textContent=cd.name+' · '+cd.role;
-  $('lkInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div>`+cd.ab.map(a=>`<div class="abl"><b>${a.n}</b> <small>(${a.cd}s)</small><br>${a.d}</div>`).join('');
+  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[P.char].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;$('lkRole').textContent=cd.name+' · '+cd.role;
+  $('lkInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div>`+(cd.passive?`<div class="abl pass"><img src="${ICON[cd.passive.ic]}" alt=""><div><b>${cd.passive.n}</b> <small>(passive)</small><br>${cd.passive.d}</div></div>`:'')+cd.ab.map(a=>`<div class="abl">${a.ic?`<img src="${abilityIcon(a)}" alt="">`:''}<div><b>${a.n}</b> <small>(${a.cd}s cooldown)</small><br>${a.d}</div></div>`).join('');
   g.innerHTML='';const tab=this.lkTab;
   const NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];const rc=i=>RARITY[Math.min(5,i%6)].c;
   const set=(k,v)=>{P[k]=v;this.saveProfile();this.enter_locker()};
@@ -150,6 +151,12 @@ class App{
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
+    <section class="update-entry"><div class="date">NOVEMBER 21, 2026 · VERSION 1.3</div><h3>Heroes Update: Chill Guy &amp; Jay</h3><ul>
+     <li><b>Chill Guy</b> (75 HP, stealth glass cannon): Disappear, Cold Blooded, Sneaky Strike and the Quiet Steps passive.</li>
+     <li><b>Jay</b> (110 HP, chef support): Pan Boomerang, Food Fight (burger, pizza, chilli, banana), Kitchen Special and the Chef's Touch passive.</li>
+     <li>Every ability has its own cooldown, animation, sound, particles and icon. All abilities work offline, online and for bots.</li>
+     <li>New character select artwork in the Locker and lobby. Online party members count as teammates for Jay's healing.</li>
+    </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 20, 2026 · VERSION 1.2</div><h3>Loot &amp; Lobby Update</h3><ul>
      <li>Floor loot is much rarer – chests and ammo crates are now the best source of gear.</li>
      <li>Floor weapons and ammo show up occasionally, mostly at lower rarities.</li>
@@ -175,7 +182,7 @@ class App{
    </div><div class="tip">More changes will appear here as Pixel Royale gets updated.</div></div>`;
   $('upBack').appendChild(this.back());
  }
- buildCredits(){$('credits').innerHTML=`<div class="pg" style="text-align:center"><div class="pg-head"><h2>Credits</h2><div id="crBack"></div></div><h1 class="logo" style="font-size:48px;transform:none">Pixel <span>Royale</span></h1><p style="margin:16px 0;font-size:18px;line-height:1.7">Characters: <b>Coolguy15</b> &amp; <b>Zach</b> — your original 2D art<br>Game design &amp; code: built with Claude<br>Engine: <b>three.js</b> · Multiplayer: <b>PeerJS / WebRTC</b><br>Audio: procedurally synthesised with the Web Audio API</p><p class="tip">Everything — island, weapons, music — is generated in code, so the game runs fully offline.</p></div>`;$('crBack').appendChild(this.back())}
+ buildCredits(){$('credits').innerHTML=`<div class="pg" style="text-align:center"><div class="pg-head"><h2>Credits</h2><div id="crBack"></div></div><h1 class="logo" style="font-size:48px;transform:none">Pixel <span>Royale</span></h1><p style="margin:16px 0;font-size:18px;line-height:1.7">Characters: <b>Coolguy15</b>, <b>Zach</b>, <b>Chill Guy</b> &amp; <b>Jay</b> — your original 2D art<br>Game design &amp; code: built with Claude<br>Engine: <b>three.js</b> · Multiplayer: <b>PeerJS / WebRTC</b><br>Audio: procedurally synthesised with the Web Audio API</p><p class="tip">Everything — island, weapons, music — is generated in code, so the game runs fully offline.</p></div>`;$('crBack').appendChild(this.back())}
  // ---------- settings
  buildSettings(){
   const p=$('settings');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Settings</h2><div id="stBack"></div></div><div class="st-body"><div class="tabs" id="stTabs"></div><div id="stBody"></div></div></div>`;$('stBack').appendChild(this.back());
@@ -244,6 +251,7 @@ class App{
   this.audio.init();this.audio.resume();const n=this.profile.bots;const ents=[{id:0,name:this.profile.name,char:this.profile.char,cos:this.cos}];
   const roster=makeBotRoster(n);
   for(let i=0;i<n;i++)ents.push({id:i+1,name:roster[i].name,char:roster[i].char,bot:true,persona:roster[i].persona,cos:roster[i].cos});
+  for(const e of ents)if(e.team===undefined)e.team=-(e.id+1);   // unique team per unaffiliated entity: nobody is an ally by accident
   this.net=new LocalNet();this.beginGame(this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,0,this.profile.diff));
  }
  beginGame(cfg){
@@ -336,10 +344,11 @@ class App{
  leaveLobby(silent){this.lobbyActive=false;if(this.net&&this.net.close){this.net.close()}this.net=null;this.lobby=null;this.go('title')}
  startOnlineHost(){
   const L=this.lobby;const ents=[];let id=0;const roster=makeBotRoster(L.bots);
-  for(const p of L.players){ents.push({id:id,name:p.name,char:p.char,cos:p.cos,peer:p.pid==='host'?undefined:p.pid,hostMe:p.pid==='host'});p.eid=id;id++}
+  for(const p of L.players){ents.push({id:id,name:p.name,char:p.char,cos:p.cos,team:0,peer:p.pid==='host'?undefined:p.pid,hostMe:p.pid==='host'});p.eid=id;id++}
   for(let i=0;i<L.bots;i++){ents.push({id:id++,name:roster[i].name,char:roster[i].char,bot:true,persona:roster[i].persona,cos:roster[i].cos})}
+  for(const e of ents)if(e.team===undefined)e.team=-(e.id+1);
   const seed=(Math.random()*1e9)|0;
-  for(const p of L.players)if(p.pid!=='host')this.net.send(p.pid,{t:'start',seed,diff:L.diff,ents:ents.map(e=>({id:e.id,name:e.name,char:e.char,bot:e.bot,cos:e.cos})),you:p.eid});
+  for(const p of L.players)if(p.pid!=='host')this.net.send(p.pid,{t:'start',seed,diff:L.diff,ents:ents.map(e=>({id:e.id,name:e.name,char:e.char,bot:e.bot,cos:e.cos,team:e.team})),you:p.eid});
   const me=L.players.find(p=>p.pid==='host');
   this.beginGame(this.makeCfg('host',this.net,seed,ents,me.eid,L.diff));
  }

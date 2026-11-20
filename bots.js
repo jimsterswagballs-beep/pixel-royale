@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {WEAPONS,ITEMS,RARITY,AMMO,clamp,lerp} from './data.js';
+import {WEAPONS,ITEMS,RARITY,AMMO,BAL,clamp,lerp} from './data.js';
 import * as W from './world.js';
 import * as NAV from './botnav.js';
 import {R,HSTAND,HCROUCH,wstat,angDiff,lerpAng} from './shared.js';
@@ -298,13 +298,16 @@ export const botMethods={
    // abilities
    if(ai.react<=0&&Math.random()<dt*cfg.ab*1.4*pe.ab){const id=e.cdef.id;
     if(id==='coolguy15'){if(look.d<11&&e.cd[0]<=0&&e.grounded)this.useAbility(e,0);else if(look.d<45&&e.cd[1]<=0&&e.fireCd<.3)this.useAbility(e,1);else if(look.d<12&&e.cd[2]<=0&&(e.hp<e.maxHp*.5||mode==='flee'))this.useAbility(e,2)}
+    else if(id==='chillguy')this.botChill(e,look.d);
+    else if(id==='jay')this.botJay(e,look.d);
     else{if(look.d<7.5&&e.cd[1]<=0&&e.grounded)this.useAbility(e,1);else if(look.d<40&&e.cd[2]<=0)this.useAbility(e,2);else if(e.hp<e.maxHp*.55&&look.d>25&&e.cd[0]<=0)this.useAbility(e,0)}}
   }else{
    const slot=e.inv[e.cur];if(slot&&slot.k==='w'){const wd=wstat(slot.w,slot.r);if(!wd.melee&&slot.mag<wd.mag*.6&&e.ammo[wd.ammo]>0)c.reload=true}
    if(ai.healing){const s=e.inv[e.cur];if(s&&s.k==='i'){c.firePressed=true;c.fire=true}else ai.healing=false}
    // fleeing / hiding bots use their survival abilities
    if(!ai.healing&&(mode==='flee'||mode==='hide')&&e.cdef.id==='zach'){if(e.hp<e.maxHp*.7&&e.cd[0]<=0&&!ai.fight)this.useAbility(e,0);else if(mode==='flee'&&e.cd[2]<=0&&Math.random()<dt*2)this.useAbility(e,2)}
-   if(!ai.healing&&mode!=='flee'&&mode!=='hide'&&e.hp<e.maxHp*.7&&e.cdef.id==='zach'&&e.cd[0]<=0&&!ai.fight)this.useAbility(e,0)}
+   if(!ai.healing&&mode!=='flee'&&mode!=='hide'&&e.hp<e.maxHp*.7&&e.cdef.id==='zach'&&e.cd[0]<=0&&!ai.fight)this.useAbility(e,0);
+   if(e.cdef.id==='jay'&&e.hp<e.maxHp*.65&&e.cd[2]<=0&&e.grounded)this.useAbility(e,2)}
   if(e.use&&en&&ai.seen>0&&e.use.t>.6){c.cancel=true;ai.healing=false}
   this.move(e,inp,dt);this.tickWeapon(e,c,dt);
   e.wi=(e.inv[e.cur]&&e.inv[e.cur].k==='w')?e.inv[e.cur].w*10+e.inv[e.cur].r:-1;e.flags=this.packFlags(e);
@@ -316,7 +319,7 @@ export const botMethods={
   for(const o of this.list){
    if(o===e||!o.alive||o.drop==='bus'||(o.drop&&o.pos.y>P.y+30))continue;
    const dx=o.pos.x-P.x,dz=o.pos.z-P.z,d=Math.hypot(dx,dz);
-   const vis=cfg.vis*(o.sprinting?1.2:1)*(o.crouch?.7:1);
+   let vis=cfg.vis*(o.sprinting?1.2:1)*(o.crouch?.7:1)*(o.char==='chillguy'?BAL.chill.quiet.botVisMul:1);if(o.cloakT>0)vis=Math.min(vis,BAL.chill.disappear.botSeeRange);
    let seen=false;
    if(d<=vis){const dot=d<.01?1:(dx*fx+dz*fz)/d;if((d<10||dot>half||t-(o.lastShotAt||-99)<1.2)&&d<bd&&W.losClear(P.x,eye,P.z,o.pos.x,o.pos.y+1.2,o.pos.z)){bd=d;best=o;seen=true}}
    if(!seen){const loud=(t-(o.lastShotAt||-99)<2.5)?55:(o.sprinting?1:o.crouch?.2:.5)*cfg.hear;const hr=loud*pe.hear;
@@ -474,6 +477,7 @@ export const botMethods={
    if(l.chest)v=(l.supply?90:55)*pe.greed;else if(l.ammobox)v=Object.values(need).some(n=>n>0)?28:8;
    else{const it=l.item;if(it.k==='w'){const wd=WEAPONS[it.w];if(wd.melee)continue;const have=e.inv.some(s=>s&&s.k==='w'&&s.w===it.w&&s.r>=it.r);if(have)continue;v=(wc<3?40:12)+it.r*14;if(wc>=3){const worst=Math.min(...e.inv.filter(s=>s&&s.k==='w'&&s.w>0).map(s=>s.r));if(it.r<=worst)continue}}
     else if(it.k==='a'){if(!(need[it.t]>0))continue;v=25}
+    else if(it.k==='m'){v=20}
     else{const d2_=ITEMS[it.id];v=d2_.kind==='heal'||d2_.kind==='shield'||d2_.kind==='chug'?(hc<4?22:6):(hc<5?12:3);if(it.id==='chug')v=30}}
    const sc=v-d*.55;if(sc>bs){bs=sc;best=l}}
   return best}

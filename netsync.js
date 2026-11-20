@@ -24,16 +24,19 @@ export const netMethods={
   // host
   const e=this.list.find(x=>x.peer===from);if(!e||!e.alive&&m.t!=='p')return;
   switch(m.t){
-   case'p':{if(!e.alive)return;e.tgt.x=m.x;e.tgt.y=m.y;e.tgt.z=m.z;e.tgt.yaw=m.yw;e.tgt.pitch=m.pt;e.vel.x=m.vx||0;e.vel.z=m.vz||0;this.unpackFlags(e,m.f);e.wi=m.w;if(e.drop==='bus'&&!(m.f&64)){e.drop=m.f&16?'free':'glide'}break}
-   case'fire':{if(m.w<0||!m.d||m.d.length>60)return;const wd=wstat(Math.floor(m.w/10),m.w%10);if(!wd)return;
+   case'p':{if(!e.alive)return;e.tgt.x=m.x;e.tgt.y=m.y;e.tgt.z=m.z;e.tgt.yaw=m.yw;e.tgt.pitch=m.pt;e.vel.x=m.vx||0;e.vel.z=m.vz||0;this.unpackFlags(e,m.f);if(this.t<(e.noCloakUntil||0)){e.cloakT=0;e.flags&=~4096}e.wi=m.w;if(e.drop==='bus'&&!(m.f&64)){e.drop=m.f&16?'free':'glide'}break}
+   case'fire':{if(m.w<0||!m.d||m.d.length>60)return;this.revealHost(e);const wd=wstat(Math.floor(m.w/10),m.w%10);if(!wd)return;
     const dx=m.o[0]-e.pos.x,dz=m.o[2]-e.pos.z;let o=m.o;if(dx*dx+dz*dz>25||Math.abs(m.o[1]-e.pos.y)>5)o=[e.pos.x,e.pos.y+1.65,e.pos.z];
     if(this.t-(e.lastFireT||0)<.4/Math.max(1,wd.rps*1.6))return;e.lastFireT=this.t;e.shootT=.12;
     this.hostFire(e,o,m.d.slice(0,wd.pellets*3),wd,m.w);break}
-   case'melee':{const wd=wstat(Math.floor(m.w/10),m.w%10);if(!wd||!wd.melee)return;this.hostMelee(e,wd,m.y,m.p,e.pos.x,e.pos.y+1.5,e.pos.z,m.w);break}
+   case'melee':{const wd=wstat(Math.floor(m.w/10),m.w%10);if(!wd||!wd.melee)return;this.revealHost(e);this.hostMelee(e,wd,m.y,m.p,e.pos.x,e.pos.y+1.5,e.pos.z,m.w);break}
+   case'build':{this.structHostBuild(e,m);break}
    case'pick':{const l=this.loot.get(m.id);if(l)this.hostPick(e,l);break}
    case'drop':{if(m.item&&Math.hypot(m.x-e.pos.x,m.z-e.pos.z)<5)this.spawnLoot(m.item,m.x,m.z,m.y);break}
    case'heal':{e.hp=Math.min(e.maxHp,e.hp+clamp(m.hp||0,0,100));e.sh=Math.min(100,e.sh+clamp(m.sh||0,0,100));break}
-   case'ab':this.abilityEffect(e,m.i,e.pos.x,e.pos.y,e.pos.z,m.yaw);break;
+   case'ab':{ // hero abilities are cooldown-checked on the host (15% latency slack) so a modified client cannot spam them
+    if(e.cdef.hero){const ab=e.cdef.ab[m.i];if(!ab||this.t<(e.abNext[m.i]||0))return;e.abNext[m.i]=this.t+ab.cd*.85}
+    this.abilityEffect(e,m.i,e.pos.x,e.pos.y,e.pos.z,m.yaw,m);break}
    case'slam':this.hostSlam(e,e.pos.x,e.pos.y,e.pos.z);break;
    case'trap':this.placeTrap(e,m.id,m.x,m.y,m.z);break;
    case'throw':this.throwItem(e,m.id,[e.pos.x,e.pos.y+1.6,e.pos.z],m.d);break;
