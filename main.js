@@ -7,6 +7,7 @@ import {HUD} from './hud.js';
 import {Net,LocalNet} from './net.js';
 import {IMG} from './shared.js';
 import * as W from './world.js';
+import {makeBotRoster} from './botnames.js';
 const $=id=>document.getElementById(id);
 const BOTNAMES=['Noodle','Sir Quacks','Turbo Toast','Pixel Pete','Captain Crunch','Waffle','Sneaky Sam','Big Chungus','Lil Bandit','Dr. Pickle','Banana Joe','Zoomer','Gizmo','Cheese Wiz','Ninja Nan','Boop','Chad','Meatball','Fuzzy','Rocket Raccoon','Grumpy','Sassy','Taco Tim','Doodle','Blip','Moonpie','Toaster','Yeet','Mr. Bean','Gremlin','Skibidi','Potato','Wobbly','Kevin','Bongo','Pancake'];
 const COLORS=['#ffffff','#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a'];
@@ -153,6 +154,10 @@ class App{
      <li>Floor loot is much rarer – chests and ammo crates are now the best source of gear.</li>
      <li>Floor weapons and ammo show up occasionally, mostly at lower rarities.</li>
      <li>Picked-up loot now disappears with a coloured pop effect.</li>
+     <li>Smarter bots: A* pathfinding through doors and around props, plus automatic unstick recovery.</li>
+     <li>Bots now have personalities (Rusher, Camper, Sniper, Looter, Survivor, Opportunist, Trickster, Balanced) with random quirks.</li>
+     <li>Bots hide and heal when low, take cover to reload, hear gunfire and investigate, and have a limited field of view.</li>
+     <li>Hundreds of new bot names and thousands of generated combinations, with random cosmetics.</li>
      <li>Brand new lobby: top navigation, party panel, big Play button, tile-based Locker, redesigned Settings and Online Party screens.</li>
     </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 20, 2026 · VERSION 1.1</div><h3>Visual Overhaul</h3><ul>
@@ -237,19 +242,28 @@ class App{
  makeCfg(role,net,seed,list,myId,diff){return{role,net,seed,diff,myId,ents:list}}
  startOffline(){
   this.audio.init();this.audio.resume();const n=this.profile.bots;const ents=[{id:0,name:this.profile.name,char:this.profile.char,cos:this.cos}];
-  const names=BOTNAMES.slice().sort(()=>Math.random()-.5);
-  for(let i=0;i<n;i++)ents.push({id:i+1,name:names[i%names.length]+(i>=names.length?i:''),char:Math.random()<.5?'zach':'coolguy15',bot:true,cos:{nameColor:'#ffd0d0'}});
+  const roster=makeBotRoster(n);
+  for(let i=0;i<n;i++)ents.push({id:i+1,name:roster[i].name,char:roster[i].char,bot:true,persona:roster[i].persona,cos:roster[i].cos});
   this.net=new LocalNet();this.beginGame(this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,0,this.profile.diff));
  }
  beginGame(cfg){
   for(const el of document.querySelectorAll('#ui>.screen'))el.classList.remove('show');$('nav').classList.remove('show');
   this.game.start(cfg);this.net=cfg.net;this.playing=true;this.paused=false;this.endCursor=false;$('bigmap').style.display='none';
-  if(cfg.role==='client')this.net.onMsg=(f,m)=>this.game.onNetMessage(f,m);else if(cfg.net.onMsg)cfg.net.onMsg=(f,m)=>this.game.onNetMessage(f,m);
+  if(this.net)this.net.onMsg=(f,m)=>{
+   if(m.t==='toLobby'){this.leaveMatch();return}
+   if(m.t==='quit'){if(this.playing&&this.game.peerLeft)this.game.peerLeft(f);return}
+   this.game.onNetMessage(f,m)};
   this.applySettings();this.lock()}
  leaveMatch(){
+  const inParty=!!(this.lobby&&this.net&&this.net.peer);
+  if(inParty&&!this.net.isHost&&this.playing&&!this.hud.finished)this.net.toHost({t:'quit'}); // mid-match quit: host hands our character to a bot
   this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();
   this.game.running=false;this.hud.hide();for(const id of ['elim','victory'])$(id).style.display='none';$('pause').classList.remove('show');$('bigmap').style.display='none';
-  if(this.net&&this.net.close&&this.net.peer){if(this.net.isHost&&this.lobbyActive){this.net.broadcast({t:'toLobby'});this.go('lobby');this.audio.mode='menu';this.lobbyUpdate();return}this.net.close();this.net=null}
+  if(inParty){
+   if(this.net.isHost)this.net.broadcast({t:'toLobby'});
+   if(this.lobbyOnMsg)this.net.onMsg=this.lobbyOnMsg;
+   this.lobbyActive=true;this.audio.mode='menu';this.go('lobby');this.lobbyUpdate();return}
+  if(this.net&&this.net.close&&this.net.peer){this.net.close();this.net=null}
   this.go('title')}
  // ---------- online
  buildOnline(){
@@ -270,7 +284,7 @@ class App{
   this.saveOnName();$('onErr').textContent='Creating lobby…';const net=new Net();this.net=net;
   net.host((err,code)=>{if(err){$('onErr').textContent='Could not create lobby ('+err+'). Check your internet connection.';return}
    this.lobby={host:true,code,players:[{pid:'host',name:this.profile.name,char:this.profile.char,cos:this.cos}],bots:0,diff:'Normal'};this.lobbyActive=true;this.go('lobby')});
-  net.onMsg=(pid,m)=>this.lobbyMsgHost(pid,m);
+  net.onMsg=(pid,m)=>this.lobbyMsgHost(pid,m);this.lobbyOnMsg=net.onMsg;
   net.onLeave=pid=>{if(!this.lobby)return;this.lobby.players=this.lobby.players.filter(p=>p.pid!==pid);if(this.playing)this.game.peerLeft(pid);else this.lobbyUpdate()};
  }
  lobbyMsgHost(pid,m){
@@ -290,6 +304,7 @@ class App{
    else if(m.t==='start'){this.startOnlineClient(m)}
    else if(m.t==='full'){this.toast('Lobby is full');this.leaveLobby()}
    else if(m.t==='toLobby'){this.leaveMatch()}};
+  this.lobbyOnMsg=net.onMsg;
   net.onClosed=()=>{this.toast('Disconnected from host');if(this.playing){this.playing=false;this.game.running=false;this.hud.hide();if(document.pointerLockElement)document.exitPointerLock();for(const id of ['elim','victory'])$(id).style.display='none'}this.leaveLobby(true)};
  }
  buildLobby(){
@@ -320,9 +335,9 @@ class App{
  }
  leaveLobby(silent){this.lobbyActive=false;if(this.net&&this.net.close){this.net.close()}this.net=null;this.lobby=null;this.go('title')}
  startOnlineHost(){
-  const L=this.lobby;const ents=[];let id=0;const names=BOTNAMES.slice().sort(()=>Math.random()-.5);
+  const L=this.lobby;const ents=[];let id=0;const roster=makeBotRoster(L.bots);
   for(const p of L.players){ents.push({id:id,name:p.name,char:p.char,cos:p.cos,peer:p.pid==='host'?undefined:p.pid,hostMe:p.pid==='host'});p.eid=id;id++}
-  for(let i=0;i<L.bots;i++){ents.push({id:id++,name:names[i%names.length],char:Math.random()<.5?'zach':'coolguy15',bot:true,cos:{nameColor:'#ffd0d0'}})}
+  for(let i=0;i<L.bots;i++){ents.push({id:id++,name:roster[i].name,char:roster[i].char,bot:true,persona:roster[i].persona,cos:roster[i].cos})}
   const seed=(Math.random()*1e9)|0;
   for(const p of L.players)if(p.pid!=='host')this.net.send(p.pid,{t:'start',seed,diff:L.diff,ents:ents.map(e=>({id:e.id,name:e.name,char:e.char,bot:e.bot,cos:e.cos})),you:p.eid});
   const me=L.players.find(p=>p.pid==='host');
