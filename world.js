@@ -255,22 +255,22 @@ export function buildMeshes(scene,quality={}){
   for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<p.r*.92&&h>1.8){c.lerp(new THREE.Color(p.type==='suburb'?'#7bb85a':'#9a9a96'),sstep(p.r*.92,p.r*.5,d)*.75)}}
   col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b}
  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();
- const terrain=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));g.add(terrain);
+ const terrain=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));terrain.receiveShadow=true;g.add(terrain);
  const water=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshPhongMaterial({color:'#2f86c8',transparent:true,opacity:.82,shininess:90,specular:'#aee'}));water.rotation.x=-Math.PI/2;water.position.y=WATER;g.add(water);
  // boxes
  const bg=new THREE.BoxGeometry(1,1,1),bm=new THREE.MeshLambertMaterial({color:0xffffff});
  const im=new THREE.InstancedMesh(bg,bm,boxVis.length);const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),ps=new THREE.Vector3();
  boxVis.forEach((b,i)=>{ps.set((b.x0+b.x1)/2,(b.y0+b.y1)/2,(b.z0+b.z1)/2);sc.set(b.x1-b.x0,b.y1-b.y0,b.z1-b.z0);m4.compose(ps,q,sc);im.setMatrixAt(i,m4);im.setColorAt(i,c.set(b.c))});
- im.instanceMatrix.needsUpdate=true;im.instanceColor.needsUpdate=true;g.add(im);
+ im.instanceMatrix.needsUpdate=true;im.instanceColor.needsUpdate=true;im.castShadow=im.receiveShadow=true;g.add(im);
  // trees
  const trunkG=new THREE.CylinderGeometry(.22,.32,3,6);trunkG.translate(0,1.5,0);const crownG=new THREE.ConeGeometry(1.7,4.2,7);crownG.translate(0,5,0);const crown2=new THREE.ConeGeometry(1.2,3.2,7);crown2.translate(0,7.2,0);
  const tm=new THREE.InstancedMesh(trunkG,new THREE.MeshLambertMaterial({color:'#6b4a2b'}),treeList.length);
  const cm=new THREE.InstancedMesh(crownG,new THREE.MeshLambertMaterial({color:0xffffff}),treeList.length);
  const cm2=new THREE.InstancedMesh(crown2,new THREE.MeshLambertMaterial({color:0xffffff}),treeList.length);
  treeList.forEach((t,i)=>{ps.set(t.x,t.y0-.2,t.z);sc.set(t.sc,t.sc,t.sc);m4.compose(ps,q,sc);tm.setMatrixAt(i,m4);cm.setMatrixAt(i,m4);cm2.setMatrixAt(i,m4);const cc=t.kind?c.set('#3d7a44').offsetHSL(0,0,hash(i,5)*.06):c.set('#4f9a3a').offsetHSL(0,0,hash(i,9)*.08);cm.setColorAt(i,cc);cm2.setColorAt(i,cc)});
- [tm,cm,cm2].forEach(m=>{m.instanceMatrix.needsUpdate=true;g.add(m)});cm.instanceColor.needsUpdate=true;cm2.instanceColor.needsUpdate=true;
+ [tm,cm,cm2].forEach(m=>{m.instanceMatrix.needsUpdate=true;m.castShadow=m.receiveShadow=true;g.add(m)});cm.instanceColor.needsUpdate=true;cm2.instanceColor.needsUpdate=true;
  const rm=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:'#8a8a85',flatShading:true}),rockList.length);
- rockList.forEach((r,i)=>{ps.set(r.x,r.y0+r.sc*.4,r.z);q.setFromEuler(new THREE.Euler(r.rot,r.rot*2,0));sc.set(r.r*1.05,r.sc*.8,r.r*1.05);m4.compose(ps,q,sc);rm.setMatrixAt(i,m4)});q.identity();g.add(rm);
+ rockList.forEach((r,i)=>{ps.set(r.x,r.y0+r.sc*.4,r.z);q.setFromEuler(new THREE.Euler(r.rot,r.rot*2,0));sc.set(r.r*1.05,r.sc*.8,r.r*1.05);m4.compose(ps,q,sc);rm.setMatrixAt(i,m4)});q.identity();rm.castShadow=rm.receiveShadow=true;g.add(rm);
  // clouds
  const cg=new THREE.BoxGeometry(1,1,1),cmat=new THREE.MeshBasicMaterial({color:'#fff',transparent:true,opacity:.85,fog:false});const clouds=new THREE.InstancedMesh(cg,cmat,24);
  const r2=mulberry32(5);for(let i=0;i<24;i++){ps.set((r2()-.5)*1400,170+r2()*60,(r2()-.5)*1400);sc.set(60+r2()*80,10+r2()*8,30+r2()*40);m4.compose(ps,q,sc);clouds.setMatrixAt(i,m4)}g.add(clouds);

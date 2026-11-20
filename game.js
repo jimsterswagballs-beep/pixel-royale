@@ -11,24 +11,38 @@ import {netMethods} from './netsync.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 const SKY_V=`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
-const SKY_F=`varying vec3 vP;void main(){float h=normalize(vP).y;vec3 top=vec3(.25,.55,.95),mid=vec3(.62,.82,.97),bot=vec3(.75,.88,.95);vec3 c=h>0.?mix(mid,top,pow(h,.6)):mix(mid,bot,-h);gl_FragColor=vec4(c,1.);}`;
+const SKY_F=`varying vec3 vP;void main(){vec3 d=normalize(vP);float h=d.y;vec3 top=vec3(.20,.48,.92),mid=vec3(.60,.80,.97),hz=vec3(.725,.863,.961),bot=vec3(.75,.88,.95);vec3 c=h>0.?mix(mix(hz,mid,smoothstep(0.,.22,h)),top,pow(h,.65)):mix(hz,bot,min(1.,-h*3.));vec3 sd=normalize(vec3(200.,300.,120.));float s=max(dot(d,sd),0.);c+=vec3(1.,.82,.5)*pow(s,8.)*.2+vec3(1.,.9,.7)*pow(s,64.)*.3+vec3(1.,.97,.9)*smoothstep(.9985,.9995,s);c=mix(c,hz,exp(-abs(h)*9.)*.55);gl_FragColor=vec4(c,1.);}`;
 
+// sun shadow: a camera-following ortho shadow map, snapped to whole texels so shadows don't shimmer; resolution follows the quality preset
+const SUN_DIR=new THREE.Vector3(200,300,120).normalize(),SHADOW_R=62,SHADOW_RES={Low:0,Medium:1024,High:2048};
+function updateSun(g,cam){
+ const sun=g.sun,ql=(g.app.settings&&g.app.settings.quality)||'High',res=SHADOW_RES[ql]===undefined?2048:SHADOW_RES[ql],on=res>0;
+ if(sun.castShadow!==on)sun.castShadow=on;
+ if(!on)return;
+ if(sun.shadow.mapSize.x!==res){sun.shadow.mapSize.set(res,res);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}}
+ const ts=2*SHADOW_R/res,L=SUN_DIR,rl=Math.hypot(L.z,L.x),Rx=L.z/rl,Rz=-L.x/rl,Ux=L.y*Rz,Uy=L.z*Rx-L.x*Rz,Uz=-L.y*Rx;
+ let tx=cam.position.x,ty=cam.position.y,tz=cam.position.z;
+ const pr=tx*Rx+tz*Rz,pu=tx*Ux+ty*Uy+tz*Uz,dr=Math.round(pr/ts)*ts-pr,du=Math.round(pu/ts)*ts-pu;
+ tx+=Rx*dr+Ux*du;ty+=Uy*du;tz+=Rz*dr+Uz*du;
+ sun.target.position.set(tx,ty,tz);sun.position.set(tx+L.x*300,ty+L.y*300,tz+L.z*300);sun.target.updateMatrixWorld()}
 export class Game{
  constructor(app){
   this.app=app;this.renderer=app.renderer;this.input=app.input;this.audio=app.audio;this.hud=app.hud;
   this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog('#b9dcf5',80,800);
   this.camera=new THREE.PerspectiveCamera(92,1,.08,1600);this.scene.add(this.camera);
   const sky=new THREE.Mesh(new THREE.SphereGeometry(1200,20,12),new THREE.ShaderMaterial({vertexShader:SKY_V,fragmentShader:SKY_F,side:THREE.BackSide,depthWrite:false,fog:false}));sky.renderOrder=-10;sky.frustumCulled=false;this.sky=sky;this.scene.add(sky);
-  this.scene.add(new THREE.HemisphereLight('#e4f2ff','#7a8a60',1.4));
-  const sun=new THREE.DirectionalLight('#fff3d6',1.8);sun.position.set(200,300,120);this.scene.add(sun);
+  this.scene.add(new THREE.HemisphereLight('#dcecff','#76865c',1.3));
+  const sun=new THREE.DirectionalLight('#ffeac4',2.0);sun.position.set(200,300,120);this.scene.add(sun);this.scene.add(sun.target);this.sun=sun;
+  this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;
+  sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);{const sc=sun.shadow.camera;sc.left=-SHADOW_R;sc.right=SHADOW_R;sc.top=SHADOW_R;sc.bottom=-SHADOW_R;sc.near=1;sc.far=700;sc.updateProjectionMatrix()}sun.shadow.bias=-.0005;sun.shadow.normalBias=.5;
   this.vmScene=new THREE.Scene();this.vmCam=new THREE.PerspectiveCamera(58,1,.02,10);this.vmScene.add(new THREE.HemisphereLight('#fff','#778',1.4));const vs=new THREE.DirectionalLight('#fff',1.2);vs.position.set(1,2,1);this.vmScene.add(vs);
-  this.fx=new FX(this.scene);this.worldBuilt=false;this.running=false;this.dynamic=new THREE.Group();this.scene.add(this.dynamic);
+  this.fx=new FX(this.scene);this.fx.cam=this.camera;this.worldBuilt=false;this.running=false;this.dynamic=new THREE.Group();this.scene.add(this.dynamic);
   this.ents=new Map();this.list=[];this.loot=new Map();this.traps=new Map();this.projs=[];this.pvis=new Map();this.outEvents=[];this.tmpV=new THREE.Vector3();
   this.view={recoilP:0,recoilY:0,kick:0,shake:0,bobT:0,eye:EYE,roll:0,fov:92,adsK:0,equipK:1,reloadK:0,sway:0,flash:0,hitK:0,burgerT:0};
   this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
  }
  ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
- renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
+ renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
  peerLeft(pid){const e=this.list.find(x=>x.peer===pid);if(!e)return;e.peer=undefined;if(e.alive){e.bot=true;this.initBot(e);e.ai.state='loot';e.name+=' (bot)'}}
  get settings(){return this.app.settings}
  get me(){return this.ents.get(this.myId)}
@@ -253,10 +267,10 @@ export class Game{
    if(this.over&&this.winnerId===tgt.id){const a=this.t*.5;cam.position.set(tgt.rpos.x+Math.sin(a)*5,tgt.rpos.y+2,tgt.rpos.z+Math.cos(a)*5);cam.lookAt(tgt.rpos.x,tgt.rpos.y+1.1,tgt.rpos.z)}
    cam.fov=lerp(cam.fov,s.fov,.1);cam.rotation.z=0}
   cam.updateProjectionMatrix();
-  this.sky.position.copy(cam.position);
+  this.sky.position.copy(cam.position);updateSun(this,cam);
   this.audio.listener={x:cam.position.x,y:cam.position.y,z:cam.position.z,yaw:fpv?this.me.yaw:(this.specYaw||0)};
   for(const e of this.list)this.updateSprite(e,dt,cam.position);
-  const st=this.storm;const inStorm=this.insideStorm(cam.position.x,cam.position.z)===false;this.scene.fog.color.set(inStorm?'#7a4ab0':'#b9dcf5');
+  const st=this.storm;const inStorm=this.insideStorm(cam.position.x,cam.position.z)===false;this.scene.fog.color.set(inStorm?'#7a4ab0':'#b9dcf5');this.fx.stormy=inStorm;
   this.renderWorld(cam);
   if(fpv&&this.me.drop===null){this.updateViewmodel(dt);this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.vmScene,this.vmCam);this.renderer.autoClear=true}
  }
