@@ -7,7 +7,9 @@ export const R=.42,HSTAND=1.8,HCROUCH=1.3,EYE=1.65,EYEC=1.1,EYES=.85,GRAV=23,JUM
 export const texCache={};
 export function charTex(ch,view){const k=ch+view;if(texCache[k])return texCache[k];const t=new THREE.TextureLoader().load(IMG[ch][view]);t.colorSpace=THREE.SRGBColorSpace;t.magFilter=THREE.NearestFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.anisotropy=4;return texCache[k]=t}
 const sc={};
-export function wstat(w,r){const k=w*10+r;if(sc[k])return sc[k];const d=WEAPONS[w],R_=RARITY[r];return sc[k]=Object.assign({},d,{dmg:d.dmg*R_.dm,rps:d.rps*(r===5?1.12:1),mag:Math.round(d.mag*R_.mm),splash:d.splash*(r>=4?1.1:1),mythic:r===5})}
+// global weapon damage multiplier (lower = weapons deal less damage)
+export const WEAPON_DMG_MUL=.7;
+export function wstat(w,r){const k=w*10+r;if(sc[k])return sc[k];const d=WEAPONS[w],R_=RARITY[r];return sc[k]=Object.assign({},d,{dmg:d.dmg*R_.dm*WEAPON_DMG_MUL,rps:d.rps*(r===5?1.12:1),mag:Math.round(d.mag*R_.mm),splash:d.splash*(r>=4?1.1:1),mythic:r===5})}
 const mats={};
 export function mat(c,emi){const k=c+(emi||'');return mats[k]||(mats[k]=new THREE.MeshLambertMaterial(Object.assign({color:c},emi?{emissive:emi,emissiveIntensity:.5}:{})))}
 const bx=new THREE.BoxGeometry(1,1,1),cy=new THREE.CylinderGeometry(.5,.5,1,10),sp=new THREE.SphereGeometry(.5,10,8);

@@ -11,17 +11,25 @@ export function rollItem(rng,q=1,min=0){
  if(k<.42||min>0&&k<.8){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
  if(k<.62){const types=Object.keys(AMMO);const t=types[pick(rng,[10,8,6,3,1.5])];return{k:'a',t,n:AMMO[t].box}}
  const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana'];const ws=[9,8,3.5,2.5,.7,2.2,2,2.8,1.4,1.6];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
+export function rollWeapon(rng,q=1,min=0){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
 export function itemName(it){if(it.k==='w')return RARITY[it.r].n+' '+WEAPONS[it.w].n;if(it.k==='i')return ITEMS[it.id].n+(it.n>1?' x'+it.n:'');return AMMO[it.t].n+' Ammo x'+it.n}
 export function itemColor(it){if(it.k==='w')return RARITY[it.r].c;if(it.k==='i')return ITEMS[it.id].col;return AMMO[it.t].c}
 export const lootMethods={
- genLoot(rng){let id=1;this.loot.clear();
+ genLoot(rng){let id=1;this.loot.clear();const seenB=new Set();
   for(const s of W.lootSpots){
-   if(s.chest){this.addLootObj({id:id++,x:s.x,y:s.y,z:s.z,chest:1,q:s.q})}
-   else{const n=s.inside?(rng()<.55?2:1):1;if(!s.inside&&rng()<.45)continue;for(let i=0;i<n;i++){const it=rollItem(rng,s.q);this.addLootObj({id:id++,x:s.x+(i?.9:0),y:s.y,z:s.z+(i?.5:0),item:it})}}
-   if(s.inside&&!s.chest&&rng()<.15){this.addLootObj({id:id++,x:s.x+.5,y:s.y,z:s.z-.6,item:{k:'a',t:['light','med','shells'][Math.floor(rng()*3)],n:20}})}
+   if(s.chest){this.addLootObj({id:id++,x:s.x,y:s.y,z:s.z,chest:1,q:s.q});continue}
+   if(!s.inside&&rng()<.4)continue;
+   const n=s.inside?(rng()<.5?2:1):1;
+   for(let i=0;i<n;i++){
+    // indoor floor loot: first item is a weapon about half the time so houses reliably have guns
+    const it=s.inside&&i===0&&rng()<.5?rollWeapon(rng,s.q):rollItem(rng,s.q);
+    const a=rng()*6.283,off=i?.9:0;let x=s.x+Math.cos(a)*off,z=s.z+Math.sin(a)*off,y=s.y;
+    if(off&&W.blocked(x,y,z,.3,1,.05)){x=s.x;z=s.z}
+    this.addLootObj({id:id++,x,y,z,item:it})}
+   if(s.inside&&rng()<.15){this.addLootObj({id:id++,x:s.x+.5,y:s.y,z:s.z-.6,item:{k:'a',t:['light','med','shells'][Math.floor(rng()*3)],n:20}})}
   }
   // ammo boxes
-  for(let i=0;i<40;i++){const a=rng()*6.283,r=Math.sqrt(rng())*W.ISL*.8;const x=Math.cos(a)*r,z=Math.sin(a)*r;const y=W.H(x,z);if(y<2.5)continue;this.addLootObj({id:id++,x,y:y+.1,z,ammobox:1})}
+  for(let i=0;i<40;i++){const a=rng()*6.283,r=Math.sqrt(rng())*W.ISL*.8;const x=Math.cos(a)*r,z=Math.sin(a)*r;const y=W.H(x,z);if(y<2.5||W.blocked(x,y+.1,z,.5,1,.05))continue;this.addLootObj({id:id++,x,y:y+.1,z,ammobox:1})}
  },
  addLootObj(l,fromEv){if(l.item&&l.item.k==='a'&&!l.chest){}this.loot.set(l.id,Object.assign(l,{mesh:null}))},
  removeLoot(id){const l=this.loot.get(id);if(!l)return;if(l.mesh)this.dynamic.remove(l.mesh);this.loot.delete(id)},
@@ -33,7 +41,9 @@ export const lootMethods={
   this.emit({k:'cho',id:l.id});const rng=Math.random;const items=[];
   if(l.supply){items.push(rollItem(rng,3,3));items.push(rollItem(rng,3,2));items.push({k:'i',id:'bigshield',n:2});items.push({k:'i',id:'medkit',n:2});items.push({k:'a',t:['med','light','heavy'][Math.floor(rng()*3)],n:60})}
   else{let w=rollItem(rng,1.6,1);while(w.k!=='w')w=rollItem(rng,1.6,1);items.push(w);items.push(rollItem(rng,1.4));items.push({k:'a',t:WEAPONS[w.w].ammo||'light',n:AMMO[WEAPONS[w.w].ammo||'light'].box});if(rng()<.6)items.push(rollItem(rng,1.2))}
-  items.forEach((it,i)=>{const a=i/items.length*6.283+Math.random()*.5;this.spawnLoot(it,l.x+Math.cos(a)*1.6,l.z+Math.sin(a)*1.6,l.y+.2)});
+  items.forEach((it,i)=>{let x=l.x,z=l.z;const a0=i/items.length*6.283+Math.random()*.5;
+   for(let k=0;k<10;k++){const a=a0+k*.7,r=1.5+(k>>2)*.5;const px=l.x+Math.cos(a)*r,pz=l.z+Math.sin(a)*r;if(W.H(px,pz)<2&&l.y>2.5)continue;if(!W.blocked(px,l.y+.1,pz,.3,1,.05)&&Math.abs(W.groundAt(px,pz,l.y+.5,.3,.6)-l.y)<1.2){x=px;z=pz;break}}
+   this.spawnLoot(it,x,z,W.groundAt(x,z,l.y+.5,.3,.6)+.1)});
   this.loot.delete(l.id)},
  openAmmoBox(l){this.emit({k:'cho',id:l.id});for(const t of ['light','med','shells','heavy'])if(Math.random()<.8||t==='light')this.spawnLoot({k:'a',t,n:Math.ceil(AMMO[t].box*.7)},l.x+(Math.random()-.5)*2.5,l.z+(Math.random()-.5)*2.5,l.y+.2);this.loot.delete(l.id)},
  // ---- picking up

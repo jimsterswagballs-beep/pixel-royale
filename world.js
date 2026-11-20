@@ -173,6 +173,41 @@ export function buildMap(){
  for(const p of POIS){for(let i=0;i<10;i++){const a=rng()*6.283,r=Math.sqrt(rng())*p.r*.9;lootSpots.push({x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:false,q:.7})}}
  for(let i=0;i<70;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.85;const x=Math.cos(a)*r,z=Math.sin(a)*r;if(H(x,z)<2.4)continue;lootSpots.push({x,z,y:0,inside:false,chest:false,q:.5})}
  for(const s of lootSpots)if(!s.inside)s.y=H(s.x,s.z)+.1;
+ fixLootSpots();
+}
+// ---- loot spot cleanup + extra chests (runs once after the map is built; uses its own rng so the map layout is unchanged)
+function spotBlocked(x,y,z,r){return blocked(x,y,z,r,1.2,.05)}
+function nudgeSpot(s,r){ // find a nearby clear position, return true if found
+ if(!spotBlocked(s.x,s.y,s.z,r))return true;
+ for(let k=1;k<=14;k++){const rad=.6+k*.45;for(let j=0;j<8;j++){const a=j/8*6.283+k;const x=s.x+Math.cos(a)*rad,z=s.z+Math.sin(a)*rad;
+  const y=s.inside?s.y:H(x,z)+.1;if(!s.inside&&H(x,z)<2.4)continue;
+  if(s.inside&&!insideAnyBuilding(x,z))continue;
+  if(!spotBlocked(x,y,z,r)){s.x=x;s.z=z;s.y=y;return true}}}
+ return false}
+function insideAnyBuilding(x,z){for(const b of buildings)if(Math.abs(x-b.x)<b.w/2-.9&&Math.abs(z-b.z)<b.d/2-.9)return true;return false}
+function fixLootSpots(){
+ const keep=[];
+ for(const s of lootSpots){
+  if(!s.inside){ // outdoor: not in water, not on steep cliffs, not inside walls/trees/rocks
+   s.y=H(s.x,s.z)+.1;if(s.y<2.4)continue;
+   const[gx,gz]=slope(s.x,s.z);if(Math.hypot(gx,gz)>.9)continue}
+  if(!nudgeSpot(s,s.chest?.75:.4))continue; // drop spots that are buried in a wall/prop and can't be moved
+  keep.push(s)}
+ lootSpots.length=0;for(const s of keep)lootSpots.push(s);
+ // extra chests: one more in every building that has none, plus outdoor chests scattered around each POI
+ const r2=mulberry32(4242);
+ for(const b of buildings){
+  if(lootSpots.some(s=>s.chest&&s.inside&&Math.abs(s.x-b.x)<b.w/2&&Math.abs(s.z-b.z)<b.d/2))continue;
+  if(r2()<.55){const s={x:b.x+(r2()-.5)*(b.w-4),z:b.z+(r2()<.5?-1:1)*(b.d/2-1.1),y:b.y0+.1,door:b.door,inside:true,chest:true,q:1.3};if(nudgeSpot(s,.75))lootSpots.push(s)}}
+ for(const p of POIS){
+  const n=p.type==='fort'?3:2;let made=0;
+  for(let t=0;t<40&&made<n;t++){const a=r2()*6.283,r=p.r*(.3+r2()*.7);const s={x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:true,q:1.4};
+   s.y=H(s.x,s.z)+.1;if(s.y<2.6)continue;const[gx,gz]=slope(s.x,s.z);if(Math.hypot(gx,gz)>.6)continue;
+   if(!nudgeSpot(s,.75))continue;if(lootSpots.some(o=>o.chest&&Math.hypot(o.x-s.x,o.z-s.z)<14))continue;lootSpots.push(s);made++}}
+ // wilderness chests so the open areas aren't empty
+ let w=0;for(let t=0;t<400&&w<18;t++){const a=r2()*6.283,r=Math.sqrt(r2())*ISL*.8;const s={x:Math.cos(a)*r,z:Math.sin(a)*r,y:0,inside:false,chest:true,q:1};
+  s.y=H(s.x,s.z)+.1;if(s.y<3)continue;const[gx,gz]=slope(s.x,s.z);if(Math.hypot(gx,gz)>.5)continue;
+  if(!nudgeSpot(s,.75))continue;if(lootSpots.some(o=>o.chest&&Math.hypot(o.x-s.x,o.z-s.z)<35))continue;lootSpots.push(s);w++}
 }
 // ---------------- rays
 const _q=[];
