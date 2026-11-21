@@ -323,6 +323,12 @@ select{background:#0a0e24;border:2px solid #34407f;color:#fff;border-radius:8px;
 .lb-keys span{background:rgba(255,255,255,.08);border:1px solid var(--line);padding:3px 9px;font-size:12px;font-weight:800;color:#cfe0ff}
 #boardFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .6s ease;z-index:60}
 #boardFade.show{opacity:1;pointer-events:auto}
+#inter{position:fixed;left:50%;top:14px;transform:translateX(-50%);display:none;flex-direction:column;align-items:center;gap:2px;z-index:40;pointer-events:none;color:#fff;text-align:center;text-shadow:0 2px 6px #000}
+#inter.show{display:flex}
+#inter .int-k{font-size:14px;font-weight:900;letter-spacing:2px;text-transform:uppercase;color:#ffd84a}
+#inter .int-n{font-family:'Arial Black',Impact,sans-serif;font-size:72px;line-height:1}
+#inter .int-p{font-size:16px;font-weight:800}
+#inter .int-tip{font-size:13px;opacity:.85;margin-top:6px;max-width:460px}
 
 
 /* ===================== v1.4 lobby remake ===================== */

@@ -10,6 +10,7 @@ import {StarterIsland} from './starter.js';
 import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
 import {makeBotRoster} from './botnames.js';
+const INTER_SECS=10; // seconds everyone waits on the starter island before the bus leaves
 import {buildEntrants,MODES,MODE_KEYS} from './teams.js';
 const $=id=>document.getElementById(id);
 const BOTNAMES=['Noodle','Sir Quacks','Turbo Toast','Pixel Pete','Captain Crunch','Waffle','Sneaky Sam','Big Chungus','Lil Bandit','Dr. Pickle','Banana Joe','Zoomer','Gizmo','Cheese Wiz','Ninja Nan','Boop','Chad','Meatball','Fuzzy','Rocket Raccoon','Grumpy','Sassy','Taco Tim','Doodle','Blip','Moonpie','Toaster','Yeet','Mr. Bean','Gremlin','Skibidi','Potato','Wobbly','Kevin','Bongo','Pancake'];
@@ -25,6 +26,7 @@ class App{
   this.input=new Input(this.canvas,this);this.audio=new Audio();this.hud=new HUD(this);
   this.starter=new StarterIsland(this.renderer,this.input);
   {const bf=document.createElement('div');bf.id='boardFade';document.body.appendChild(bf)}
+  this.inter=null;this.buildInter();
   this.game=new Game(this);this.screen='loading';this.paused=false;this.playing=false;this.net=null;this.lobby=null;
   this.menuT=0;this.last=performance.now();
   addEventListener('resize',()=>this.resize());document.addEventListener('fullscreenchange',()=>this.resize());
@@ -75,7 +77,7 @@ class App{
   $('btnSpec').onclick=()=>{$('elim').style.display='none';this.endCursor=false;this.lock()};
   $('btnElimMenu').onclick=()=>this.leaveMatch();$('btnAgain').onclick=()=>this.leaveMatch();
   document.addEventListener('pointerdown',()=>{this.audio.init();this.audio.resume()},{once:false});
-  this.canvas.addEventListener('click',()=>{if(this.playing&&!this.paused&&!this.input.locked&&!this.endCursor)this.lock();else if(this.playing&&this.endCursor&&this.game.over===false&&!$('elim').style.display!=='none'){}});
+  this.canvas.addEventListener('click',()=>{if(this.inter){this.lock();return}if(this.playing&&!this.paused&&!this.input.locked&&!this.endCursor)this.lock();else if(this.playing&&this.endCursor&&this.game.over===false&&!$('elim').style.display!=='none'){}});
  }
  sfx(n){this.audio.play(n)} buildNav(){
   const n=h(`<div id="nav"><div class="nav-logo">PIXEL<span>ROYALE</span></div><div class="nav-tabs" id="navTabs"></div><div class="nav-right"><div class="nav-me" id="navMe"><img alt=""><span></span></div><button class="nav-ico" id="navInfo" title="Credits">i</button><button class="nav-ico" id="navQuit" title="Quit game">&#x23FB;</button></div></div>`);
@@ -119,7 +121,7 @@ buildTitle(){
    </div>
   </div>`;
   for(const b of t.querySelectorAll('[data-go]'))b.onclick=()=>{this.sfx('ui');this.go(b.dataset.go)};
-  $('playBtn').onclick=()=>{this.sfx('ui');this.boardThen(()=>this.startOffline())};
+  $('playBtn').onclick=()=>this.soloStart();
   $('slName').onchange=e=>{this.profile.name=e.target.value.trim()||'Player';this.saveProfile();this.updateStage()};
   $('slBots').oninput=e=>{this.profile.bots=+e.target.value;$('slBotN').textContent=this.profile.bots;this.saveProfile()};
   const dd=$('slDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.profile.diff=d;this.saveProfile();this.refreshChips(dd,d);this.sfx('ui')};dd.appendChild(c)}
@@ -267,20 +269,29 @@ buildTitle(){
  }
  // ---------- starting matches
  makeCfg(role,net,seed,list,myId,diff){return{role,net,seed,diff,myId,ents:list}}
-// Board Bus (party lobby) flies the bus off over the island; Play (solo) just fades out. Either way the match starts after the fade.
+// The bus leaves with the hero aboard, the screen fades, then fn starts the match.
  boardThen(fn){
-  if(this.boarding)return;this.boarding=true;this.sfx('ui');
+  if(this.boarding)return;this.boarding=true;
   const finish=()=>{const f=$('boardFade');f.classList.add('show');
-   setTimeout(()=>{try{fn()}finally{this.boarding=false;this.starter.reset()}
+   setTimeout(()=>{try{fn()}finally{this.boarding=false;this.starter.reset();this.starter.clearCrowd()}
     requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('show')))},650)};
-  if(this.screen==='lobby')this.starter.board(finish);else finish();
+  this.starter.board(finish);
  }
- startOffline(){
-  this.audio.init();this.audio.resume();const P=this.profile;
+ // Play (solo): everyone in the match is shown on the island, then the countdown ends and the bus leaves.
+ soloStart(){
+  if(this.boarding||this.inter)return;this.sfx('ui');this.audio.init();this.audio.resume();this.lock();
+  const cfg=this.soloConfig();
+  this.beginIntermission({crowd:cfg.crowd,onEnd:()=>this.endIntermission(()=>this.beginGame(cfg))});
+ }
+ // straight into a solo match with no intermission (used by the headless tests)
+ startOffline(){this.audio.init();this.audio.resume();this.beginGame(this.soloConfig())}
+ soloConfig(){
+  const P=this.profile;
   const ents=buildEntrants({mode:P.mode,humans:[{name:P.name,char:P.char,cos:this.cos,hostMe:true}],roster:makeBotRoster(P.bots),fill:P.fill});
   const me=ents.find(e=>e.hostMe);
   this.net=new LocalNet();const cfg=this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,me.id,P.diff);cfg.mode=P.mode;
-  this.beginGame(cfg);
+  cfg.crowd=ents.filter(e=>e!==me).map(e=>({name:e.name,char:e.char,nameColor:e.cos&&e.cos.nameColor}));
+  return cfg;
  }
  beginGame(cfg){
   for(const el of document.querySelectorAll('#ui>.screen'))el.classList.remove('show');$('nav').classList.remove('show');
@@ -337,11 +348,11 @@ buildTitle(){
   net.onMsg=(f,m)=>{
    if(this.playing){this.game.onNetMessage(f,m);return}
    if(m.t==='lobby'){this.lobby.players=m.players;this.lobby.bots=m.bots;this.lobby.diff=m.diff;this.lobby.mode=m.mode||'solo';this.lobby.fill=!!m.fill;this.lobby.myPid=m.you;this.lobbyUpdate()}
-   else if(m.t==='start'){this.startOnlineClient(m)}
+   else if(m.t==='inter'){this.guestInter(m)}else if(m.t==='start'){this.startOnlineClient(m)}
    else if(m.t==='full'){this.toast('Lobby is full');this.leaveLobby()}
    else if(m.t==='toLobby'){this.leaveMatch()}};
   this.lobbyOnMsg=net.onMsg;
-  net.onClosed=()=>{this.toast('Disconnected from host');if(this.playing){this.playing=false;this.game.running=false;this.hud.hide();if(document.pointerLockElement)document.exitPointerLock();for(const id of ['elim','victory'])$(id).style.display='none'}this.leaveLobby(true)};
+  net.onClosed=()=>{this.toast('Disconnected from host');this.cancelIntermission();if(this.playing){this.playing=false;this.game.running=false;this.hud.hide();if(document.pointerLockElement)document.exitPointerLock();for(const id of ['elim','victory'])$(id).style.display='none'}this.leaveLobby(true)};
  }
 buildLobby(){
   const p=$('lobby');
@@ -374,7 +385,7 @@ buildLobby(){
   const dd=$('lbDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.lobby.diff=d;this.lobbyUpdate()};dd.appendChild(c)}
   const md=$('lbMode');for(const k of MODE_KEYS){const c=h(`<span class="chip" data-k="${k}">${MODES[k].name}</span>`);c.onclick=()=>{if(this.lobby.host){this.lobby.mode=k;this.lobbyUpdate()}};md.appendChild(c)}
   $('lbFill').onclick=()=>{if(this.lobby.host){this.lobby.fill=!this.lobby.fill;this.lobbyUpdate();this.sfx('click')}};
-  $('lbStart').onclick=()=>this.boardThen(()=>this.startOnlineHost());
+  $('lbStart').onclick=()=>this.hostStart();
  }
  copy(t){try{navigator.clipboard.writeText(t)}catch(e){const i=document.createElement('input');i.value=t;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove()}}
  enter_lobby(){this.lobbyUpdate(false,true)}
@@ -394,17 +405,45 @@ lobbyUpdate(noBroadcast,full){
   if(L.host)this.net.broadcast({t:'lobby',players:L.players,bots:L.bots,diff:L.diff,mode:L.mode,fill:L.fill});
  }
  leaveLobby(silent){this.lobbyActive=false;if(this.net&&this.net.close){this.net.close()}this.net=null;this.lobby=null;this.go('title')}
- startOnlineHost(){
+ // Board Bus (party host): the roster is fixed, guests get the intermission, then 'start' and the bus together.
+ hostStart(){
+  if(this.boarding||this.inter||!this.lobby||!this.net)return;this.sfx('ui');this.audio.init();this.audio.resume();this.lock();
   const L=this.lobby;
   const humans=L.players.map(p=>({pid:p.pid,name:p.name,char:p.char,cos:p.cos,hostMe:p.pid==='host'}));
   const ents=buildEntrants({mode:L.mode,humans,roster:makeBotRoster(L.bots),fill:L.fill});
   const seed=(Math.random()*1e9)|0;
   const slim=ents.map(e=>({id:e.id,name:e.name,char:e.char,bot:e.bot,cos:e.cos,team:e.team}));
-  for(const e of ents){if(e.pid&&e.pid!=='host'){this.net.send(e.pid,{t:'start',seed,diff:L.diff,mode:L.mode,ents:slim,you:e.id});const p=L.players.find(x=>x.pid===e.pid);if(p)p.eid=e.id}}
   const me=ents.find(e=>e.hostMe);
-  const cfg=this.makeCfg('host',this.net,seed,ents,me.id,L.diff);cfg.mode=L.mode;this.beginGame(cfg);
+  const guests=ents.filter(e=>e.pid&&e.pid!=='host');
+  for(const e of guests)this.net.send(e.pid,{t:'inter',ents:slim,secs:INTER_SECS,you:e.id});
+  const cfg=this.makeCfg('host',this.net,seed,ents,me.id,L.diff);cfg.mode=L.mode;
+  this.beginIntermission({crowd:slim.filter(e=>e.id!==me.id),onEnd:()=>{
+   for(const e of guests){this.net.send(e.pid,{t:'start',seed,diff:L.diff,mode:L.mode,ents:slim,you:e.id});const p=L.players.find(x=>x.pid===e.pid);if(p)p.eid=e.id}
+   this.endIntermission(()=>this.beginGame(cfg))}});
  }
- startOnlineClient(m){this.audio.init();const cfg=this.makeCfg('client',this.net,m.seed,m.ents,m.you,m.diff);cfg.mode=m.mode;this.beginGame(cfg)}
+ startOnlineClient(m){this.audio.init();const cfg=this.makeCfg('client',this.net,m.seed,m.ents,m.you,m.diff);cfg.mode=m.mode;const go=()=>this.beginGame(cfg);if(this.inter)this.endIntermission(go);else go()}
+ // ---------- intermission: everyone waits on the starter island, then the bus leaves
+ buildInter(){
+  const d=document.createElement('div');d.id='inter';
+  d.innerHTML='<div class="int-k">Bus departs in</div><div class="int-n" id="intN">'+INTER_SECS+'</div><div class="int-p" id="intP"></div><div class="int-tip">Walk around and look at the other players. The bus leaves when the timer hits zero.</div>';
+  document.body.appendChild(d);this.interEl=d;
+ }
+ beginIntermission({crowd,secs=INTER_SECS,onEnd}){
+  for(const el of document.querySelectorAll('#ui>.screen'))el.classList.remove('show');$('nav').classList.remove('show');
+  this.inter={end:performance.now()+secs*1000,shown:-1,onEnd:onEnd||null};
+  this.starter.setCrowd(crowd);this.starter.reset();
+  $('intP').textContent=(crowd.length+1)+' players on the island';
+  this.interEl.classList.add('show');this.tickInter();
+ }
+ tickInter(){
+  const I=this.inter;if(!I)return;
+  const left=Math.max(0,Math.ceil((I.end-performance.now())/1000));
+  if(left!==I.shown){I.shown=left;$('intN').textContent=left}
+  if(left===0&&I.onEnd){const cb=I.onEnd;I.onEnd=null;cb()}
+ }
+ endIntermission(fn){this.inter=null;this.interEl.classList.remove('show');this.boardThen(fn)}
+ cancelIntermission(){this.inter=null;if(this.interEl)this.interEl.classList.remove('show');this.starter.clearCrowd()}
+ guestInter(m){if(this.inter||this.boarding||this.playing)return;this.beginIntermission({crowd:m.ents.filter(e=>e.id!==m.you),secs:m.secs||INTER_SECS,onEnd:null})}
  // ---------- loop
  loop(now){
   requestAnimationFrame(t=>this.loop(t));
@@ -417,7 +456,7 @@ lobbyUpdate(noBroadcast,full){
     if(act){g.update(dt)}else g.fx.update(dt);
     g.render(dt);
     this.hud.update(g,dt);
-   }else if(this.screen==='lobby'){this.starter.update(dt,this.profile.char);this.starter.render()}else{g.renderMenu(dt)}
+   }else if(this.screen==='lobby'||this.inter||this.boarding){if(this.inter)this.tickInter();this.starter.update(dt,this.profile.char);this.starter.render()}else{g.renderMenu(dt)}
   }catch(e){console.error(e);window.__err=(window.__err||'')+e.stack+'\n'}
   this.input.endFrame();
  }

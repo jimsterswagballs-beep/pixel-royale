@@ -12,7 +12,7 @@ const ABIL_ICON={'Ground Slam':'💥','Overdrive Aura':'⚡','Energy Dodge':'�
 const $=id=>document.getElementById(id);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
 export const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-class HUD{
+export class HUD{
  constructor(app){this.app=app;this.root=$('hud');this.scope=false;this.toastT=0;this.build();this.mapImg=null;this.dmgNums=[];this.lastSlotKey='';this.matLast={};this.matEls=null;
   this.scale=1;this.fit();window.addEventListener('resize',()=>this.fit());}
  // The HUD is laid out for a 1280x720 screen and scaled to fit the actual window.

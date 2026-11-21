@@ -159,3 +159,13 @@ Known limits:
 - Headshot kills get a "Headshot" tag. The kill event carries a `h` flag for this.
 - Frag and Boogie grenades have separate kill names (`-5`, `-17`).
 - Player names are written as text, not HTML, so a name containing markup can't inject anything.
+
+## Starter island intermission
+
+- **Play** (solo) or **Board Bus** (party host) now opens a 10 second intermission on the Starter Island (`INTER_SECS` in `main.js`).
+- Everyone in the match stands on the island with their character and name tag, so you can see the other players while the timer runs. Bots are shown too. You can walk around with WASD and turn with the arrow keys.
+- When the timer hits zero, the Battle Bus boards with your hero aboard, the screen fades, and the match starts with the in-match bus.
+- Multiplayer: the host sends `inter` (roster and seconds, plus each guest's own entity id) when the intermission starts, then `start` when the timer ends. Guests show the same island from `inter`, then board when `start` arrives.
+- If a guest's connection to the host drops during the intermission, the intermission is cancelled and the lobby returns as before.
+- Pointer lock is requested from the Play or Board Bus click so mouse control carries into the match. Clicking during the intermission also takes it.
+- Code: `starter.js` (`setCrowd`, `updateCrowd`, `clearCrowd`), `main.js` (`soloStart`, `hostStart`, `beginIntermission`, `tickInter`, `endIntermission`, `guestInter`, `boardThen`).

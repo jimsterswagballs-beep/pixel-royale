@@ -19,6 +19,14 @@ export function islandH(x,z){
 
 const M=(c,opts={})=>new THREE.MeshLambertMaterial(Object.assign({color:c,flatShading:true},opts));
 const sunTint=['#ffeac4'];
+// a name label that always faces the camera (canvas texture on a sprite)
+function nameTag(name,col){
+ const cv=document.createElement('canvas');cv.width=256;cv.height=64;const x=cv.getContext('2d');
+ const label=String(name||'Player').slice(0,16);
+ x.font='bold 26px Arial Black, Arial';x.textAlign='center';x.textBaseline='middle';x.lineWidth=6;x.strokeStyle='rgba(0,0,0,.85)';
+ x.strokeText(label,128,34);x.fillStyle=col||'#ffffff';x.fillText(label,128,34);
+ const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),transparent:true,depthWrite:false}));
+ s.scale.set(3,.75,1);s.position.y=2.45;return s}
 
 export class StarterIsland{
  constructor(renderer,input){
@@ -28,7 +36,7 @@ export class StarterIsland{
   this.camera=new THREE.PerspectiveCamera(50,1,.1,1200);
   this.camYaw=0;this.camPos=new THREE.Vector3(0,6,12);
   this.t=0;this.heroYaw=Math.PI;this.dance=0;this.char=null;this.view='front';this.boardT=null;this.onBoard=null;
-  this.hero=new THREE.Group();this.scene.add(this.hero);
+  this.crowd=[];this.hero=new THREE.Group();this.scene.add(this.hero);
   this.buildLights();this.buildSky();this.buildIsland();this.buildDecor();this.buildBus();this.buildHero();
   this.reset();
  }
@@ -202,7 +210,43 @@ export class StarterIsland{
   this.animateWorld(dt);
  }
 
+ // ---- crowd: the other players, standing and wandering on the island during the intermission
+ setCrowd(list){
+  this.clearCrowd();
+  const geo=this.crowdGeo||(this.crowdGeo=new THREE.PlaneGeometry(2.1,2.1));
+  for(const p of list){
+   const g=new THREE.Group();
+   const mat=new THREE.MeshBasicMaterial({map:charTex(p.char,'front'),transparent:true,alphaTest:.35,side:THREE.DoubleSide});
+   const plane=new THREE.Mesh(geo,mat);plane.position.y=.88;g.add(plane);
+   const tag=nameTag(p.name,p.nameColor||(p.cos&&p.cos.nameColor));g.add(tag);
+   const s=this.spot();g.position.set(s.x,islandH(s.x,s.z),s.z);this.scene.add(g);
+   this.crowd.push({g,plane,tag,mat,x:s.x,z:s.z,tx:s.x,tz:s.z,wait:Math.random()*2,speed:1.6+Math.random()*1.2,ph:Math.random()*6.28})}
+ }
+ clearCrowd(){
+  for(const c of this.crowd){this.scene.remove(c.g);c.mat.dispose();c.tag.material.map.dispose();c.tag.material.dispose()}
+  this.crowd=[];
+ }
+ // a random spot on the plateau, away from the sea
+ spot(){
+  for(let i=0;i<30;i++){const a=Math.random()*6.2832,r=5+Math.sqrt(Math.random())*24,x=Math.cos(a)*r,z=Math.sin(a)*r;if(islandH(x,z)>1)return{x,z}}
+  return{x:0,z:-8}
+ }
+ updateCrowd(dt){
+  if(!this.crowd.length)return;
+  const cam=this.camera.position;
+  for(const c of this.crowd){
+   if(c.wait>0)c.wait-=dt;
+   else{const dx=c.tx-c.x,dz=c.tz-c.z,d=Math.hypot(dx,dz);
+    if(d<.3){c.wait=1+Math.random()*3;const s=this.spot();c.tx=s.x;c.tz=s.z}
+    else{const st=Math.min(d,c.speed*dt);c.x+=dx/d*st;c.z+=dz/d*st}}
+   const walking=c.wait<=0;
+   c.g.position.set(c.x,islandH(c.x,c.z),c.z);
+   c.plane.position.y=.88+(walking?Math.abs(Math.sin(this.t*9+c.ph))*.12:Math.sin(this.t*2+c.ph)*.03);
+   c.plane.rotation.y=Math.atan2(cam.x-c.x,cam.z-c.z);
+  }
+ }
  animateWorld(dt){
+  this.updateCrowd(dt);
   this.water.position.y=-.2+Math.sin(this.t*.8)*.05;
   this.padRing.material.opacity=.55+.25*Math.sin(this.t*3);
   for(const c of this.clouds){c.position.x+=dt*2.5;if(c.position.x>700)c.position.x=-700}
