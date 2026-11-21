@@ -5,6 +5,7 @@ import * as NAV from './botnav.js';
 import {R,HSTAND,HCROUCH,wstat,angDiff,lerpAng} from './shared.js';
 import {itemName} from './loot.js';
 import {PERSONA_WEIGHTS} from './botnames.js';
+import {REVIVE_RANGE} from './knock.js';
 
 // ---------------------------------------------------------------------------------------------
 // Difficulty: reaction/aim/turn speed plus perception (vis = sight range, fov = field of view in degrees,
@@ -183,6 +184,9 @@ export const botMethods={
   if(ai.think<=0){ai.think=rr(.15,.25);this.botThink(e,cfg);this.botSupport(e)}
   const mode=ai.mode;
   const en=ai.fight&&ai.enemy&&ai.enemy.alive&&ai.seen>0?ai.enemy:null;
+  // revive: hold interact while within reach of the knocked teammate (tickKnock reads holdI on the host)
+  const rk=mode==='revive'?ai.kmate:null;
+  e.holdI=!!(rk&&rk.knocked&&rk.alive&&!en&&d2(P.x,P.z,rk.pos.x,rk.pos.z)<REVIVE_RANGE-.4&&Math.abs(P.y-rk.pos.y)<2.5);
   const nz=this.nextZone()||{x:this.storm.cx,z:this.storm.cz,r:this.storm.r};
   const outside=!this.inZoneAt(P.x,P.z,6);
   const hh=(e.crouch||e.sliding)?HCROUCH:HSTAND;
@@ -327,6 +331,8 @@ export const botMethods={
   return{best,bd,heard}},
  // ------------------------------------------------------------------ decision making
  // ---------------------------------------------------------------- team play
+ // team modes: the nearest knocked teammate within 60 m (a bot goes to revive them)
+ knockedMate(e){if(!this.teamMode)return null;let best=null,bd=60;for(const o of this.list){if(o===e||!o.knocked||!o.alive||o.team!==e.team)continue;const q=d2(o.pos.x,o.pos.z,e.pos.x,e.pos.z);if(q<bd){bd=q;best=o}}return best},
  nearestMate(e){let mate=null,d=1e9;for(const o of this.list){if(o===e||!o.alive||o.knocked||o.drop||o.team!==e.team)continue;const q=d2(o.pos.x,o.pos.z,e.pos.x,e.pos.z);if(q<d){d=q;mate=o}}return{mate,d}},
  healSlot(e){for(let i=1;i<6;i++){const s=e.inv[i];if(s&&s.k==='i'&&(ITEMS[s.id].kind==='heal'||s.id==='chug'))return i}return -1},
  // an ammo type this bot can spare for a teammate who carries a gun of that type but is nearly out
@@ -365,6 +371,7 @@ export const botMethods={
   const low=(e.hp+e.sh*.6)/e.maxHp;                 // 0..~1.6 ; shields count for a bit
   const {best,bd,heard}=this.botSense(e,cfg,eye);
   const near=this.nearestMate(e),sup=best?null:this.supportNeed(e);ai.support=sup;
+  const kmate=best?null:this.knockedMate(e);ai.kmate=kmate;
   const hitRecent=t-ai.hitT<4;
   if(best){if(ai.enemy!==best||ai.seen<=0)ai.react=cfg.react*(.7+Math.random()*.6)*pe.twitchy;ai.enemy=best;ai.seen=1;ai.lastSeenPos={x:best.pos.x,z:best.pos.z,t};ai.lastSeenT=t}
   else{if(ai.seen>0)ai.seen-=.34;if(ai.seen<=0&&!hitRecent&&t-ai.lastSeenT>pe.chase+3)ai.enemy=null}
@@ -411,7 +418,8 @@ export const botMethods={
    const sinceSeen=t-ai.lastSeenT;
    const hurt=low<pe.hideHp;const haveHeal=e.inv.some(s=>s&&s.k==='i'&&(ITEMS[s.id].kind==='heal'||ITEMS[s.id].kind==='shield'||s.id==='chug'));
    if(ai.mode==='fight'||ai.mode==='flee')ai.cornered=false;
-   if(outside&&!(ai.mode==='fight'&&ai.seen>0))next='rotate';
+   if(kmate&&!hitRecent&&!outside&&low>pe.fleeHp)next='revive';
+   else if(outside&&!(ai.mode==='fight'&&ai.seen>0))next='rotate';
    else if(hurt&&(sinceSeen<14||haveHeal||pe.caution>.5)&&(ai.mode==='hide'?t-ai.hideT0<28:true)&&!(outside)){next='hide'}
    else if(ai.mode==='hide'&&!hurt&&!ai.healing){next='loot'}
    else if(sup){next='regroup'}
@@ -461,6 +469,9 @@ export const botMethods={
     break}
    case'chase':{const p=ai.lastSeenPos;if(p)this.setGoal(e,p.x,p.z,3,'chase');break}
    case'investigate':{if(noise){if(!ai.noiseUntil||t>ai.noiseUntil)ai.noiseUntil=t+12;this.setGoal(e,noise.x,noise.z,5,'investigate')}else this.setMode(e,'roam',0);break}
+   case'revive':{const k=ai.kmate;if(!k||!k.knocked||!k.alive){this.setMode(e,'loot',0);break}
+    if(!ai.goal||ai.goal.why!=='revive'||t-(ai.reviveAt||0)>1.5){ai.reviveAt=t;this.setGoal(e,k.pos.x,k.pos.z,1.2,'revive')}
+    break}
    case'regroup':{const tm=sup?sup.mate:near.mate;if(!tm){this.setMode(e,'loot',0);break}
     if(!ai.goal||ai.goal.why!=='regroup'||t-(ai.regroupAt||0)>1.5){ai.regroupAt=t;const a=rr(0,6.283),r=sup?1.2:rr(3,5);this.setGoal(e,tm.pos.x+Math.cos(a)*r,tm.pos.z+Math.sin(a)*r,2,'regroup')}
     break}

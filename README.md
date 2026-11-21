@@ -118,7 +118,9 @@ Known limits: the multiplayer code has only been tested with fake networking, no
 - **Sync**: knocked is a flag bit, and cards and vans are in each snapshot. The host decides everything. Clients send a `hold` message when they press or release interact.
 - **Tests**: `knock.js` logic was checked with a Node harness (timers, revive and interrupts, team out, cards, vans, cooldowns and expiry).
 
-Not built yet: bots reviving or rebooting teammates, pings, and a bot-side knocked response. A knocked bot stands still until it is finished.
+- **Bots revive** (`botThink`, mode `revive`): a bot with no enemy in sight, a safe distance from the storm and enough health walks to the nearest knocked teammate within 60 m and holds interact within 2.2 m. It is interrupted if it is hit or an enemy appears.
+
+Not built yet: bots rebooting teammates from cards and vans, pings, and a bot-side knocked response. A knocked bot stands still until it is finished.
 
 ## Lobby remake and Starter Island
 
