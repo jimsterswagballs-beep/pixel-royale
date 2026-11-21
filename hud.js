@@ -4,13 +4,15 @@ import {abilityIcon} from './icons.js';
 import * as W from './world.js';
 import {wstat,IMG} from './shared.js';
 import {MATS,MAT_KEYS} from './materials.js';
+import {REVIVE_T} from './knock.js';
 
 // one glyph per weapon type and per ability, used in the loadout and ability cards
 const WICON={melee:'⛏',ar:'🔫',smg:'🔫',sg:'💥',sn:'🎯',pi:'🔫',ex:'🚀'};
 const ABIL_ICON={'Ground Slam':'💥','Overdrive Aura':'⚡','Energy Dodge':'💨','Burger Break':'🍔','Chomp Lunge':'🦷','Sugar Rush':'🍬'};
 const $=id=>document.getElementById(id);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
-export class HUD{
+export const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+class HUD{
  constructor(app){this.app=app;this.root=$('hud');this.scope=false;this.toastT=0;this.build();this.mapImg=null;this.dmgNums=[];this.lastSlotKey='';this.matLast={};this.matEls=null;
   this.scale=1;this.fit();window.addEventListener('resize',()=>this.fit());}
  // The HUD is laid out for a 1280x720 screen and scaled to fit the actual window.
@@ -23,7 +25,7 @@ export class HUD{
   <div id="cross"><i></i><i></i><i></i><i></i><b></b></div><div id="hitm"><i></i><i></i><i></i><i></i></div>
   <div id="topr"><div class="pill" id="alive"><span>👥</span><b id="aliveN">100</b></div><div class="pill" id="kills"><span>☠</span><b id="killN">0</b></div><div class="pill" id="fps" style="display:none"></div></div>
   <div id="mmwrap"><canvas id="mm" width="340" height="340"></canvas><div id="stormbox"><div id="stormlbl">Storm</div><div id="stormtime">--</div></div><div id="locname"></div></div>
-  <div id="killfeed"></div><div id="toasts"></div><div id="announce"></div>
+  <div id="team"></div><div id="knock"></div><div id="killfeed"></div><div id="toasts"></div><div id="announce"></div>
   <div id="prompt"><span class="k"></span><span class="t"></span></div>
   <div id="usebar"><div><i></i></div><span></span></div>
   <div id="busHint"></div>
@@ -57,9 +59,23 @@ export class HUD{
  hide(){this.root.style.display='none'}
  toast(m,c){const t=el('div','toast',m);if(c)t.style.color=c;const box=this.q('#toasts');box.appendChild(t);while(box.children.length>3)box.removeChild(box.firstChild);setTimeout(()=>t.remove(),2200)}
  announce(m,c='#fff'){const a=this.q('#announce');a.textContent=m;a.style.color=c;a.classList.remove('show');void a.offsetWidth;a.classList.add('show')}
- killfeed(by,v,w,mine,died){
-  const wn=w>=0&&WEAPONS[w]?WEAPONS[w].n:KILL_NAMES[w]||(w===undefined?'The Storm':'Ability');
-  const d=el('div','kf'+(mine?' mine':died?' died':''),`<b>${by||'Storm'}</b> <i>${wn}</i> <b>${v}</b>`);const kf=this.q('#killfeed');kf.appendChild(d);while(kf.children.length>5)kf.removeChild(kf.firstChild);setTimeout(()=>d.remove(),6000)}
+ killfeed(k){
+  // k: {code, head, mine, died, killer: null | {name,col,me} | {gone:true}, victim: {name,col,me}}
+  // Weapon kills carry weapon*10+rarity; abilities and projectiles carry negative codes (KILL_NAMES).
+  const kf=this.q('#killfeed');if(!kf)return;
+  const code=k.code,isW=code>=0&&!!WEAPONS[Math.floor(code/10)];
+  const wd=isW?WEAPONS[Math.floor(code/10)]:null,rar=isW?RARITY[code%10]:null;
+  const storm=code===-9&&!k.killer,self=!k.killer&&!storm;
+  const d=document.createElement('div');d.className='kf'+(k.mine?' mine':k.died?' died':'');
+  const who=(n,col,me,cls)=>{const s=document.createElement('b');s.textContent=me?'You':n;if(cls)s.className=cls;if(col)s.style.color=col;return s};
+  if(storm)d.appendChild(who('The Storm',null,false,'storm'));
+  else if(k.killer)d.appendChild(k.killer.gone?who('Player who left',null,false,'gone'):who(k.killer.name,k.killer.col,k.killer.me));
+  else d.appendChild(who(k.victim.name,k.victim.col,k.victim.me));
+  if(!storm){const w=document.createElement('i');w.textContent=wd?wd.n:(KILL_NAMES[code]||'Ability');if(rar&&rar.c)w.style.color=rar.c;d.appendChild(w)}
+  if(k.head){const h=document.createElement('em');h.className='hs';h.textContent='Headshot';d.appendChild(h)}
+  if(self){const o=document.createElement('em');o.className='own';o.textContent='own goal';d.appendChild(o)}
+  else d.appendChild(who(k.victim.name,k.victim.col,k.victim.me));
+  kf.appendChild(d);while(kf.children.length>6)kf.removeChild(kf.firstChild);setTimeout(()=>d.remove(),6000)}
  hitmarker(kill,head,sh){const h=this.q('#hitm');h.className=(kill?'kill ':'')+(head?'head ':'')+(sh?'sh ':'');void h.offsetWidth;h.className+='show'}
  healNumber(pos,a){const n=el('div','dn hl','+'+Math.round(a));this.q('#dmgnums').appendChild(n);this.dmgNums.push({n,p:pos.clone(),t:0,dx:(Math.random()-.5)*40});setTimeout(()=>{n.remove();this.dmgNums=this.dmgNums.filter(x=>x.n!==n)},900)}
  dmgNumber(pos,d,head,g){const n=el('div','dn'+(head?' hd':''),d);this.q('#dmgnums').appendChild(n);this.dmgNums.push({n,p:pos.clone(),t:0,dx:(Math.random()-.5)*40});setTimeout(()=>{n.remove();this.dmgNums=this.dmgNums.filter(x=>x.n!==n)},900)}
@@ -78,8 +94,8 @@ export class HUD{
  markSupply(){}
  showElim(place,by,kills,g){setTimeout(()=>{if(g.over)return;const e=$('elim');e.style.display='flex';$('elimPlace').textContent='#'+place;$('elimBy').textContent='Eliminated by '+by;$('elimKills').textContent=kills+' eliminations';this.app.showCursor(true)},1500)}
  showVictory(g){}
- onEnd(g,ev){this.finished=true;$('elim').style.display='none';const won=g.me.alive&&ev.win===g.myId;const v=$('victory');v.classList.toggle('lose',!won);v.style.display='flex';
-  if(won){$('vicTitle').textContent='VICTORY ROYALE';$('vicSub').textContent='#1 – last one standing!'}
+ onEnd(g,ev){this.finished=true;$('elim').style.display='none';const won=g.me.team===ev.tm;const v=$('victory');v.classList.toggle('lose',!won);v.style.display='flex';
+  if(won){$('vicTitle').textContent='VICTORY ROYALE';$('vicSub').textContent=g.teamMode?'#1 – your team is last standing!':'#1 – last one standing!'}
   else{const w=g.ents.get(ev.win);$('vicTitle').textContent=(w?w.name:'Nobody')+' WINS';$('vicSub').textContent='You placed #'+g.me.place}
   $('vicKills').textContent=g.me.kills+' eliminations';if(won)this.confetti();setTimeout(()=>this.app.showCursor(true),800)}
  confetti(){const c=$('confetti');c.innerHTML='';for(let i=0;i<90;i++){const p=el('i');p.style.left=Math.random()*100+'%';p.style.background=`hsl(${Math.random()*360},90%,60%)`;p.style.animationDelay=Math.random()*2+'s';p.style.animationDuration=2.5+Math.random()*2.5+'s';c.appendChild(p)}}
@@ -90,6 +106,7 @@ export class HUD{
   this.q('#hpbar i').style.width=clamp(hp/tgt.maxHp*100,0,100)+'%';this.q('#hpbar b').textContent=Math.ceil(hp)+' / '+tgt.maxHp;
   this.q('#shbar i').style.width=clamp(sh,0,100)+'%';this.q('#shbar b').textContent=Math.ceil(sh);this.q('#shbar').classList.toggle('temp',(tgt.ts||0)>0);
   this.q('#aliveN').textContent=g.aliveCount();this.q('#killN').textContent=me.kills;
+  this.updateTeam(g,me);this.updateKnock(g,me);
   // storm
   const s=g.storm;let lbl='Storm approaching',tm=s.t;
   if(s.state==='idle'){lbl='Storm forming';tm=Math.max(0,10-g.t)+0}else if(s.state==='wait')lbl='Storm shrinks in';else if(s.state==='shrink')lbl='Storm closing';else lbl='Final circle';
@@ -118,7 +135,7 @@ export class HUD{
    d.querySelector('.cdt').textContent=cd>0?Math.ceil(cd):'';d.querySelector('.kk').textContent=keyLabel(B['ab'+(i+1)]);d.classList.toggle('ready',cd<=0);
    const id=me.cdef.id,act=(i===1&&me.auraT>0&&id==='coolguy15')||(i===2&&me.buffT>0&&id==='zach')||(id==='chillguy'&&((i===0&&me.cloakT>0)||(i===1&&me.coldT>0)))||(id==='jay'&&i===2&&me.cookT>0);d.classList.toggle('active',!!act);
    if(id==='jay'&&i===1&&me.foodBag)d.querySelector('.nx').textContent=FOOD_ICON[me.foodBag[0]]||''});
-  {const b=[];if(me.cloakT>0)b.push(['Cloaked '+me.cloakT.toFixed(1)+'s','#9be0ff']);if(me.coldT>0)b.push(['Cold Blooded '+me.coldT.toFixed(1)+'s','#7fe0ff']);if(me.slowT>0)b.push(['Slowed','#8ab4ff']);if(me.cookT>0)b.push(['Cooking','#ffb347']);
+  {const b=[];if(me.cloakT>0)b.push(['Cloaked '+me.cloakT.toFixed(1)+'s','#9be0ff']);if(me.coldT>0)b.push(['Cold Blooded '+me.coldT.toFixed(1)+'s','#7fe0ff']);if(me.slowT>0)b.push(['Slowed','#8ab4ff']);if(me.cookT>0)b.push(['Cooking','#ffb347']);if(me.energyT>0)b.push(['Energy '+me.energyT.toFixed(1)+'s','#c6ff3d']);if(me.spicyT>0)b.push(['Spicy '+me.spicyT.toFixed(1)+'s','#ff7a4a']);if(me.jetFuel>0)b.push(['Jet '+me.jetFuel.toFixed(1)+'s','#9be0ff']);
    const k=b.map(x=>x[0]).join('|');const bf=this.q('#buffs');if(bf.dataset.k!==k||me.cloakT>0||me.coldT>0){bf.dataset.k=k;bf.innerHTML=b.map(x=>`<span class="bf" style="color:${x[1]}">${x[0]}</span>`).join('')}this.q('#stealth').classList.toggle('on',me.cloakT>0&&me.alive)}
   // crosshair
   const wd=g.curWeapon(me);const c=this.q('#cross');const sp=Math.hypot(me.vel.x,me.vel.z);
@@ -137,6 +154,34 @@ export class HUD{
   // scoreboard
   const bd=this.q('#board');if(I.down('score')){bd.style.display='block';if(!this.bt||performance.now()-this.bt>300){this.bt=performance.now();const l=g.list.slice().sort((a,b)=>b.kills-a.kills||(b.alive-a.alive));bd.innerHTML='<h3>Players</h3>'+l.slice(0,16).map(e=>`<div class="${e.alive?'':'dead'}"><span>${e.name}${e.bot?' 🤖':''}</span><b>${e.kills}</b></div>`).join('')}}else bd.style.display='none';
  }
+ updateTeam(g,me){
+  const box=this.q('#team');const now=performance.now();if(this.teamT&&now-this.teamT<200)return;this.teamT=now;
+  const mates=g.list.filter(o=>o!==me&&o.team===me.team);
+  if(!mates.length){if(box.dataset.k!=='')box.innerHTML='';box.dataset.k='';return}
+  const rows=mates.map(o=>{
+   const d=Math.round(Math.hypot(o.pos.x-me.pos.x,o.pos.z-me.pos.z));
+   const card=[...g.cards.values()].find(c=>c.owner===o.id);
+   let st;
+   if(!o.alive)st=card?`<span class="card">REBOOT CARD ${card.carrier>=0?'· '+esc((g.ents.get(card.carrier)||{}).name||'carried'):'· on the ground'}</span>`:'<span class="ko">OUT</span>';
+   else if(o.knocked)st=`<span class="kn">KNOCKED · ${Math.ceil(o.kT)}s · ${d}m</span><i class="rv"><u style="width:${Math.min(100,o.reviveT/REVIVE_T*100)}%"></u></i>`;
+   else st=`<i><u style="width:${clamp(o.hp/o.maxHp*100,0,100)}%"></u></i><span>${Math.ceil(o.hp)} HP · ${d}m</span>`;
+   return `<div class="tm${o.alive?'':' out'}${o.knocked?' kn':''}"><b>${esc(o.name)}</b>${st}</div>`}).join('');
+  if(box.dataset.k!==rows){box.dataset.k=rows;box.innerHTML=`<div class="tt">Team</div>${rows}`}
+ }
+ // your own knock (countdown and being revived) or the revive you are doing
+ updateKnock(g,me){
+  const box=this.q('#knock');let html='';
+  if(me.alive&&me.knocked){
+   html=`<div class="kn-t">KNOCKED</div><div class="kn-s">Crawling · a teammate can revive you · <b>${Math.ceil(me.kT)}s</b></div>`+
+    (me.reviveT>0?`<div class="kn-bar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div><div class="kn-s">Being revived…</div>`:'');
+  }else{
+   const r=g.list.find(o=>o!==me&&o.alive&&o.knocked&&o.reviver===me.id);
+   if(r)html=`<div class="kn-t rv">REVIVING ${esc(r.name)}</div><div class="kn-bar"><i style="width:${Math.min(100,r.reviveT/REVIVE_T*100)}%"></i></div>`;
+  }
+  if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
+  box.style.display=html?'flex':'none';
+ }
+ hideElim(){$('elim').style.display='none'}
  drawMinimap(g,tgt,big){
   const cv=big||this.mm,x=big?big.getContext('2d'):this.mx,S=cv.width;x.clearRect(0,0,S,S);if(!this.mapImg)return;
   const view=big?W.HALF*2:230;const k=S/view;const m2px=this.mapS/(W.HALF*2);
@@ -165,6 +210,8 @@ export class HUD{
   const b=g.bus;const[s0,s1]=P(b.sx,b.sz),[e0,e1]=P(b.sx+b.dx*b.len,b.sz+b.dz*b.len);x.strokeStyle='#ffd23d';x.setLineDash([10,8]);x.lineWidth=3;x.beginPath();x.moveTo(s0,s1);x.lineTo(e0,e1);x.stroke();x.setLineDash([]);
   const[bp0,bp1]=P(b.pos.x,b.pos.z);if(g.busMesh.visible){x.fillStyle='#ffd23d';x.beginPath();x.arc(bp0,bp1,9,0,6.283);x.fill()}
   for(const s of g.supplies){const[a,c]=P(s.x,s.z);x.fillStyle='#ff4a4a';x.fillRect(a-7,c-7,14,14)}
+  // teammates: green dots on the map (knocked/eliminated ones are left off)
+  for(const o of g.list){if(o===g.me||!o.alive||o.drop||o.team!==g.me.team)continue;const[a,c]=P(o.pos.x,o.pos.z);x.fillStyle='#5cff8a';x.strokeStyle='#021a0a';x.lineWidth=2;x.beginPath();x.arc(a,c,6,0,6.283);x.fill();x.stroke()}
   const[m0,m1]=P(tgt.pos.x,tgt.pos.z);x.save();x.translate(m0,m1);x.rotate(-tgt.yaw+Math.PI);x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=2;x.beginPath();x.moveTo(0,12);x.lineTo(9,-10);x.lineTo(0,-5);x.lineTo(-9,-10);x.closePath();x.fill();x.stroke();x.restore();
   x.restore()}
 }

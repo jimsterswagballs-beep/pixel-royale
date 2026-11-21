@@ -5,6 +5,7 @@ import * as W from './world.js';
 import {FX} from './fx.js';
 import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,charTex,wstat,makeWeaponModel,mat,angDiff,lerpAng,crispMat,makeBusModel} from './shared.js';
 import {movementMethods} from './movement.js';
+import {knockMethods} from './knock.js';
 import {combatMethods} from './combat.js';
 import {lootMethods} from './loot.js';
 import {botMethods} from './bots.js';
@@ -54,7 +55,7 @@ export class Game{
   sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);{const sc=sun.shadow.camera;sc.left=-SHADOW_R;sc.right=SHADOW_R;sc.top=SHADOW_R;sc.bottom=-SHADOW_R;sc.near=1;sc.far=700;sc.updateProjectionMatrix()}sun.shadow.bias=-.0005;sun.shadow.normalBias=.5;
   this.vmScene=new THREE.Scene();this.vmCam=new THREE.PerspectiveCamera(58,1,.02,10);this.vmScene.add(new THREE.HemisphereLight('#fff','#778',1.4));const vs=new THREE.DirectionalLight('#fff',1.2);vs.position.set(1,2,1);this.vmScene.add(vs);
   this.fx=new FX(this.scene);this.fx.cam=this.camera;this.worldBuilt=false;this.running=false;this.dynamic=new THREE.Group();this.scene.add(this.dynamic);
-  this.ents=new Map();this.list=[];this.loot=new Map();this.traps=new Map();this.projs=[];this.pvis=new Map();this.outEvents=[];this.tmpV=new THREE.Vector3();
+  this.ents=new Map();this.list=[];this.loot=new Map();this.traps=new Map();this.strikes=[];this.projs=[];this.pvis=new Map();this.outEvents=[];this.tmpV=new THREE.Vector3();
   this.view={recoilP:0,recoilY:0,kick:0,shake:0,bobT:0,eye:EYE,roll:0,fov:92,adsK:0,equipK:1,reloadK:0,sway:0,flash:0,hitK:0,burgerT:0};
   this.vfxInit();this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
  }
@@ -64,6 +65,7 @@ export class Game{
  get settings(){return this.app.settings}
  get me(){return this.ents.get(this.myId)}
  cleanup(){
+  if(this.fieldMeshes)for(const m of this.fieldMeshes.values())this.dynamic.remove(m);
   for(const e of this.list){if(e.spr)this.dynamic.remove(e.spr.group)}
   for(const l of this.loot.values())if(l.mesh)this.dynamic.remove(l.mesh);
   for(const t of this.traps.values())if(t.mesh)this.dynamic.remove(t.mesh);
@@ -73,7 +75,7 @@ export class Game{
   if(this.stormMesh){this.dynamic.remove(this.stormMesh);this.stormMesh=null}
   if(this.vmModel){this.vmScene.remove(this.vmModel);this.vmModel=null}
   this.vfxCleanup();
-  this.ents.clear();this.list=[];this.loot.clear();this.traps.clear();this.projs=[];this.pvis.clear();this.outEvents=[];
+  this.ents.clear();this.list=[];this.loot.clear();this.traps.clear();this.strikes=[];this.projs=[];this.pvis.clear();this.outEvents=[];
  }
  start(cfg){
   this.cleanup();this.role=cfg.role;this.net=cfg.net;this.myId=cfg.myId;this.seed=cfg.seed;this.diff=cfg.diff||'Normal';
@@ -89,7 +91,7 @@ export class Game{
   this.t=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
   this.storm={phase:-1,state:'idle',t:25,cx:0,cz:0,r:480,ocx:0,ocz:0,or:480,tcx:0,tcz:0,tr:480,dmg:0};
   this.supplyT=45;this.supplies=[];
-  this.genLoot(mulberry32(this.seed+99));
+  this.genLoot(mulberry32(this.seed+99));this.setupFields();
   this.initStormMesh();
   this.me.pos.copy(this.bus.pos);
   this.view.recoilP=this.view.recoilY=0;this.running=true;this.audio.mode='game';
@@ -105,7 +107,7 @@ export class Game{
    inv:[{k:'w',w:0,r:0,mag:0},null,null,null,null,null],cur:0,ammo:{light:0,med:0,shells:0,heavy:0,rockets:0},
    fireCd:0,reload:0,equipT:0,use:null,stun:0,slip:0,dance:0,dazed:0,eatT:0,auraT:0,buffT:0,cd:[0,0,0],dash:null,grap:null,slamming:false,
    hitT:0,shootT:0,landT:0,walkT:0,lastHit:-99,lastBy:-1,padCd:0,airCap:0,wi:-1,bloom:0,deadT:0,spawnT:0,
-   cloakT:0,coldT:0,slowT:0,cookT:0,slowK:.4,coldUntil:0,noCloakUntil:0,slipImm:0,abNext:[0,0,0],anim:'',animT:0,animDur:0,foodBag:null,team:info.team!==undefined?info.team:info.id,
+   cloakT:0,coldT:0,slowT:0,cookT:0,energyT:0,spicyT:0,jetFuel:0,slowK:.4,coldUntil:0,noCloakUntil:0,slipImm:0,abNext:[0,0,0],anim:'',animT:0,animDur:0,foodBag:null,team:info.team!==undefined?info.team:info.id,
    tgt:{x:0,y:0,z:0,yaw:0,pitch:0},jumpHeld:false,prevFire:false,prevCrouch:false,prevJump:false};
   e.pos.copy(this.bus.pos);e.rpos.copy(e.pos);
   if(c.id==='jay')e.foodBag=this.shuffledFoods();
@@ -165,7 +167,7 @@ export class Game{
   if(e.hitT>0){e.hitT-=dt;if(e.hitT>.09)s.mat.color.setRGB(2.2,2.2,2.2);else s.mat.color.setRGB(1.5,.45,.45)}else if(e.slowT>0)s.mat.color.setRGB(.7,.9,1.35);else s.mat.color.setRGB(1,1,1);
   if(e.char==='chillguy'){let gr=0,gg=0,gb=0;if(e.hitT>.09){gr=gg=gb=.7}else if(e.hitT>0){gr=.5}if(e.coldT>0){gg+=.12;gb+=.22}if(e.slowT>0){gg+=.1;gb+=.2}s.mat.glow.setRGB(gr,gg,gb)}
   if(!e.alive){e.deadT+=dt;const k=Math.min(1,e.deadT/.5);rz2=(flip>0?-1:1)*1.45*k;sy*=1-.2*k;s.mat.opacity=clamp(1.6-e.deadT,0,1);s.mat.transparent=true}
-  else s.mat.opacity=1;
+  else{s.mat.opacity=1;if(e.knocked)rz2=(flip>0?-1:1)*1.45}
   if(this.over&&e.id===this.winnerId){const em=e.cos.emote||0;const t=this.t*(em===0?5:em===1?3:4);if(em===0){flip*=Math.cos(t)}else if(em===1){py=Math.abs(Math.sin(t*2))*1.1;rz2=Math.sin(t*2)*.15}else{rz2=(t*2)%6.283;py=.5+Math.sin(t)*.2}}
   // ---- hero ability animations
   if(e.animT>0){e.animT=Math.max(0,e.animT-dt);const k=1-e.animT/(e.animDur||.35);
@@ -221,9 +223,11 @@ export class Game{
     if(ev.by===this.myId&&ev.t!==this.myId){this.hud.hitmarker(false,!!ev.h,ev.sh&&!ev.hp);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
     if(ev.t===this.myId){this.hud.flashDamage(ev.by>=0&&this.ents.get(ev.by)?this.ents.get(ev.by).pos:null,this);au.play('hurt');this.view.shake=Math.min(1,this.view.shake+Math.min(.6,ev.d/60));if(me.use){me.use=null;this.hud.toast('Interrupted',"#ff7a7a")}}
     break}
-   case'kill':{const v=this.ents.get(ev.v),b=this.ents.get(ev.by);
+   case'kill':{const v=this.ents.get(ev.v),b=ev.by>=0?this.ents.get(ev.by):null;
     if(v){v.alive=false;v.hp=0;v.deadT=0;fx.burst(v.pos.x,v.pos.y+1,v.pos.z,40,9,'#ffd23d',.7,8);fx.burst(v.pos.x,v.pos.y+1,v.pos.z,24,6,'#ff6bd6',.8,6);fx.ring(v.pos,3,'#ffffff',.45)}
-    this.hud.killfeed(b?b.name:null,v?v.name:'?',ev.w,ev.by===this.myId,ev.v===this.myId);
+    this.hud.killfeed({code:ev.w,head:!!ev.h,mine:ev.by===this.myId,died:ev.v===this.myId,
+     killer:ev.by>=0?(b?{name:b.name,col:b.cdef&&b.cdef.color,me:ev.by===this.myId}:{gone:true}):null,
+     victim:{name:v?v.name:'Player',col:v&&v.cdef?v.cdef.color:null,me:ev.v===this.myId}});
     if(ev.by===this.myId&&ev.v!==this.myId){this.hud.hitmarker(true,false);au.play('kill');this.hud.toast('Eliminated '+(v?v.name:''),'#ffd23d')}
     if(ev.v===this.myId){this.onMeDead(ev)}
     if(v&&v.spr)au.play('hurt',v.pos,.8);
@@ -232,6 +236,9 @@ export class Game{
    case'lt+':this.addLootObj(ev.l,true);break;
    case'lt-':this.removeLoot(ev.id);break;
    case'cho':{const l=this.loot.get(ev.id);if(l){l.opened=true;if(l.mesh){this.dynamic.remove(l.mesh);l.mesh=null}au.play('chest',new THREE.Vector3(l.x,l.y,l.z));fx.burst(l.x,l.y+.6,l.z,30,5,'#ffd23d',.8,6)}this.loot.delete(ev.id);break}
+   case'strk':{const r=new THREE.Mesh(new THREE.RingGeometry(4.6,5.3,40),new THREE.MeshBasicMaterial({color:'#ff4d3d',transparent:true,opacity:.75,side:THREE.DoubleSide,depthWrite:false}));r.rotation.x=-Math.PI/2;r.position.set(ev.x,W.H(ev.x,ev.z)+.15,ev.z);this.dynamic.add(r);au.play('click',new THREE.Vector3(ev.x,W.H(ev.x,ev.z),ev.z));setTimeout(()=>this.dynamic.remove(r),(ev.t||2.5)*1000);break}
+   case'pjv':{const p=this.pvis.get(ev.id);if(p){p.x=ev.x;p.y=ev.y;p.z=ev.z;p.vx=ev.vx;p.vy=ev.vy;p.vz=ev.vz}break}
+   case'dz':fx.tracer(new THREE.Vector3(ev.x1,ev.y1,ev.z1),new THREE.Vector3(ev.x2,ev.y2,ev.z2),'#7fe9ff',.05,.18);break;
    case'tp+':this.addTrapVis(ev);break;
    case'tp-':{const t=this.traps.get(ev.id);if(t){if(t.mesh)this.dynamic.remove(t.mesh);this.traps.delete(ev.id)}break}
    case'pj':this.addProjVis(ev);break;
@@ -244,6 +251,8 @@ export class Game{
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
    case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
+   case'ntf':if(this.me&&(ev.tm===undefined||ev.tm===this.me.team))this.hud.toast(ev.t,ev.c);break;
+   case'rb':if(ev.v===this.myId)this.onMeRebooted(ev);break;
    case'end':this.onEnd(ev);break;
    case'snd':au.play(ev.n,ev.p?new THREE.Vector3(...ev.p):null,ev.g||1);break;
    case'quip':break;
@@ -256,12 +265,17 @@ export class Game{
    case'heal':this.healFx(ev);break;
   }
  }
+ onMeRebooted(ev){
+  const me=this.me;me.alive=true;me.knocked=false;me.deadT=0;
+  if(this.role==='client'){me.pos.set(ev.x,ev.y,ev.z);me.rpos.copy(me.pos);me.vel.set(0,0,0)}
+  this.spectateId=-1;this.hud.hideElim();this.app.showCursor(false);this.app.lock();
+ }
  onMeDead(ev){
   const me=this.me;me.alive=false;const killer=this.ents.get(ev.by);this.spectateId=killer&&killer.alive?killer.id:-1;this.audio.play('lose');
   const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(ev.w||'the storm'),me.kills,this)}
  onEnd(ev){
   if(this.over)return;this.over=true;this.winnerId=ev.win;const w=this.ents.get(ev.win);this.overT=this.t;
-  if(this.me.alive&&ev.win===this.myId){this.audio.play('win');this.hud.showVictory(this)}
+  if(this.me.team===ev.tm){this.audio.play('win');this.hud.showVictory(this)}
   else this.hud.announce((w?w.name:'Nobody')+' wins!','#ffd23d');
   this.hud.onEnd(this,ev)}
  // ---------- main update
@@ -271,7 +285,7 @@ export class Game{
   this.updateBus(dt);if(this.decor)this.decor.update(this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.checkWin()}
+   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.checkWin()}
   else{this.updateClientSim(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
   this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
@@ -319,7 +333,7 @@ export class Game{
   const look=new THREE.Vector3(tgt[0]+fwd[0]*12,tgt[1]+fwd[1]*12,tgt[2]+fwd[2]*12);
   quat.setFromRotationMatrix(new THREE.Matrix4().lookAt(pos,look,new THREE.Vector3(0,1,0)));
  }
- render(dt){
+ render(dt){this.syncFieldVis();
   const cam=this.camera,s=this.settings,v=this.view;const tgt=this.viewEnt();if(!tgt)return;
   const fpv=this.fpv;
   // third person while diving and gliding; blends back to first person when the player lands
@@ -360,4 +374,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);
+Object.assign(Game.prototype,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);

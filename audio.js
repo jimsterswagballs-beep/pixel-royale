@@ -50,6 +50,12 @@ export class Audio{
    case'slip':this.tone(900,.35,.5,'triangle',dest,200);break;
    case'grapple':this.tone(300,.2,.5,'sawtooth',dest,1200);break;
    case'pad':this.tone(200,.3,.6,'square',dest,1200);break;
+   case'buff':this.tone(520,.12,.35,'triangle',dest,980);this.tone(980,.14,.3,'triangle',dest,null,.1);break;
+   case'spicy':this.noise(.35,7000,2500,.25,'highpass',dest);this.tone(330,.25,.2,'sawtooth',dest,660);break;
+   case'jet':this.noise(.5,1200,300,.3,'bandpass',dest);break;
+   case'frost':this.tone(1800,.25,.25,'sine',dest,900);this.noise(.2,9000,4000,.12,'highpass',dest);break;
+   case'shock':this.noise(.12,9000,2000,.5,'bandpass',dest);this.tone(1200,.18,.35,'sawtooth',dest,300);break;
+   case'call':[880,660,880,660].forEach((f,i)=>this.tone(f,.16,.4,'square',dest,null,i*.18));break;
    case'cloak':this.noise(.6,4000,300,.35,'bandpass',dest);this.tone(700,.5,.25,'sine',dest,120);break;
    case'cold':[1400,1850,2300].forEach((f,i)=>this.tone(f,.35,.25,'sine',dest,f*1.02,i*.06));this.noise(.3,6000,3000,.15,'highpass',dest);break;
    case'strike':this.noise(.18,6000,800,.6,'bandpass',dest);this.tone(900,.15,.3,'sawtooth',dest,200);break;

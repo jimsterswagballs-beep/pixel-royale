@@ -11,14 +11,14 @@ export function rollItem(rng,q=1,min=0){
  const k=rng();
  if(k<.22||min>0&&k<.8){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
  if(k<.42){const types=Object.keys(AMMO);const t=types[pick(rng,[10,8,6,3,1.5])];return{k:'a',t,n:AMMO[t].box}}
- const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana'];const ws=[9,8,3.5,2.5,.7,2.2,2,2.8,1.4,1.6];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
+ const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana','jet','energy','pepper','cloak','drone','strike','frost','shock'];const ws=[9,8,3.5,2.5,.7,2.2,2,2.8,1.4,1.6,1.2,2.4,2,1,1.4,.9,2,1.6];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
 // Floor loot (not chests): mostly healing/utility, with the odd weapon or ammo stack.
 // Floor weapons skew low rarity (never above Epic) so chests stay the place to find the good stuff.
 export function rollFloorItem(rng,q=1){
  const k=rng();
  if(k<.16){const w=pick(rng,WEAPON_W);const r=Math.min(3,rollRarity(rng,Math.min(q,1)*.6));return{k:'w',w,r,mag:wstat(w,r).mag}}
  if(k<.42){const types=Object.keys(AMMO);const t=types[pick(rng,[10,8,6,3,1.5])];return{k:'a',t,n:Math.ceil(AMMO[t].box*.7)}}
- const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana'];const ws=[9,8,3,1.5,.4,2.2,2,2.8,1.4,1.6];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
+ const its=['bandage','minishield','medkit','bigshield','chug','grapple','pad','frag','boogie','banana','jet','energy','pepper','cloak','drone','strike','frost','shock'];const ws=[9,8,3,1.5,.4,2.2,2,2.8,1.4,1.6,.8,2.6,2.2,.7,1,.6,1.8,1.4];const id=its[pick(rng,ws)];return{k:'i',id,n:ITEMS[id].give}}
 export function rollWeapon(rng,q=1,min=0){const w=pick(rng,WEAPON_W);const r=rollRarity(rng,q,min);return{k:'w',w,r,mag:wstat(w,r).mag}}
 export function itemName(it){if(it.k==='m')return MATS[it.t].n+' x'+it.n;if(it.k==='w')return RARITY[it.r].n+' '+WEAPONS[it.w].n;if(it.k==='i')return ITEMS[it.id].n+(it.n>1?' x'+it.n:'');return AMMO[it.t].n+' Ammo x'+it.n}
 export function itemColor(it){if(it.k==='m')return MATS[it.t].c;if(it.k==='w')return RARITY[it.r].c;if(it.k==='i')return ITEMS[it.id].col;return AMMO[it.t].c}
@@ -115,6 +115,42 @@ export function makeFloorItem(it){
     part(g,new THREE.TorusGeometry(.3,.1,8,22,Math.PI*1.35),'#ffdf38',0,.25,0,1,1,1,0,0,Math.PI/2);
     part(g,new THREE.ConeGeometry(.09,.16,8),'#72512b',-.28,.26,0,1,1,1,0,0,-Math.PI/2);
     part(g,new THREE.ConeGeometry(.09,.16,8),'#72512b',.28,.26,0,1,1,1,0,0,Math.PI/2);break;
+   case 'jet':
+    part(g,new THREE.CylinderGeometry(.12,.12,.46,12),'#c9d3e6',-.13,.32,0,1,1,1,0,0,.12);
+    part(g,new THREE.CylinderGeometry(.12,.12,.46,12),'#c9d3e6',.13,.32,0,1,1,1,0,0,-.12);
+    part(g,new THREE.BoxGeometry(.36,.08,.1),'#3a4256',0,.42,0);
+    part(g,new THREE.ConeGeometry(.1,.22,10),'#ff8a2a',0,.1,0,1,1,1,Math.PI,0,0);break;
+   case 'energy':
+    part(g,new THREE.CylinderGeometry(.19,.19,.6,14),'#2fbf5a',0,.32,0);
+    part(g,new THREE.CylinderGeometry(.2,.2,.08,14),'#d8e2ea',0,.64,0);
+    part(g,new THREE.ConeGeometry(.1,.24,4),'#f6ff7a',0,.34,.2);break;
+   case 'pepper':
+    part(g,new THREE.ConeGeometry(.14,.55,8),'#d62a1a',0,.36,0,1,1,1,.25,0,.5);
+    part(g,new THREE.CylinderGeometry(.03,.04,.14,6),'#3f8a2a',0,.66,0);break;
+   case 'cloak':
+    part(g,new THREE.CylinderGeometry(.22,.26,.5,14,1,true),'#5b4fb8',0,.34,0);
+    part(g,new THREE.TorusGeometry(.24,.04,6,18),'#b9b2ff',0,.6,0,1,1,1,Math.PI/2);
+    part(g,new THREE.SphereGeometry(.14,10,8),'#2b2250',0,.36,0,1,.6,1,0,0,0,.6);break;
+   case 'drone':
+    part(g,new THREE.SphereGeometry(.2,12,10),'#3a4a66',0,.36,0);
+    part(g,new THREE.SphereGeometry(.07,8,6),'#ff3d3d',0,.36,.18);
+    part(g,new THREE.BoxGeometry(.6,.04,.06),'#263247',0,.4,0);
+    part(g,new THREE.BoxGeometry(.06,.04,.6),'#263247',0,.4,0);
+    for(const[x,z]of[[.26,.26],[-.26,.26],[.26,-.26],[-.26,-.26]])part(g,new THREE.CylinderGeometry(.14,.14,.02,14),'#9be9ff',x,.46,z,1,1,1,0,0,0,.6);break;
+   case 'strike':
+    part(g,new THREE.TorusGeometry(.3,.04,6,22),'#ff4d3d',0,.32,0,1,1,1,Math.PI/2);
+    part(g,new THREE.BoxGeometry(.7,.03,.04),'#ff4d3d',0,.32,0);
+    part(g,new THREE.BoxGeometry(.04,.03,.7),'#ff4d3d',0,.32,0);
+    part(g,new THREE.SphereGeometry(.08,8,6),'#ffd2c8',0,.32,0);break;
+   case 'frost':
+    part(g,new THREE.SphereGeometry(.26,12,10),'#8fe9ff',0,.32,0,1,1,1,0,0,0,.4);
+    part(g,new THREE.CylinderGeometry(.08,.08,.12,8),'#dfe9ef',0,.6,0);
+    part(g,new THREE.BoxGeometry(.5,.04,.04),'#ffffff',0,.32,0);
+    part(g,new THREE.BoxGeometry(.04,.04,.5),'#ffffff',0,.32,0);break;
+   case 'shock':
+    part(g,new THREE.CylinderGeometry(.42,.46,.12,20),'#3a3f4d',0,.1,0);
+    part(g,new THREE.TorusGeometry(.3,.035,6,22),'#ffe14a',0,.2,0,1,1,1,Math.PI/2);
+    part(g,new THREE.ConeGeometry(.1,.3,4),'#fff3a0',0,.3,0);break;
    default: part(g,new THREE.DodecahedronGeometry(.28,0),c,0,.3,0);
   }
  }

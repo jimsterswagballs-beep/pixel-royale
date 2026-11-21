@@ -94,13 +94,68 @@ Known limits: the multiplayer code has only been tested with fake networking, no
 - Bots are drawn from all four characters (`botnames.js`), so Chill Guy and Jay appear in bot matches and use their own bot logic (`botChill`, `botJay`).
 - The HUD shows the hero ability icons, the next food in Jay's bag, and a buffs row (Cloaked, Cold Blooded, Cooking).
 
-## Starter Island and lobby
+## Team modes and bot teammates
 
-- **Starter Island** (`starter.js`): the title and party lobby screens show a walkable island behind the menus. Your hero stands on the plaza, the Battle Bus is parked on the north side, and a cabin, palms, rocks and training dummies fill the island. WASD walks (relative to the camera), ← / → turn the camera, and G dances.
-- **Boarding**: Play (solo) or Board Bus (party host) flies the bus off with your hero aboard, fades to black, and then starts the match (`App.boardThen` in `main.js`).
-- **Lobby**: the title plate shows your name and hero over the island, and the party lobby sits over a lighter version of the same scene.
+- **Modes**: Solo (1 per team), Duos (2), Trios (3) and Squads (4). Pick one in the solo lobby or the party lobby (host). `MODES` and `buildEntrants` live in `teams.js`.
+- **Party and teams**: in team modes the party is grouped in join order, so a party of 3 in Trios is one team. Extra party members start new teams.
+- **Fill with bots**: when on, bots fill empty teammate slots first. When off, partly filled teams stay partly filled and the bot slider only adds bot teams.
+- **Win condition**: the match ends when one team is left (in Solo, when one player is left). A team's place counts teams still standing.
+- **No friendly fire**: bullets, melee, abilities and explosions never hit a teammate (`isAlly` in `combat.js`). Jay's food still heals teammates.
+- **Team panel**: top-left shows your teammates with health and distance. Teammates show as green dots on the minimap.
+- **Bot teammates** (`bots.js`):
+  - Bots never treat a teammate as an enemy, whether seen or heard.
+  - A bot that is far from its team walks back to it (`regroup`). It follows the nearest teammate and stops when it is close again.
+  - A bot with a healing item gives it to a hurt teammate who is nearby. A bot with spare ammo gives some to a teammate who is nearly out.
+
+## Knocked, revive, reboot cards and vans (team modes)
+
+- **Knocked** (`knock.js`): in team modes a player who runs out of health is knocked instead of eliminated. Knocked players crawl slowly (`CRAWL`), cannot shoot, use abilities, drop or pick up items, and have `KNOCK_T` (30 s) before they are eliminated. Enemies can finish them off with any damage.
+- **Revive**: a standing teammate holds interact within 2.6 m for `REVIVE_T` (4 s). Damage to the reviver cancels the revive, and moving out of range resets the progress. The revived player comes back with `REVIVE_HP` (30).
+- **Team out**: when nobody on a team is standing, its knocked players are finished off.
+- **Reboot cards**: when a player is eliminated and a teammate is still standing, a card drops. A teammate picks it up with interact within 2.4 m. Cards last `CARD_T` (120 s). If the carrier is eliminated, the card falls where they fell.
+- **Reboot vans**: five vans are placed across the map from the match seed, so every client has the same positions. A carrier who presses interact near a ready van starts a `VAN_T` (8 s) reboot. The carrier must stay within about 5.5 m, or the reboot is cancelled and the card goes back to them. A rebooted player returns with `REBOOT_HP` (50), a pistol and 30 light ammo. The van then cools down for `VAN_COOL` (60 s).
+- **HUD**: your own knock shows a countdown and your revive progress. The team panel shows knocked teammates with a revive bar, and eliminated teammates with a reboot card status. Notifications appear as toasts for your team.
+- **Sync**: knocked is a flag bit, and cards and vans are in each snapshot. The host decides everything. Clients send a `hold` message when they press or release interact.
+- **Tests**: `knock.js` logic was checked with a Node harness (timers, revive and interrupts, team out, cards, vans, cooldowns and expiry).
+
+Not built yet: bots reviving or rebooting teammates, pings, and a bot-side knocked response. A knocked bot stands still until it is finished.
+
+## Lobby remake and Starter Island
+
+- **Solo lobby** (the Lobby tab): match setup (name, bots, difficulty) sits on the left next to a hero showcase with stats and a Change hero button. Play drops straight into a match with a quick fade. The battle royale map shows behind the screen.
+- **Party lobby** (after you create or join a party): the squad panel is on the left, match settings and Board Bus are on the right, and your hero picker sits in a bar under the island.
+- **Starter Island** (`starter.js`): a walkable island shown only behind the party lobby. Your hero stands on the plaza, the Battle Bus is parked on the north side, and a cabin, palms, rocks and training dummies fill the island. WASD walks (relative to the camera), ← / → turn the camera, and G dances.
+- **Board Bus** (party host): the bus flies off with your hero aboard, the screen fades to black, and the match starts (`App.boardThen` in `main.js`). Solo Play skips the bus and just fades.
+- Player names in the lobby are escaped before they are written to the page.
 
 ## Dive and glide camera
 
 - While skydiving and gliding the camera is third person, behind the hero. On landing it blends back to first person in about a third of a second (`tpPose` and `tpK` in `game.js`).
 - Gliding shows a glider canopy with strings to the hero's shoulders, coloured by hero (`makeGliderModel` in `game.js`). It opens with a short deploy animation and sways in the wind. Other players see it too.
+
+## Weapon damage and new items
+
+- **Weapon damage**: every weapon's damage is multiplied by `WEAPON_DMG_MUL` in `shared.js`, now `.55` (it was `.7`). Change that one number to tune how fast fights end.
+- **Homing Missile Launcher** (rockets ammo): each missile re-picks a target every 0.25 s, the nearest enemy within about 40 degrees either side of its flight path, up to 90 m away, with a clear line of sight. It steers toward that target at a limited turn rate. The host runs the steering and sends `pjv` updates so every client draws the same flight path.
+- **Jetpack** (`jet`): drinking it gives 6 s of fuel. Hold Space in the air to climb, up to 11 m/s. Fuel only burns while you thrust.
+- **Energy Drink** (`energy`): +10 HP and +25% move speed for 8 s.
+- **Chili Pepper** (`pepper`): Spicy for 8 s, +30% weapon damage (host-side, from flag bit `262144`), plus a fire trail while sprinting.
+- **Invisibility Cloak** (`cloak`): invisible for 8 s, using the same cloak flag as Chill Guy. Attacking reveals you, and so does taking damage from someone else.
+- **Recon Drone** (`drone`, deploy): placed 2.4 m in front of you and hovers for 14 s. Every 0.8 s it shoots the nearest enemy within 40 m that it has a clear line to, for 7 damage (host-run, sends `dz` tracers).
+- **Air Strike** (`strike`, call-in): aim at the ground (up to 150 m) and a red ring marks the spot for 2.5 s. Then six bombs fall within about 6.5 m of it (host-run; clients send a `strike` message).
+- **Frost Grenade** (`frost`, throwable): bursts after 1.8 s, slows enemies in the blast by 50% for 3 s, and deals damage.
+- **Shock Trap** (`shock`, placed): the first enemy to step on it within about 1.5 m is stunned for 1.3 s and the trap is removed. The owner never triggers it.
+
+Known limits:
+- Bots do not use the new items; they only use the homing launcher through normal weapon scoring.
+- The jetpack, energy and spicy effects are not drawn on remote players.
+- Multiplayer with real PeerJS has not been tested. Headless tests cover single-player and bot logic only.
+
+## Kill feed
+
+- Weapon kills show the weapon name and its rarity colour. The kill event's weapon id is `weapon*10+rarity`, decoded before lookup.
+- Each row reads killer, weapon, victim. You appear as "You" (highlighted for kills, red for your death).
+- The storm, self kills ("own goal"), and a killer who has left the match each get their own label.
+- Headshot kills get a "Headshot" tag. The kill event carries a `h` flag for this.
+- Frag and Boogie grenades have separate kill names (`-5`, `-17`).
+- Player names are written as text, not HTML, so a name containing markup can't inject anything.

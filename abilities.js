@@ -61,7 +61,7 @@ function emojiTexture(e){if(emojiTex[e])return emojiTex[e];const c=document.crea
 export const heroMethods={
  // ================================================================== shared helpers
  allied(a,b){return !!a&&!!b&&a.team===b.team},
- dmgMulOf(e){return e&&e.coldUntil>this.t?CB.cold.dmgMul:1},
+ dmgMulOf(e){return (e&&e.coldUntil>this.t?CB.cold.dmgMul:1)*(e&&e.spicyT>0?1.3:1)},
  foodHealMul(t){return t&&t.cdef&&t.cdef.id==='jay'?JB.passive.foodHealMul:1},
  isFoodLoot(l){const it=l&&l.item;if(!it||it.k!=='i')return false;const d=ITEMS[it.id];return !!d&&(d.kind==='heal'||d.kind==='shield'||d.kind==='chug'||it.id==='banana')},
  // Chef's Touch: Jay reaches consumables from further away

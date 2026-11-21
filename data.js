@@ -37,6 +37,7 @@ export const WEAPONS=[
  w({n:'Potato Cannon',t:'fun',ammo:'light',dmg:32,speed:85,grav:8,rps:3,mag:10,reload:2.2,rc:1.2,auto:false,col:'#b08a55',sp2:'potato',lw:9}),
  w({n:'Fish Slapper',t:'melee',dmg:42,rps:2,range:3,melee:true,kb:8,col:'#5ab0d0',lw:8,auto:true}),
  w({n:'Pirate Blunderbuss',t:'sg',ammo:'shells',dmg:14,pellets:14,rps:.6,mag:1,reload:2.2,sp:.1,rc:4,range:30,kb:10,auto:false,col:'#6a3d1a',lw:5}),
+  w({n:'Homing Missile Launcher',t:'ex',ammo:'rockets',dmg:62,splash:4.5,speed:30,grav:0,homing:1,rps:1.1,mag:4,reload:3,rc:1.2,auto:false,col:'#5a7a4a',lw:5}),
 ];
 export const ITEMS={
  bandage:{n:'Bandage',kind:'heal',time:2,hp:15,cap:75,col:'#f2f2f2',stack:15,give:5,lw:14,ic:'🩹'},
@@ -49,6 +50,14 @@ export const ITEMS={
  frag:{n:'Frag Grenade',kind:'throw',col:'#6b8f3a',stack:6,give:3,lw:8,ic:'💣'},
  boogie:{n:'Boogie Bomb',kind:'throw',col:'#ff55ff',stack:4,give:2,lw:4,ic:'🪩'},
  banana:{n:'Banana Peel',kind:'place',col:'#ffe14a',stack:6,give:3,lw:4,ic:'🍌'},
+ jet:{n:'Jetpack',kind:'buff',buff:'jet',time:1.2,col:'#9be0ff',stack:2,give:1,lw:1.2,ic:'🚀'},
+ energy:{n:'Energy Drink',kind:'buff',buff:'energy',time:1,hp:10,col:'#c6ff3d',stack:4,give:2,lw:2.4,ic:'🥤'},
+ pepper:{n:'Chili Pepper',kind:'buff',buff:'spicy',time:1,col:'#ff3a1a',stack:4,give:2,lw:2,ic:'🌶️'},
+ cloak:{n:'Invis Cloak',kind:'buff',buff:'cloak',time:1.5,col:'#7a6cff',stack:2,give:1,lw:1,ic:'👻'},
+ drone:{n:'Recon Drone',kind:'deploy',col:'#7fe9ff',stack:2,give:1,lw:1.4,ic:'🛸'},
+ strike:{n:'Air Strike',kind:'call',col:'#ff4d3d',stack:2,give:1,lw:.9,ic:'🎯'},
+ frost:{n:'Frost Grenade',kind:'throw',col:'#8fe9ff',stack:4,give:2,lw:2,ic:'❄️'},
+ shock:{n:'Shock Trap',kind:'place',col:'#ffe14a',stack:4,give:2,lw:1.6,ic:'⚡'},
 };
 // ---------------------------------------------------------------------------------------------
 // HERO BALANCE TABLE – every tunable number for Chill Guy and Jay lives here (see ABILITIES.md).
@@ -99,7 +108,7 @@ export const CHARS=[
       {n:'Food Fight',cd:BAL.jay.food.cd,ic:'food',d:'Lob a random food: Burger heals a teammate '+BAL.jay.food.burger.heal+', Pizza makes a healing area, Chilli explodes, Banana makes a slippery patch.'},
       {n:'Kitchen Special',cd:BAL.jay.kitchen.cd,ic:'kitchen',d:'Cook up a healing station that restores teammates nearby for '+BAL.jay.kitchen.dur+' seconds.'}]},
 ];
-export const KILL_NAMES={'-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast'};
+export const KILL_NAMES={'-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb'};
 export const ACTIONS=[
  ['fwd','Move Forward','KeyW'],['back','Move Back','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
  ['jump','Jump / Leave Bus','Space'],['sprint','Sprint','ShiftLeft'],['crouch','Crouch / Slide','KeyC'],
