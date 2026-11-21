@@ -4,7 +4,7 @@ import {abilityIcon} from './icons.js';
 import * as W from './world.js';
 import {wstat,IMG} from './shared.js';
 import {MATS,MAT_KEYS} from './materials.js';
-import {REVIVE_T} from './knock.js';
+import {REVIVE_T,KNOCK_T,VAN_READY} from './knock.js';
 
 // one glyph per weapon type and per ability, used in the loadout and ability cards
 const WICON={melee:'⛏',ar:'🔫',smg:'🔫',sg:'💥',sn:'🎯',pi:'🔫',ex:'🚀'};
@@ -25,7 +25,7 @@ export class HUD{
   <div id="cross"><i></i><i></i><i></i><i></i><b></b></div><div id="hitm"><i></i><i></i><i></i><i></i></div>
   <div id="topr"><div class="pill" id="alive"><span>👥</span><b id="aliveN">100</b></div><div class="pill" id="kills"><span>☠</span><b id="killN">0</b></div><div class="pill" id="fps" style="display:none"></div></div>
   <div id="mmwrap"><canvas id="mm" width="340" height="340"></canvas><div id="stormbox"><div id="stormlbl">Storm</div><div id="stormtime">--</div></div><div id="locname"></div></div>
-  <div id="team"></div><div id="knock"></div><div id="killfeed"></div><div id="toasts"></div><div id="announce"></div>
+  <div id="wmarks"></div><div id="team"></div><div id="knock"></div><div id="killfeed"></div><div id="toasts"></div><div id="announce"></div>
   <div id="prompt"><span class="k"></span><span class="t"></span></div>
   <div id="usebar"><div><i></i></div><span></span></div>
   <div id="busHint"></div>
@@ -92,12 +92,22 @@ export class HUD{
    if(this.matLast[k]!==undefined){d.classList.remove('bump');void d.offsetWidth;d.classList.add('bump')}
    d.querySelector('b').textContent=v;this.matLast[k]=v}}
  markSupply(){}
- showElim(place,by,kills,g){setTimeout(()=>{if(g.over)return;const e=$('elim');e.style.display='flex';$('elimPlace').textContent='#'+place;$('elimBy').textContent='Eliminated by '+by;$('elimKills').textContent=kills+' eliminations';this.app.showCursor(true)},1500)}
+
+ fmtTime(sec){sec=Math.max(0,Math.floor(sec));return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0')}
+ statTiles(rows){return rows.map(([k,v])=>`<div class="es-st"><small>${k}</small><b>${v}</b></div>`).join('')}
+ showElim(place,by,kills,g){setTimeout(()=>{if(g.over)return;const e=$('elim');e.style.display='flex';const r=this.app.lastReward||{total:0,why:''};
+   $('elimPlace').textContent='#'+place;$('elimOf').textContent='of '+g.list.length+' players';$('elimBy').textContent=by?'Eliminated by '+by:'Eliminated';
+   $('elimStats').innerHTML=this.statTiles([['Eliminations',kills],['Survived',this.fmtTime(g.deathT||g.t)],['Players left',g.aliveCount()]]);
+   $('elimTok').textContent=r.total?`+${r.total} Swag Tokens · ${r.why}`:'';this.app.showCursor(true)},1500)}
  showVictory(g){}
+
  onEnd(g,ev){this.finished=true;$('elim').style.display='none';const won=g.me.team===ev.tm;const v=$('victory');v.classList.toggle('lose',!won);v.style.display='flex';
-  if(won){$('vicTitle').textContent='VICTORY ROYALE';$('vicSub').textContent=g.teamMode?'#1 – your team is last standing!':'#1 – last one standing!'}
-  else{const w=g.ents.get(ev.win);$('vicTitle').textContent=(w?w.name:'Nobody')+' WINS';$('vicSub').textContent='You placed #'+g.me.place}
-  $('vicKills').textContent=g.me.kills+' eliminations';if(won)this.confetti();setTimeout(()=>this.app.showCursor(true),800)}
+  const r=this.app.lastReward||{total:0,why:''};
+  if(won){$('vicTitle').textContent='Victory Royale';$('vicSub').textContent=g.teamMode?'#1 · Your team is last standing':'#1 · Last one standing'}
+  else{const w=g.ents.get(ev.win);$('vicTitle').textContent=(w?w.name:'Nobody')+' wins';$('vicSub').textContent='You placed #'+g.me.place}
+  $('vicStats').innerHTML=this.statTiles([['Eliminations',g.me.kills],['Survived',this.fmtTime(g.me.alive?g.t:(g.deathT||g.t))],['Placed','#'+(won?1:(g.me.place||'-'))]]);
+  $('vicTok').textContent=r.total?`+${r.total} Swag Tokens · ${r.why}`:'';
+  if(won)this.confetti();setTimeout(()=>this.app.showCursor(true),800)}
  confetti(){const c=$('confetti');c.innerHTML='';for(let i=0;i<90;i++){const p=el('i');p.style.left=Math.random()*100+'%';p.style.background=`hsl(${Math.random()*360},90%,60%)`;p.style.animationDelay=Math.random()*2+'s';p.style.animationDuration=2.5+Math.random()*2.5+'s';c.appendChild(p)}}
  update(g,dt){
   const me=g.me,tgt=g.viewEnt(),I=this.app.input,B=I.binds;
@@ -150,7 +160,7 @@ export class HUD{
   const cam=g.camera;for(const d of this.dmgNums){d.t+=dt;const v=d.p.clone().project(cam);if(v.z>1){d.n.style.display='none';continue}d.n.style.display='block';const S=this.scale;d.n.style.left=((v.x*.5+.5)*innerWidth+d.dx*d.t)/S+'px';d.n.style.top=((-v.y*.5+.5)*innerHeight-d.t*60)/S+'px';d.n.style.opacity=Math.max(0,1-d.t/.9)}
   // fps
   if(g.settings.fps){this.fpsAcc=(this.fpsAcc||0)+dt;this.fpsN=(this.fpsN||0)+1;if(this.fpsAcc>.5){this.q('#fps').textContent=Math.round(this.fpsN/this.fpsAcc)+' FPS';this.fpsAcc=0;this.fpsN=0}}
-  this.drawMinimap(g,tgt);
+  this.drawMinimap(g,tgt);if($('bigmap').style.display==='flex')this.drawMinimap(g,tgt,$('bm'));this.drawWorldMarks(g,me);
   // scoreboard
   const bd=this.q('#board');if(I.down('score')){bd.style.display='block';if(!this.bt||performance.now()-this.bt>300){this.bt=performance.now();const l=g.list.slice().sort((a,b)=>b.kills-a.kills||(b.alive-a.alive));bd.innerHTML='<h3>Players</h3>'+l.slice(0,16).map(e=>`<div class="${e.alive?'':'dead'}"><span>${e.name}${e.bot?' 🤖':''}</span><b>${e.kills}</b></div>`).join('')}}else bd.style.display='none';
  }
@@ -169,49 +179,116 @@ export class HUD{
   if(box.dataset.k!==rows){box.dataset.k=rows;box.innerHTML=`<div class="tt">Team</div>${rows}`}
  }
  // your own knock (countdown and being revived) or the revive you are doing
+
  updateKnock(g,me){
   const box=this.q('#knock');let html='';
+  const vig=this.q('#vig');if(vig)vig.classList.toggle('knocked',!!(me.alive&&me.knocked));
+  const B=this.app.input.binds;
   if(me.alive&&me.knocked){
-   html=`<div class="kn-t">KNOCKED</div><div class="kn-s">Crawling · a teammate can revive you · <b>${Math.ceil(me.kT)}s</b></div>`+
-    (me.reviveT>0?`<div class="kn-bar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div><div class="kn-s">Being revived…</div>`:'');
+   html=`<div class="kn-card"><div class="kn-top"><span class="kn-t">Knocked</span><b>${Math.ceil(me.kT)}s</b></div>`+
+    `<div class="kn-bleed"><i style="width:${clamp(me.kT/KNOCK_T*100,0,100)}%"></i></div>`+
+    `<div class="kn-s">Bleeding out. Move to crawl · <kbd>${keyLabel(B.roll)}</kbd> to roll · teammates hold <kbd>${keyLabel(B.interact)}</kbd> to revive you</div>`+
+    (me.reviveT>0?`<div class="kn-rv"><div class="kn-bar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div><span>Being revived…</span></div>`:'')+`</div>`;
   }else{
    const r=g.list.find(o=>o!==me&&o.alive&&o.knocked&&o.reviver===me.id);
-   if(r)html=`<div class="kn-t rv">REVIVING ${esc(r.name)}</div><div class="kn-bar"><i style="width:${Math.min(100,r.reviveT/REVIVE_T*100)}%"></i></div>`;
+   if(r)html=`<div class="kn-card rv"><div class="kn-top"><span class="kn-t">Reviving ${esc(r.name)}</span></div><div class="kn-bar"><i style="width:${Math.min(100,r.reviveT/REVIVE_T*100)}%"></i></div></div>`;
   }
   if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
   box.style.display=html?'flex':'none';
  }
  hideElim(){$('elim').style.display='none'}
+ // the reboot waypoint: a teammate's card on the ground, then a reboot van once you carry the card
+ waypointTarget(g,me){
+  if(!me||!me.alive||me.knocked)return null;
+  if([...g.cards.values()].some(c=>c.carrier===me.id)){
+   let best=null,bd=1e9;
+   for(const v of g.vans.values()){const d=Math.hypot(v.x-me.pos.x,v.z-me.pos.z)+(v.state===VAN_READY?0:500);if(d<bd){bd=d;best=v}}
+   return best?{x:best.x,y:W.H(best.x,best.z)+2,z:best.z,label:'Reboot van',cls:'van'}:null;
+  }
+  if(!g.teamMode)return null;
+  let best=null,bd=1e9;
+  for(const c of g.cards.values()){if(c.team!==me.team||c.carrier>=0)continue;const d=Math.hypot(c.x-me.pos.x,c.z-me.pos.z);if(d<bd){bd=d;best=c}}
+  return best?{x:best.x,y:best.y+1.2,z:best.z,label:'Reboot card',cls:'card'}:null;
+ }
+ // teammates (visible through walls and across the map) and the waypoint, as markers at the screen edge when off screen
+ drawWorldMarks(g,me){
+  const box=this.q('#wmarks');if(!box||!g.camera)return;const cam=g.camera;const W0=innerWidth/this.scale,H0=innerHeight/this.scale;
+  const items=[];
+  if(g.teamMode)for(const o of g.list){if(o===me||o.team!==me.team||!o.alive)continue;items.push({key:'m'+o.id,cls:'mate'+(o.knocked?' kn':''),x:o.pos.x,y:o.pos.y+2.3,z:o.pos.z,name:o.name+(o.knocked?' · knocked':''),d:o.pos})}
+  const wp=this.waypointTarget(g,me);if(wp)items.push({key:'wp',cls:'wp '+wp.cls,x:wp.x,y:wp.y,z:wp.z,name:wp.label,d:wp});
+  this.wmEls=this.wmEls||new Map();const used=new Set();
+  for(const it of items){
+   used.add(it.key);
+   let el=this.wmEls.get(it.key);
+   if(!el){el=document.createElement('div');el.innerHTML='<i></i><b></b><small></small>';box.appendChild(el);this.wmEls.set(it.key,el)}
+   el.className='wmark '+it.cls;
+   const v=new THREE.Vector3(it.x,it.y,it.z).project(cam);
+   let sx=(v.x*.5+.5)*W0,sy=(-v.y*.5+.5)*H0;
+   if(v.z>1){let dx=-v.x,dy=v.y;const l=Math.hypot(dx,dy)||1;sx=W0/2+dx/l*2000;sy=H0/2+dy/l*2000}  // behind the camera: point at the edge
+   const M=60;const edge=sx<M||sx>W0-M||sy<M||sy>H0-M||v.z>1;
+   sx=clamp(sx,M,W0-M);sy=clamp(sy,M,H0-M);
+   if(sx<290&&sy<260)sx=290;   // keep edge markers clear of the team list in the top left
+   if(sy<150&&sx>W0-340)sy=150;   // and clear of the counters in the top right
+   el.style.transform=`translate(${sx}px,${sy}px) translate(-50%,-50%)`;
+   el.classList.toggle('edge',edge);
+   el.querySelector('b').textContent=it.name;
+   el.querySelector('small').textContent=Math.round(Math.hypot(it.d.x-me.pos.x,it.d.z-me.pos.z))+'m';
+  }
+  for(const[k,el]of this.wmEls)if(!used.has(k)){el.remove();this.wmEls.delete(k)}
+ }
+ // minimap: rotating circle centred on the player; teammates, waypoint, supplies, storm and next zone
  drawMinimap(g,tgt,big){
-  const cv=big||this.mm,x=big?big.getContext('2d'):this.mx,S=cv.width;x.clearRect(0,0,S,S);if(!this.mapImg)return;
-  const view=big?W.HALF*2:230;const k=S/view;const m2px=this.mapS/(W.HALF*2);
-  x.save();
-  if(big){x.drawImage(this.mapImg,0,0,S,S)}
-  else{x.beginPath();x.arc(S/2,S/2,S/2,0,6.283);x.clip();x.translate(S/2,S/2);if(g.settings.mapRotate)x.rotate(tgt.yaw);x.scale(k,k);x.translate(-tgt.pos.x,-tgt.pos.z);x.drawImage(this.mapImg,-W.HALF,-W.HALF,W.HALF*2,W.HALF*2)}
-  const T=big?(px,pz)=>[(px+W.HALF)*k,(pz+W.HALF)*k]:null;
-  const st=g.storm;
-  // storm overlay
-  if(!big){x.fillStyle='rgba(140,60,220,.45)';x.beginPath();x.rect(tgt.pos.x-300,tgt.pos.z-300,600,600);x.arc(st.cx,st.cz,st.r,0,6.283,true);x.fill('evenodd');x.strokeStyle='#cf8bff';x.lineWidth=2/k;x.beginPath();x.arc(st.cx,st.cz,st.r,0,6.283);x.stroke();
-   const z=g.nextZone();if(z){x.strokeStyle='#fff';x.lineWidth=2/k;x.beginPath();x.arc(z.x,z.z,z.r,0,6.283);x.stroke()}
-   for(const s of g.supplies)if(!s.landed||g.loot.has(s.id)){x.fillStyle='#ff4a4a';x.fillRect(s.x-5,s.z-5,10,10)}
-   // bus
-   if(g.busMesh&&g.busMesh.visible){x.fillStyle='#ffd23d';x.beginPath();x.arc(g.bus.pos.x,g.bus.pos.z,5/k*.9,0,6.283);x.fill()}
+  const cv=big||this.mm,x=cv.getContext('2d'),S=cv.width;x.clearRect(0,0,S,S);if(!this.mapImg)return;
+  const st=g.storm,z=g.nextZone(),wp=this.waypointTarget(g,g.me);
+  const teammates=g.teamMode?g.list.filter(o=>o!==g.me&&o.alive&&o.team===g.me.team&&!o.drop):[];
+  if(!big){
+   const view=230,k=S/view;const rot=g.settings.mapRotate;
+   // map->canvas transform for the minimap (player at the centre)
+   const T=(px,pz)=>{let dx=(px-tgt.pos.x)*k,dz=(pz-tgt.pos.z)*k;if(rot){const c=Math.cos(tgt.yaw),s=Math.sin(tgt.yaw);const rx=dx*c-dz*s,rz=dx*s+dz*c;dx=rx;dz=rz}return [S/2+dx,S/2+dz]};
+   x.save();x.beginPath();x.arc(S/2,S/2,S/2,0,6.283);x.clip();
+   x.fillStyle='#0b1230';x.fillRect(0,0,S,S);
+   x.translate(S/2,S/2);if(rot)x.rotate(tgt.yaw);x.scale(k,k);x.translate(-tgt.pos.x,-tgt.pos.z);
+   x.drawImage(this.mapImg,-W.HALF,-W.HALF,W.HALF*2,W.HALF*2);
+   x.setTransform(1,0,0,1,0,0);
+   // storm: the outside of the circle is shaded
+   x.save();x.translate(S/2,S/2);if(rot)x.rotate(tgt.yaw);x.scale(k,k);x.translate(-tgt.pos.x,-tgt.pos.z);
+   x.fillStyle='rgba(150,70,255,.42)';x.beginPath();x.rect(tgt.pos.x-400,tgt.pos.z-400,800,800);x.arc(st.cx,st.cz,st.r,0,6.283,true);x.fill('evenodd');
+   x.strokeStyle='#d7a6ff';x.lineWidth=2/k;x.beginPath();x.arc(st.cx,st.cz,st.r,0,6.283);x.stroke();
+   if(z){x.setLineDash([6/k,5/k]);x.strokeStyle='#ffffff';x.beginPath();x.arc(z.x,z.z,z.r,0,6.283);x.stroke();x.setLineDash([])}
+   for(const s of g.supplies)if(!s.landed||g.loot.has(s.id)){x.fillStyle='#ff5a5a';x.fillRect(s.x-6/k,s.z-6/k,12/k,12/k)}
+   if(g.busMesh&&g.busMesh.visible){x.fillStyle='#ffd23d';x.beginPath();x.arc(g.bus.pos.x,g.bus.pos.z,7/k,0,6.283);x.fill()}
    x.restore();
-   x.save();x.translate(S/2,S/2);if(!g.settings.mapRotate)x.rotate(-0)  ;
-   x.rotate(g.settings.mapRotate?0:-tgt.yaw);
-   x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=2;x.beginPath();x.moveTo(0,-11);x.lineTo(8,8);x.lineTo(0,4);x.lineTo(-8,8);x.closePath();x.fill();x.stroke();x.restore();
-   x.strokeStyle='rgba(255,255,255,.5)';x.lineWidth=3;x.beginPath();x.arc(S/2,S/2,S/2-1.5,0,6.283);x.stroke();return}
-  // big map
-  const P=(px,pz)=>[(px+W.HALF)*k,(pz+W.HALF)*k];
-  x.fillStyle='rgba(140,60,220,.4)';x.beginPath();x.rect(0,0,S,S);const[c0,c1]=P(st.cx,st.cz);x.arc(c0,c1,st.r*k,0,6.283,true);x.fill('evenodd');x.strokeStyle='#cf8bff';x.lineWidth=3;x.beginPath();x.arc(c0,c1,st.r*k,0,6.283);x.stroke();
-  const z=g.nextZone();if(z){const[a,b]=P(z.x,z.z);x.strokeStyle='#fff';x.lineWidth=3;x.beginPath();x.arc(a,b,z.r*k,0,6.283);x.stroke()}
-  x.font='bold 15px Arial Black,Arial';x.textAlign='center';x.lineWidth=4;x.strokeStyle='rgba(0,0,0,.8)';x.fillStyle='#fff';for(const p of W.POIS){const[a,b]=P(p.x,p.z);x.strokeText(p.n,a,b);x.fillText(p.n,a,b)}
-  // bus path
-  const b=g.bus;const[s0,s1]=P(b.sx,b.sz),[e0,e1]=P(b.sx+b.dx*b.len,b.sz+b.dz*b.len);x.strokeStyle='#ffd23d';x.setLineDash([10,8]);x.lineWidth=3;x.beginPath();x.moveTo(s0,s1);x.lineTo(e0,e1);x.stroke();x.setLineDash([]);
+   // teammates and the waypoint (clamped to the rim when they are off the minimap)
+   const rim=S/2-14;
+   const mark=(px,pz,col,shape)=>{let[a,c]=T(px,pz);let dx=a-S/2,dy=c-S/2;const d=Math.hypot(dx,dy);const out=d>rim;if(out){dx=dx/d*rim;dy=dy/d*rim;a=S/2+dx;c=S/2+dy}
+    x.fillStyle=col;x.strokeStyle='#021';x.lineWidth=2;x.beginPath();
+    if(shape==='diamond'){x.moveTo(a,c-9);x.lineTo(a+7,c);x.lineTo(a,c+9);x.lineTo(a-7,c)}else x.arc(a,c,6,0,6.283);
+    x.closePath();x.fill();x.stroke()};
+   for(const o of teammates)mark(o.pos.x,o.pos.z,o.knocked?'#ff6b6b':'#4dff8a','dot');
+   if(wp)mark(wp.x,wp.z,'#ffd23d','diamond');
+   x.restore();
+   // player arrow in the centre (points up, or the way you face when the map is fixed)
+   x.save();x.translate(S/2,S/2);if(!rot)x.rotate(-tgt.yaw);
+   x.fillStyle='#ffffff';x.strokeStyle='#000';x.lineWidth=2;x.beginPath();x.moveTo(0,-11);x.lineTo(8,8);x.lineTo(0,4);x.lineTo(-8,8);x.closePath();x.fill();x.stroke();x.restore();
+   x.strokeStyle='rgba(160,210,255,.7)';x.lineWidth=3;x.beginPath();x.arc(S/2,S/2,S/2-1.5,0,6.283);x.stroke();
+   return
+  }
+  // world map
+  const k=S/(W.HALF*2),P=(px,pz)=>[(px+W.HALF)*k,(pz+W.HALF)*k];
+  x.drawImage(this.mapImg,0,0,S,S);
+  const[c0,c1]=P(st.cx,st.cz);x.fillStyle='rgba(150,70,255,.42)';x.beginPath();x.rect(0,0,S,S);x.arc(c0,c1,st.r*k,0,6.283,true);x.fill('evenodd');
+  x.strokeStyle='#d7a6ff';x.lineWidth=3;x.beginPath();x.arc(c0,c1,st.r*k,0,6.283);x.stroke();
+  if(z){const[a,b]=P(z.x,z.z);x.setLineDash([12,9]);x.strokeStyle='#ffffff';x.lineWidth=3;x.beginPath();x.arc(a,b,z.r*k,0,6.283);x.stroke();x.setLineDash([])}
+  x.font='700 17px Segoe UI,Arial,sans-serif';x.textAlign='center';x.lineWidth=5;x.strokeStyle='rgba(0,0,0,.75)';x.fillStyle='#ffffff';
+  for(const p of W.POIS){const[a,b]=P(p.x,p.z);x.strokeText(p.n,a,b);x.fillText(p.n,a,b)}
+  const b=g.bus;const[s0,s1]=P(b.sx,b.sz),[e0,e1]=P(b.sx+b.dx*b.len,b.sz+b.dz*b.len);
+  x.strokeStyle='#ffd23d';x.setLineDash([10,8]);x.lineWidth=3;x.beginPath();x.moveTo(s0,s1);x.lineTo(e0,e1);x.stroke();x.setLineDash([]);
   const[bp0,bp1]=P(b.pos.x,b.pos.z);if(g.busMesh.visible){x.fillStyle='#ffd23d';x.beginPath();x.arc(bp0,bp1,9,0,6.283);x.fill()}
-  for(const s of g.supplies){const[a,c]=P(s.x,s.z);x.fillStyle='#ff4a4a';x.fillRect(a-7,c-7,14,14)}
-  // teammates: green dots on the map (knocked/eliminated ones are left off)
-  for(const o of g.list){if(o===g.me||!o.alive||o.drop||o.team!==g.me.team)continue;const[a,c]=P(o.pos.x,o.pos.z);x.fillStyle='#5cff8a';x.strokeStyle='#021a0a';x.lineWidth=2;x.beginPath();x.arc(a,c,6,0,6.283);x.fill();x.stroke()}
-  const[m0,m1]=P(tgt.pos.x,tgt.pos.z);x.save();x.translate(m0,m1);x.rotate(-tgt.yaw+Math.PI);x.fillStyle='#fff';x.strokeStyle='#000';x.lineWidth=2;x.beginPath();x.moveTo(0,12);x.lineTo(9,-10);x.lineTo(0,-5);x.lineTo(-9,-10);x.closePath();x.fill();x.stroke();x.restore();
-  x.restore()}
+  for(const s of g.supplies){const[a,c]=P(s.x,s.z);x.fillStyle='#ff5a5a';x.fillRect(a-7,c-7,14,14)}
+  if(wp){const[a,c]=P(wp.x,wp.z);x.fillStyle='#ffd23d';x.strokeStyle='#000';x.lineWidth=3;x.beginPath();x.moveTo(a,c-16);x.lineTo(a+10,c);x.lineTo(a,c+16);x.lineTo(a-10,c);x.closePath();x.fill();x.stroke();
+    x.font='800 15px Segoe UI,Arial,sans-serif';x.strokeText(wp.label,a,c-22);x.fillStyle='#ffd23d';x.fillText(wp.label,a,c-22);x.fillStyle='#ffffff'}
+  for(const o of teammates){const[a,c]=P(o.pos.x,o.pos.z);x.fillStyle=o.knocked?'#ff6b6b':'#4dff8a';x.strokeStyle='#021';x.lineWidth=2;x.beginPath();x.arc(a,c,8,0,6.283);x.fill();x.stroke();
+    x.font='800 15px Segoe UI,Arial,sans-serif';x.strokeStyle='rgba(0,0,0,.8)';x.lineWidth=4;x.strokeText(o.name,a,c-14);x.fillStyle='#e8fff0';x.fillText(o.name,a,c-14)}
+  const[m0,m1]=P(tgt.pos.x,tgt.pos.z);x.save();x.translate(m0,m1);x.rotate(-tgt.yaw+Math.PI);x.fillStyle='#ffffff';x.strokeStyle='#000';x.lineWidth=2;x.beginPath();x.moveTo(0,12);x.lineTo(9,-10);x.lineTo(0,-5);x.lineTo(-9,-10);x.closePath();x.fill();x.stroke();x.restore();
+ }
 }

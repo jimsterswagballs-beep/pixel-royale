@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {shopMethods} from './shop.js';
+import {CHAR_PRICES} from './emote.js';
 import {CHARS,ACTIONS,DEFAULT_SETTINGS,keyLabel,clamp,WEAPONS,RARITY} from './data.js';
 import {Game} from './game.js';
 import {Input} from './input.js';
@@ -36,7 +38,7 @@ class App{
  // ---------- state
  loadSettings(){let s={};try{s=JSON.parse(localStorage.getItem('brg_settings')||'{}')}catch(e){}this.settings=Object.assign({},DEFAULT_SETTINGS,s)}
  saveSettings(){try{localStorage.setItem('brg_settings',JSON.stringify(this.settings))}catch(e){}}
- loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,diff:'Normal',mode:'solo',fill:true},p)}
+ loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,diff:'Normal',mode:'solo',fill:true,tokens:0,ownedChars:['coolguy15','zach'],ownedEmotes:[],equipEmote:''},p);const P=this.profile;P.ownedChars=[...new Set(['coolguy15','zach',...(P.ownedChars||[])])];P.ownedEmotes=P.ownedEmotes||[];if(!P.ownedChars.includes(P.char))P.char='coolguy15';if(P.equipEmote&&!P.ownedEmotes.includes(P.equipEmote))P.equipEmote=''}
  saveProfile(){try{localStorage.setItem('brg_profile',JSON.stringify(this.profile))}catch(e){}}
  get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote}}
  applySettings(){
@@ -73,20 +75,20 @@ class App{
  // ---------- screens
  buildScreens(){
   $('loading').classList.remove('show');
-  this.buildNav();this.buildTitle();this.buildOnline();this.buildLobby();this.buildLocker();this.buildSettings();this.buildCredits();this.buildUpdateLog();
+  this.buildNav();this.buildShop();this.buildTitle();this.buildOnline();this.buildLobby();this.buildLocker();this.buildSettings();this.buildCredits();this.buildUpdateLog();
   $('btnSpec').onclick=()=>{$('elim').style.display='none';this.endCursor=false;this.lock()};
-  $('btnElimMenu').onclick=()=>this.leaveMatch();$('btnAgain').onclick=()=>this.leaveMatch();
+  $('btnElimMenu').onclick=()=>this.leaveMatch();$('btnAgain').onclick=()=>this.leaveMatch();$('btnPlayAgain').onclick=$('btnPlayAgainV').onclick=()=>this.playAgain();
   document.addEventListener('pointerdown',()=>{this.audio.init();this.audio.resume()},{once:false});
   this.canvas.addEventListener('click',()=>{if(this.inter){this.lock();return}if(this.playing&&!this.paused&&!this.input.locked&&!this.endCursor)this.lock();else if(this.playing&&this.endCursor&&this.game.over===false&&!$('elim').style.display!=='none'){}});
  }
  sfx(n){this.audio.play(n)} buildNav(){
-  const n=h(`<div id="nav"><div class="nav-logo">PIXEL<span>ROYALE</span></div><div class="nav-tabs" id="navTabs"></div><div class="nav-right"><div class="nav-me" id="navMe"><img alt=""><span></span></div><button class="nav-ico" id="navInfo" title="Credits">i</button><button class="nav-ico" id="navQuit" title="Quit game">&#x23FB;</button></div></div>`);
+  const n=h(`<div id="nav"><div class="nav-logo">PIXEL<span>ROYALE</span></div><div class="nav-tabs" id="navTabs"></div><div class="nav-right"><div class="tok" id="navTok"><i>&#9670;</i><b>0</b></div><div class="nav-me" id="navMe"><img alt=""><span></span></div><button class="nav-ico" id="navInfo" title="Credits">i</button><button class="nav-ico" id="navQuit" title="Quit game">&#x23FB;</button></div></div>`);
   $('ui').appendChild(n);
-  for(const[k,l]of[['title','Lobby'],['online','Online'],['locker','Locker'],['updates','News'],['settings','Settings']]){const b=h(`<button data-go="${k}">${l}</button>`);b.onclick=()=>{this.sfx('ui');this.go(k)};b.onmouseenter=()=>this.sfx('click');$('navTabs').appendChild(b)}
+  for(const[k,l]of[['shop','Shop'],['title','Lobby'],['online','Online'],['locker','Locker'],['updates','News'],['settings','Settings']]){const b=h(`<button data-go="${k}">${l}</button>`);b.onclick=()=>{this.sfx('ui');this.go(k)};b.onmouseenter=()=>this.sfx('click');$('navTabs').appendChild(b)}
   $('navInfo').onclick=()=>{this.sfx('ui');this.go('credits')};$('navQuit').onclick=()=>{this.sfx('ui');this.exit()};
  }
  updateNav(name){
-  const nav=$('nav');if(!nav)return;nav.classList.toggle('show',!['lobby','loading','pause'].includes(name));
+  const nav=$('nav');if(!nav)return;nav.querySelector('#navTok b').textContent=this.profile.tokens||0;nav.classList.toggle('show',!['lobby','loading','pause'].includes(name));
   const act={chars:'locker'}[name]||name;for(const b of $('navTabs').children)b.classList.toggle('on',b.dataset.go===act);
   const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[c.id].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor}
 buildTitle(){
@@ -101,8 +103,7 @@ buildTitle(){
      <div class="k">Match setup</div>
      <label class="sl-f"><span class="sl-lab">Name</span><input type="text" id="slName" maxlength="14"></label>
      <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="slBotN"></b></div><input type="range" id="slBots" min="0" max="39"></div>
-     <div class="sl-f"><div class="sl-lab"><span>Difficulty</span></div><div class="sl-chips" id="slDiff"></div></div><div class="sl-f"><div class="sl-lab"><span>Mode</span></div><div class="sl-chips" id="slMode"></div></div><div class="sl-row" id="slFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="slFill"></div></div>
-     <div class="tip">0 bots lets you explore the island alone.</div>
+     <div class="sl-f"><div class="sl-lab"><span>Difficulty</span></div><div class="sl-chips" id="slDiff"></div></div><div class="tip">0 bots lets you explore the island alone.</div>
     </div>
    </div>
    <div class="sl-right">
@@ -119,13 +120,14 @@ buildTitle(){
     </div>
     <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
    </div>
+   <div class="glass sl-modes"><div class="k">Game mode</div><div class="sl-modecards" id="slMode"></div><div class="sl-row" id="slFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="slFill"></div></div></div>
   </div>`;
   for(const b of t.querySelectorAll('[data-go]'))b.onclick=()=>{this.sfx('ui');this.go(b.dataset.go)};
   $('playBtn').onclick=()=>this.soloStart();
   $('slName').onchange=e=>{this.profile.name=e.target.value.trim()||'Player';this.saveProfile();this.updateStage()};
   $('slBots').oninput=e=>{this.profile.bots=+e.target.value;$('slBotN').textContent=this.profile.bots;this.saveProfile()};
   const dd=$('slDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.profile.diff=d;this.saveProfile();this.refreshChips(dd,d);this.sfx('ui')};dd.appendChild(c)}
-  const md=$('slMode');for(const k of MODE_KEYS){const c=h(`<span class="chip" data-k="${k}">${MODES[k].name}</span>`);c.onclick=()=>{this.profile.mode=k;this.saveProfile();this.refreshMode();this.sfx('ui')};md.appendChild(c)}
+  const md=$('slMode');for(const k of MODE_KEYS){const c=h(`<span class="chip mc" data-k="${k}"><b>${MODES[k].name}</b><small>${MODES[k].sub}</small></span>`);c.onclick=()=>{this.profile.mode=k;this.saveProfile();this.refreshMode();this.sfx('ui')};md.appendChild(c)}
   $('slFill').onclick=()=>{this.profile.fill=!this.profile.fill;this.saveProfile();this.refreshMode();this.sfx('click')};
  }
  enter_title(){const P=this.profile;this.updateStage();$('slName').value=P.name;$('slBots').value=P.bots;$('slBotN').textContent=P.bots;this.refreshChips($('slDiff'),P.diff);this.refreshMode()}
@@ -145,7 +147,11 @@ buildTitle(){
  charPicker(sel,onPick,compact){
   const box=h(`<div class="tiles ${compact?'small':''}"></div>`);const rar={coolguy15:4,zach:3,chillguy:3,jay:4};
   for(const c of CHARS){
-   const t=this.mkTile({rc:RARITY[rar[c.id]||3].c,pic:`<div class="cart" style="background-image:url('${charArt(c.id)}')"></div><img src="${IMG[c.id].front}" alt="">`,label:c.name,sel:sel()===c.id,fn:()=>{onPick(c.id);for(const x of box.children)x.classList.remove('sel');t.classList.add('sel')}});
+   const owned=this.owns('char',c.id),price=CHAR_PRICES[c.id];
+   const t=this.mkTile({rc:RARITY[rar[c.id]||3].c,pic:`<div class="cart" style="background-image:url('${charArt(c.id)}')"></div><img src="${IMG[c.id].front}" alt="">`,label:c.name+(owned?'':' &#128274;'),sel:sel()===c.id,fn:()=>{
+    if(!owned){this.toast('Unlock '+c.name+' in the Shop ('+price+' Swag Tokens)');this.sfx('empty');return}
+    onPick(c.id);for(const x of box.children)x.classList.remove('sel');t.classList.add('sel')}});
+   if(!owned)t.classList.add('locked');
    box.appendChild(t)}
   return box}
  refreshChips(box,val){for(const c of box.children)c.classList.toggle('sel',c.textContent===val)}
@@ -163,16 +169,26 @@ buildTitle(){
   g.innerHTML='';const tab=this.lkTab;
   const NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];const rc=i=>RARITY[Math.min(5,i%6)].c;
   const set=(k,v)=>{P[k]=v;this.saveProfile();this.enter_locker()};
+  if(tab==='Emote'){g.appendChild(this.emotePicker());return}
   if(tab==='Outfit'){g.appendChild(this.charPicker(()=>P.char,id=>{P.char=id;this.saveProfile();this.enter_locker()}));return}
   const box=h(`<div class="tiles"></div>`);
   if(tab==='Name Color')COLORS.forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i),pic:`<span class="swb" style="background:${c}"></span>`,label:NAMES[i],sel:P.nameColor===c,fn:()=>set('nameColor',c)})));
   if(tab==='Sprint Trail'){box.appendChild(this.mkTile({rc:rc(0),pic:`<span class="swb none">&#8709;</span>`,label:'None',sel:!P.trail,fn:()=>set('trail','')}));COLORS.slice(1).forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i+1),pic:`<span class="trl" style="--tc:${c}"></span>`,label:NAMES[i+1],sel:P.trail===c,fn:()=>set('trail',c)})))}
-  if(tab==='Emote')EMOTES.forEach((e,i)=>box.appendChild(this.mkTile({rc:rc(i+2),pic:`<span class="emo">${['&#128378;','&#127942;','&#127744;'][i]}</span>`,label:e,sel:P.emote===i,fn:()=>set('emote',i)})));
   g.appendChild(box)}
  buildUpdateLog(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
+    <section class="update-entry"><div class="date">NOVEMBER 21, 2026 · VERSION 1.4</div><h3>Shop, Emotes &amp; Lobby Redesign</h3><ul>
+     <li><b>Item Shop</b> (first tab): spend Swag Tokens on Chill Guy, Jay and emotes. Skins are coming later.</li>
+     <li><b>Swag Tokens</b> are earned from eliminations, surviving longer, finishing in the top 10 and winning.</li>
+     <li><b>Emotes</b>: Best Weapon, Streamer Jumps, Bart, Dab and Floss. Press G to play one and press G again to cancel.</li>
+     <li>Emotes stun you while they play, and cancel if you are shot. Nearby players hear emote music.</li>
+     <li>Pick your emote in the Locker. The victory poses are still there.</li>
+     <li><b>Game Modes</b> now have their own section in both lobbies, with a card for each mode.</li>
+     <li>Simpler, clean font and flatter menus.</li>
+     <li>The Solo and Party lobbies now fit the whole screen with no scrolling.</li>
+    </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 21, 2026 · VERSION 1.3</div><h3>Heroes Update: Chill Guy &amp; Jay</h3><ul>
      <li><b>Chill Guy</b> (75 HP, stealth glass cannon): Disappear, Cold Blooded, Sneaky Strike and the Quiet Steps passive.</li>
      <li><b>Jay</b> (110 HP, chef support): Pan Boomerang, Food Fight (burger, pizza, chilli, banana), Kitchen Special and the Chef's Touch passive.</li>
@@ -301,6 +317,15 @@ buildTitle(){
    if(m.t==='quit'){if(this.playing&&this.game.peerLeft)this.game.peerLeft(f);return}
    this.game.onNetMessage(f,m)};
   this.applySettings();this.lock()}
+ playAgain(){
+  this.sfx('ui');
+  if(this.lobby&&this.net){this.leaveMatch();return}   // party: back to the lobby to board again
+  this.audio.init();this.audio.resume();
+  this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();
+  this.game.running=false;this.hud.hide();for(const id of ['elim','victory'])$(id).style.display='none';$('pause').classList.remove('show');$('bigmap').style.display='none';
+  this.hud.finished=false;
+  this.startOffline();
+ }
  leaveMatch(){
   const inParty=!!(this.lobby&&this.net&&this.net.peer);
   if(inParty&&!this.net.isHost&&this.playing&&!this.hud.finished)this.net.toHost({t:'quit'}); // mid-match quit: host hands our character to a bot
@@ -366,11 +391,11 @@ buildLobby(){
     <div class="pl-h"><span class="k">Squad</span><b id="lbCount"></b></div>
     <div class="pl-slots" id="lbPlayers"></div>
    </aside>
-   <div class="pl-gap"><div class="glass pl-herobar"><div class="pl-h"><span class="k">Your hero</span></div><div id="lbChars"></div></div></div>
+   <div class="pl-gap"><div class="glass pl-modes"><div class="k">Game mode</div><div class="sl-modecards" id="lbMode"></div><div class="sl-row" id="lbFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="lbFill"></div></div></div><div class="glass pl-herobar"><div class="pl-h"><span class="k">Your hero</span></div><div id="lbChars"></div></div></div>
    <aside class="glass pl-side">
     <div id="lbHostCtl">
      <div class="pl-h"><span class="k">Match settings</span></div>
-     <div class="sl-f"><div class="sl-lab"><span>Mode</span></div><div class="sl-chips" id="lbMode"></div></div><div class="sl-row" id="lbFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="lbFill"></div></div><div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="lbBotN">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0"></div>
+     <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="lbBotN">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0"></div>
      <div class="sl-f"><div class="sl-lab"><span>Bot difficulty</span></div><div class="sl-chips" id="lbDiff"></div></div>
      <button class="btn play" id="lbStart">Board Bus</button>
     </div>
@@ -383,7 +408,7 @@ buildLobby(){
   $('lbInvite').onclick=()=>{const u=location.href.split('#')[0]+'#join='+this.lobby.code;this.copy(u);this.toast('Invite link copied!')};
   $('lbBots').oninput=e=>{this.lobby.bots=+e.target.value;$('lbBotN').textContent=e.target.value;this.lobbyUpdate(true)};
   const dd=$('lbDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.lobby.diff=d;this.lobbyUpdate()};dd.appendChild(c)}
-  const md=$('lbMode');for(const k of MODE_KEYS){const c=h(`<span class="chip" data-k="${k}">${MODES[k].name}</span>`);c.onclick=()=>{if(this.lobby.host){this.lobby.mode=k;this.lobbyUpdate()}};md.appendChild(c)}
+  const md=$('lbMode');for(const k of MODE_KEYS){const c=h(`<span class="chip mc" data-k="${k}"><b>${MODES[k].name}</b><small>${MODES[k].sub}</small></span>`);c.onclick=()=>{if(this.lobby.host){this.lobby.mode=k;this.lobbyUpdate()}};md.appendChild(c)}
   $('lbFill').onclick=()=>{if(this.lobby.host){this.lobby.fill=!this.lobby.fill;this.lobbyUpdate();this.sfx('click')}};
   $('lbStart').onclick=()=>this.hostStart();
  }
@@ -461,4 +486,5 @@ lobbyUpdate(noBroadcast,full){
   this.input.endFrame();
  }
 }
+Object.assign(App.prototype,shopMethods);
 window.__W=W;window.app=new App();

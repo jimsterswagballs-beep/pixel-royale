@@ -28,6 +28,7 @@ export const netMethods={
   switch(m.t){
    case'hold':e.holdI=!!m.on;break;
    case'p':{if(!e.alive)return;e.tgt.x=m.x;e.tgt.y=m.y;e.tgt.z=m.z;e.tgt.yaw=m.yw;e.tgt.pitch=m.pt;e.vel.x=m.vx||0;e.vel.z=m.vz||0;this.unpackFlags(e,m.f);if(this.t<(e.noCloakUntil||0)){e.cloakT=0;e.flags&=~4096}e.wi=m.w;if(e.drop==='bus'&&!(m.f&64)){e.drop=m.f&16?'free':'glide'}break}
+   case'emo':{if(m.on)this.startEmote(e,m.id);else this.stopEmote(e);break}
    case'fire':{if(m.w<0||!m.d||m.d.length>60)return;this.revealHost(e);const wd=wstat(Math.floor(m.w/10),m.w%10);if(!wd)return;
     const dx=m.o[0]-e.pos.x,dz=m.o[2]-e.pos.z;let o=m.o;if(dx*dx+dz*dz>25||Math.abs(m.o[1]-e.pos.y)>5)o=[e.pos.x,e.pos.y+1.65,e.pos.z];
     if(this.t-(e.lastFireT||0)<.4/Math.max(1,wd.rps*1.6))return;e.lastFireT=this.t;e.shootT=.12;

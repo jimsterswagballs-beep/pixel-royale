@@ -18,7 +18,7 @@ export const VAN_COOL=60;                // seconds before a used van can be use
 export const VAN_RANGE=4.5;
 export const REBOOT_HP=50;               // health a rebooted player comes back with
 export const CRAWL=1.6;                  // crawl speed in m/s
-const VAN_READY=0,VAN_ACTIVE=1,VAN_COOLING=2;
+export const VAN_READY=0,VAN_ACTIVE=1,VAN_COOLING=2;
 
 const d2=(ax,az,bx,bz)=>Math.hypot(ax-bx,az-bz);
 
@@ -40,6 +40,20 @@ export const knockMethods={
 
  // a standing player is alive and not knocked
  teamStands(team){for(const e of this.list)if(e.team===team&&e.alive&&!e.knocked)return true;return false},
+
+
+ // knocked players can roll (a short dash in the direction they move, or the way they face); crawling is the normal move
+ rollInput(){const me=this.me;if(!me||!me.alive||!me.knocked||!this.app.inputActive()||!this.input.pressed('roll'))return;this.rollKnocked(me)},
+ rollKnocked(e){
+  if(!e.alive||!e.knocked||e.dash||e.emote||this.t<(e.rollReady||0))return;
+  const I=this.input;const f=(I.down('fwd')?1:0)-(I.down('back')?1:0),s=(I.down('right')?1:0)-(I.down('left')?1:0);
+  const sy=Math.sin(e.yaw),cy=Math.cos(e.yaw);
+  let dx=-sy*f+cy*s,dz=-cy*f-sy*s;
+  if(!f&&!s){dx=-sy;dz=-cy}
+  const l=Math.hypot(dx,dz)||1;dx/=l;dz/=l;
+  e.dash={vx:dx*9,vz:dz*9,t:.5,kind:'roll'};e.rollReady=this.t+1.8;
+  if(e.local)this.audio.play('slide',e.pos,.8);
+ },
 
  // ------------------------------------------------------------------ knocked
  canKnock(t){return !!this.teamMode&&t.alive&&!t.knocked&&!t.drop},

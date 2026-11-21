@@ -3,6 +3,7 @@ import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,BAL,mulberry32,clamp,lerp} from './data.
 import {heroMethods,makeChefHat} from './abilities.js';
 import * as W from './world.js';
 import {FX} from './fx.js';
+import {emoteMethods} from './emote.js';
 import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,charTex,wstat,makeWeaponModel,mat,angDiff,lerpAng,crispMat,makeBusModel} from './shared.js';
 import {movementMethods} from './movement.js';
 import {knockMethods} from './knock.js';
@@ -61,7 +62,10 @@ export class Game{
  }
  ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
  renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
- peerLeft(pid){const e=this.list.find(x=>x.peer===pid);if(!e)return;e.peer=undefined;if(e.alive){e.bot=true;this.initBot(e);e.ai.state='loot';e.name+=' (bot)'}}
+ // a human left mid-match: their team is told (team modes), then a bot takes over if they were still alive
+ peerLeft(pid){const e=this.list.find(x=>x.peer===pid);if(!e)return;e.peer=undefined;
+  if(this.teamMode&&e.alive)this.emit({k:'ntf',tm:e.team,c:'#ffd27a',t:`${e.name} left the match, a bot is taking over`});
+  if(e.alive){e.bot=true;this.initBot(e);e.ai.state='loot';e.name+=' (bot)'}}
  get settings(){return this.app.settings}
  get me(){return this.ents.get(this.myId)}
  cleanup(){
@@ -88,7 +92,7 @@ export class Game{
   this.busPos(0);
   {const bm=makeBusModel();this.busMesh=bm.group;this.busProp=bm.prop;this.dynamic.add(this.busMesh)}
   for(const info of cfg.ents)this.makeEnt(info);
-  this.t=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
+  this.t=0;this.tokensPaid=false;this.deathT=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
   this.storm={phase:-1,state:'idle',t:25,cx:0,cz:0,r:480,ocx:0,ocz:0,or:480,tcx:0,tcz:0,tr:480,dmg:0};
   this.supplyT=45;this.supplies=[];
   this.genLoot(mulberry32(this.seed+99));this.setupFields();
@@ -145,7 +149,8 @@ export class Game{
   s.bb.rotation.y=Math.atan2(dx,dz);
   const fx=-Math.sin(e.yaw),fz=-Math.cos(e.yaw);const dot=fx*nx+fz*nz;
   const view=dot>.55?'front':dot<-.55?'back':'side';
-  if(view!==s.view){s.view=view;s.mat.map=charTex(e.char,view);s.mat.needsUpdate=true}
+  if(e.emote&&e.emote.tex){if(s.mat.map!==e.emote.tex){s.mat.map=e.emote.tex;s.mat.needsUpdate=true}}
+  else if(view!==s.view){s.view=view;s.mat.map=charTex(e.char,view);s.mat.needsUpdate=true}
   const rx=nz,rz=-nx;const faceRight=fx*rx+fz*rz>=0;
   let flip=view==='side'?(faceRight?1:-1):1;
   // animation
@@ -186,6 +191,7 @@ export class Game{
     if(e.coldT>0)this.fx.emit(P.x+(rr()-.5),P.y+.4+rr()*1.4,P.z+(rr()-.5),0,.8,0,'#bff4ff',.6,0,.2,-.5,.5);
     if(e.slowT>0)this.fx.emit(P.x+(rr()-.5),P.y+.1+rr()*.6,P.z+(rr()-.5),0,.3,0,'#7fe0ff',.5,0,.18,-.5,.6);
     if(e.cookT>0)this.fx.puff(P.x+(rr()-.5)*.6,P.y+1.9,P.z+(rr()-.5)*.6,0,1.2,0,'#ffffff',.8,.5,1.6,.5,0,.8)}}}
+  const EA=e.emote&&e.spr?this.emoteAnim(e,s):null;if(EA){py+=EA.py;rz2+=EA.rz;sx*=EA.sx;sy*=EA.sy;s.pivot.position.x=EA.px}else s.pivot.position.x=0;
   s.pivot.position.y=bob+py;s.pivot.rotation.z=rz2+tilt;s.pivot.scale.set(sx*flip,sy,1);
   // aura / buffs
   const aOn=(e.flags&512)||(e.flags&1024)||e.coldT>0;s.aura.visible=!!aOn&&e.alive&&!(s.cloakK>.5);if(aOn){s.aura.material.color.set(e.coldT>0?'#7fe0ff':(e.flags&512)?'#5ab8ff':'#ffd84a');s.aura.scale.setScalar(1+Math.sin(this.t*10)*.06)}
@@ -233,6 +239,7 @@ export class Game{
     if(v&&v.spr)au.play('hurt',v.pos,.8);
     break}
    case'ex':{const p=new THREE.Vector3(ev.x,ev.y,ev.z);fx.explosion(p,ev.r,ev.c||'#ff9a3c');au.play('expl',p,1.4);const cam=this.camera.position;const d=cam.distanceTo(p);this.view.shake=Math.min(1.2,this.view.shake+clamp(1.4-d/45,0,1.2));break}
+   case'emo':{const en=this.ents.get(ev.i);if(en){if(ev.on)this.applyEmote(en,ev.id);else this.clearEmote(en)}break}
    case'lt+':this.addLootObj(ev.l,true);break;
    case'lt-':this.removeLoot(ev.id);break;
    case'cho':{const l=this.loot.get(ev.id);if(l){l.opened=true;if(l.mesh){this.dynamic.remove(l.mesh);l.mesh=null}au.play('chest',new THREE.Vector3(l.x,l.y,l.z));fx.burst(l.x,l.y+.6,l.z,30,5,'#ffd23d',.8,6)}this.loot.delete(ev.id);break}
@@ -272,20 +279,20 @@ export class Game{
  }
  onMeDead(ev){
   const me=this.me;me.alive=false;const killer=this.ents.get(ev.by);this.spectateId=killer&&killer.alive?killer.id:-1;this.audio.play('lose');
-  const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(ev.w||'the storm'),me.kills,this)}
+  const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(ev.w||'the storm'),me.kills,this);this.deathT=this.t;this.awardTokens(false)}
  onEnd(ev){
   if(this.over)return;this.over=true;this.winnerId=ev.win;const w=this.ents.get(ev.win);this.overT=this.t;
-  if(this.me.team===ev.tm){this.audio.play('win');this.hud.showVictory(this)}
+  this.awardTokens(this.me.team===ev.tm);if(this.me.team===ev.tm){this.audio.play('win');this.hud.showVictory(this)}
   else this.hud.announce((w?w.name:'Nobody')+' wins!','#ffd23d');
   this.hud.onEnd(this,ev)}
  // ---------- main update
  update(dt){
-  if(!this.running)return;dt=Math.min(dt,.05);this.t+=dt;
+  if(!this.running)return;dt=Math.min(dt,.05);this.t+=dt;this.emoteInput();this.rollInput();
   const me=this.me;
   this.updateBus(dt);if(this.decor)this.decor.update(this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.checkWin()}
+   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
   else{this.updateClientSim(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
   this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
@@ -338,7 +345,7 @@ export class Game{
   const fpv=this.fpv;
   // third person while diving and gliding; blends back to first person when the player lands
   const me=this.me;if(me)me.rpos.copy(me.pos); // the local hero's sprite is drawn from its live position
-  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide')?1:0;
+  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide'||!!me.emote)?1:0;
   this.tpK=(this.tpK||0)+(tpWant-(this.tpK||0))*(1-Math.exp(-9*dt));
   if(fpv){this.positionFPS(dt);
    if(this.tpK>.002){const fp=cam.position.clone(),fq=cam.quaternion.clone(),tp=new THREE.Vector3(),tq=new THREE.Quaternion();this.tpPose(me,tp,tq);cam.position.lerpVectors(fp,tp,this.tpK);cam.quaternion.copy(fq).slerp(tq,this.tpK)}}
@@ -374,4 +381,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);
+Object.assign(Game.prototype,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);

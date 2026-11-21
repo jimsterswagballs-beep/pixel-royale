@@ -9,7 +9,7 @@ export const movementMethods={
  readInput(){
   const I=this.input,s=this.settings,me=this.me;
   const active=this.app.inputActive();
-  if(!active){return {f:0,s:0,jump:false,jumpP:false,sprint:false,crouch:me.crouchState||false,crouchP:false}}
+  if(!active||me.emote){return {f:0,s:0,jump:false,jumpP:false,sprint:false,crouch:me.crouchState||false,crouchP:false}}
   const f=(I.down('fwd')?1:0)-(I.down('back')?1:0),st=(I.down('right')?1:0)-(I.down('left')?1:0);
   let sprint=I.down('sprint');if(s.autoSprint&&f>0)sprint=true;
   let crouch;if(s.crouchToggle){if(I.pressed('crouch'))me.crouchState=!me.crouchState;crouch=!!me.crouchState}else crouch=I.down('crouch');
@@ -48,7 +48,7 @@ export const movementMethods={
    if(!me.knocked&&I.pressed('drop'))this.dropCurrent(me);
    // interact
    this.updateNearLoot(me);
-   if(I.pressed('interact')&&this.near&&!me.knocked)this.pickupLocal(me,this.near);
+   if(I.pressed('interact')&&this.near&&!me.knocked&&!me.emote)this.pickupLocal(me,this.near);
    if(!this.near){const kp=this.knockPrompt(me);this.hud.setPrompt(kp,{})}
    me.holdI=!!I.down('interact')&&!me.knocked;
   }else{this.near=null;me.holdI=false}
@@ -72,7 +72,7 @@ export const movementMethods={
   for(let i=0;i<3;i++)if(e.cd[i]>0)e.cd[i]-=dt;
   if(e.drop){this.moveDrop(e,inp,dt);return}
   const P=e.pos,V=e.vel;
-  const stunned=e.stun>0||e.slip>0||e.dance>0||e.eatT>0;
+  const stunned=e.stun>0||!!e.emote||e.slip>0||e.dance>0||e.eatT>0;
   const h=(e.crouch||e.sliding)?HCROUCH:HSTAND;
   let gnd=W.groundAt(P.x,P.z,P.y,R),swim=false;
   if(W.H(P.x,P.z)<-.9){gnd=Math.max(gnd,-.9);swim=true}e.swim=swim;

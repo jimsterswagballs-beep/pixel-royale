@@ -115,7 +115,7 @@ export const ACTIONS=[
  ['fire','Fire / Use','Mouse0'],['aim','Aim Down Sights','Mouse2'],['reload','Reload','KeyR'],['interact','Interact / Pick Up','KeyE'],
  ['ab1','Ability 1','KeyQ'],['ab2','Ability 2','KeyF'],['ab3','Ability 3','KeyV'],
  ['s1','Slot 1 (Melee)','Digit1'],['s2','Slot 2','Digit2'],['s3','Slot 3','Digit3'],['s4','Slot 4','Digit4'],['s5','Slot 5','Digit5'],['s6','Slot 6','Digit6'],
- ['next','Next Slot','WheelDown'],['prev','Previous Slot','WheelUp'],['drop','Drop Item','KeyX'],['build','Build Mode','KeyB'],['rotate','Rotate Piece','KeyT'],['matcycle','Cycle Material','KeyY'],['map','Big Map','KeyM'],['score','Scoreboard','Tab'],['spec','Next Spectate Target','Mouse0'],
+ ['next','Next Slot','WheelDown'],['prev','Previous Slot','WheelUp'],['drop','Drop Item','KeyX'],['emote','Emote / Cancel','KeyG'],['roll','Roll (when knocked)','KeyZ'],['build','Build Mode','KeyB'],['rotate','Rotate Piece','KeyT'],['matcycle','Cycle Material','KeyY'],['map','Big Map','KeyM'],['score','Scoreboard','Tab'],['spec','Next Spectate Target','Mouse0'],
 ];
 export const DEFAULT_SETTINGS={quality:'High',scale:100,res:'native',fov:92,fps:false,master:80,sfx:90,music:40,sens:1,camSens:1,adsSens:.7,invertY:false,crouchToggle:false,aimToggle:false,autoSprint:false,hitmarkers:true,dmgNumbers:true,shake:1,bob:1,mapRotate:true,dist:'Far',particles:'High',pix:'Slight',vib:132,bright:108,xcol:'#ffffff',xsize:1};
 export const POI_NAMES=[];

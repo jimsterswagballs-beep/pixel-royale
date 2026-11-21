@@ -35,7 +35,7 @@ export const combatMethods={
  tickWeapon(e,c,dt){
   const slot=e.inv[e.cur];const v=this.view;
   e.fireCd=Math.max(0,e.fireCd-dt);e.equipT=Math.max(0,e.equipT-dt);e.bloom=Math.max(0,e.bloom-dt*.05);
-  if(e.drop||!e.alive||e.stun>0||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0){e.aiming=false;if(e.use&&(e.slip>0||e.dance>0||e.stun>0))e.use=null;if(e.local)v.reloadK=0;return}
+  if(e.drop||!e.alive||e.stun>0||e.emote||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0){e.aiming=false;if(e.use&&(e.slip>0||e.dance>0||e.stun>0))e.use=null;if(e.local)v.reloadK=0;return}
   // using item
   if(e.use){e.use.t-=dt;if(e.local)this.hud.useBar&&this.hud.useBar(e.use);
    if(c.cancel||e.inv[e.cur]!==e.use.slot){e.use=null}
@@ -72,7 +72,7 @@ export const combatMethods={
   if(e.local){
    if(this.t-(v.lastShot||-9)>.45)e.shotIdx=0;e.shotIdx=(e.shotIdx||0)+1;v.lastShot=this.t;const ph=Math.sin(e.shotIdx*1.7)*(1-Math.exp(-e.shotIdx*.4));
    v.recoilP+=wd.rc*.0085*(e.aiming?.62:1)*(e.shotIdx<4?1.1:.9);v.recoilY+=ph*wd.rc*.0042*(e.aiming?.6:1);v.kick=Math.min(1,v.kick+wd.rc*.04);v.recoilKick=Math.min(1.6,(v.recoilKick||0)+wd.rc*.35);v.flash=.05;v.shake=Math.min(.5,v.shake+wd.rc*.006);
-   this.audio.play(wd.quiet?'quiet':wd.laser?'laser':wd.t==='ar'?'ar':wd.t==='smg'?'smg':wd.t==='sg'?'sg':wd.t==='sn'?'sn':wd.t==='pi'?'pi':wd.t==='ex'?'launch':'fun',null,wd.quiet?.7:1);
+   this.audio.play(wd.quiet?'quiet':wd.laser?'laser':wd.t==='ar'?'ar':wd.t==='smg'?'smg':wd.t==='sg'?'sg':wd.t==='sn'?'sn':wd.t==='pi'?'pi':wd.t==='ex'?'launch':'fun',{x:o[0],y:o[1],z:o[2]},wd.quiet?.7:1);
    if(slot.mag<=0&&this.settings&&e.ammo[wd.ammo]>0&&e.reload<=0){}}
   e.shootT=.12;this.revealEnt(e);
   if(this.role==='client'&&e.local){this.net.toHost({t:'fire',o,d:dirs,w:e.wi});
@@ -176,6 +176,7 @@ export const combatMethods={
   if(this.role==='client'||!t.alive||t.drop==='bus')return;
   if(by&&by!==t&&(by.bot)){amount*=this.botDmg}
   if(amount<=0)return;
+  if(t.emote)this.stopEmote(t);
   let rem=amount,shHit=0;
   if(t.ts>0){const a=Math.min(t.ts,rem);t.ts-=a;rem-=a;shHit=1}
   if(rem>0&&t.sh>0){const a=Math.min(t.sh,rem);t.sh-=a;rem-=a;shHit=1}
@@ -206,7 +207,7 @@ export const combatMethods={
  placeOf(t){const teams=new Set(this.list.filter(e=>e.alive&&!e.knocked&&e!==t).map(e=>e.team));return teams.size+1},
  // ================= abilities
  useAbility(e,i){
-  if(!e.alive||e.drop||e.cd[i]>0||e.stun>0||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0||e.use)return false;
+  if(!e.alive||e.drop||e.cd[i]>0||e.stun>0||e.emote||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0||e.use)return false;
   const ab=e.cdef.ab[i];const z=e.cdef.id==='zach';
   if(e.cdef.hero)return this.useHeroAbility(e,i,ab);
   const net=this.role==='client'&&e.local;
