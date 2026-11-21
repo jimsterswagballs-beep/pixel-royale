@@ -78,7 +78,7 @@ export const chaosMethods={
   s.light.visible=true;s.sp.visible=true;
  },
  onChaos(ev){
-  if(ev.m)this.hud.announce(ev.m,'#ff7ad9');
+  if(ev.m){this.hud.announce(ev.m,'#ff7ad9');this.audio.play('storm')}
   if(ev.r&&ev.t)this.addWarn(ev.x,ev.z,ev.r,ev.t);
  },
  addWarn(x,z,r,t){
@@ -93,10 +93,12 @@ export const chaosMethods={
   const cam=this.camera.position;
   if(this.weather==='rain'){for(let i=0;i<7;i++){const a=Math.random()*6.283,d=Math.random()*26;this.fx.emit(cam.x+Math.cos(a)*d,cam.y+8+Math.random()*10,cam.z+Math.sin(a)*d,0,-22,0,'#a9c8ff',.45,0,.12,0,0,.55)}}
   // fog: near the coast the view closes in; elsewhere it stays open (rain closes it a little)
+  // the fog never closes in so far that the map disappears: the bus ride starts a long way out
   let far=800;
-  if(this.weather==='fog'){let nearWater=W.H(cam.x,cam.z)<2.5;for(let k=0;k<8&&!nearWater;k++){const a=k/8*6.283;if(W.H(cam.x+Math.cos(a)*45,cam.z+Math.sin(a)*45)<0)nearWater=true}far=nearWater?90:260}
-  else if(this.weather==='rain')far=300;
-  else if(this.weather==='night')far=240;
+  if(this.weather==='fog'){let nearWater=W.H(cam.x,cam.z)<2.5;for(let k=0;k<8&&!nearWater;k++){const a=k/8*6.283;if(W.H(cam.x+Math.cos(a)*45,cam.z+Math.sin(a)*45)<0)nearWater=true}far=nearWater?260:520}
+  else if(this.weather==='rain')far=600;
+  else if(this.weather==='night')far=620;
+  if(this.state==='bus')far=Math.max(far,1000);
   this.fogFar=(this.fogFar||800)+(far-(this.fogFar||800))*Math.min(1,dt*2);
   this.scene.fog.far=this.fogFar;
  },

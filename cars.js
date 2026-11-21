@@ -222,7 +222,7 @@ export const carMethods={
     c.seats.forEach((sid,i)=>{const e=this.ents.get(sid);if(!e)return;const[px,pz]=this.seatPos(c,i);e.pos.set(px,c.y+.05,pz);if(e.tgt){e.tgt.x=px;e.tgt.y=c.y+.05;e.tgt.z=pz}})
    }
    c.group.position.set(c.x,c.y,c.z);c.group.rotation.y=c.yaw;
-   c.group.visible=!(me&&me.car===c.id);     // you do not see your own car body from inside it
+   c.group.visible=true;     // the car body is always drawn (you are in third person while driving)
    c.flame.visible=c.burn;
    if(c.beams)c.beams.visible=this.weather==='night';
    if(c.burn){c.flame.scale.set(1,.7+Math.random()*.6,1);c.flame.rotation.y+=dt*3}

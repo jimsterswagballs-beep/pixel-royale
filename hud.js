@@ -26,7 +26,7 @@ export class HUD{
   <div id="topr"><div class="pill" id="alive"><span>👥</span><b id="aliveN">100</b></div><div class="pill" id="kills"><span>☠</span><b id="killN">0</b></div><div class="pill" id="fps" style="display:none"></div></div>
   <div id="mmwrap"><canvas id="mm" width="340" height="340"></canvas><div id="stormbox"><div id="stormlbl">Storm</div><div id="stormtime">--</div></div><div id="locname"></div></div>
   <div id="wmarks"></div><div id="team"></div><div id="knock"></div><div id="killfeed"></div><div id="toasts"></div><div id="announce"></div>
-  <div id="carhud"></div><div id="rbwait"></div><div id="prompt"><span class="k"></span><span class="t"></span></div>
+  <div id="carhud"></div><div id="rbwait"></div><div id="chaoslbl"></div><div id="prompt"><span class="k"></span><span class="t"></span></div>
   <div id="usebar"><div><i></i></div><span></span></div>
   <div id="busHint"></div>
   <div id="bottom">
@@ -156,6 +156,7 @@ export class HUD{
   // vignette storm
   const inS=g.insideStorm(tgt.pos.x,tgt.pos.z);this.q('#vig').classList.toggle('storm',!inS);
   this.carHud(g,me,B);
+  this.chaosHud(g);
   // bus hint
   const bh=this.q('#busHint');if(me.drop==='bus'&&me.alive){bh.style.display='block';bh.innerHTML=`Press <b>${keyLabel(B.jump)}</b> to jump from the Battle Bus`}else if(me.drop==='free'||me.drop==='glide'){bh.style.display='block';bh.innerHTML=me.drop==='free'?`Dive with <b>${keyLabel(B.fwd)}</b> + look down · glider auto-deploys low`:'Gliding…';if(me.drop==='free'&&performance.now()%1e9<1e12)bh.innerHTML+=` · <b>${keyLabel(B.jump)}</b> deploys early`}else bh.style.display='none';
   if(!me.alive&&!g.over){bh.style.display='block';bh.innerHTML=`Spectating <b>${tgt.name}</b> · <b>${keyLabel(B.spec)}</b> next player`}
@@ -195,6 +196,11 @@ export class HUD{
   }
   if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
   box.style.display=html?'flex':'none';
+ }
+ // Chaos Rising: the countdown to the next event
+ chaosHud(g){
+  const el=this.q('#chaoslbl');
+  if(g.gm==='chaos'&&g.running&&!g.over&&g.chaosT!==undefined){el.style.display='block';el.textContent=`CHAOS RISING · next event in ${Math.max(0,Math.ceil(g.chaosT))}s`}else el.style.display='none';
  }
  // car HUD: your seat, car health and the keys (or a prompt when a car is close)
  carHud(g,me,B){

@@ -1,4 +1,12 @@
-# Pixel Royale: v20 update
+# Pixel Royale: v21 update
+
+Fixes from the v20 report:
+- Joining a match no longer leaves the map invisible. Night and fog weather used to close the view while the Battle Bus was still far out. The view now stays open during the bus ride.
+- Driving a car now uses a third-person camera until you exit.
+- Chaos Rising shows a countdown ("next event in Ns") and plays a sound when each event starts.
+- Car bodies stay visible at all times. Headlight beams show at night.
+
+## v20 update
 
 - **Gamemodes menu**: the Gamemodes button on the lobby screens opens a menu for team size (Solo, Duos, Trios, Squads), the game mode, and bot filling. In a party, only the host can change it.
 - **Chaos Rising** (game mode): a random chaos event every 30 seconds. Events are a meteor (3 s warning), a gale that pushes everyone, a surprise supply drop, or a car frenzy (three cars on the roads).

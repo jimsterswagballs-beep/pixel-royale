@@ -356,7 +356,8 @@ export class Game{
   const fpv=this.fpv;
   // third person while diving and gliding; blends back to first person when the player lands
   const me=this.me;if(me)me.rpos.copy(me.pos); // the local hero's sprite is drawn from its live position
-  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide'||!!me.emote)?1:0;
+  // third person while diving, gliding, emoting and while in a car (until you get out)
+  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide'||!!me.emote||me.car>=0)?1:0;
   this.tpK=(this.tpK||0)+(tpWant-(this.tpK||0))*(1-Math.exp(-9*dt));
   if(fpv){this.positionFPS(dt);
    if(this.tpK>.002){const fp=cam.position.clone(),fq=cam.quaternion.clone(),tp=new THREE.Vector3(),tq=new THREE.Quaternion();this.tpPose(me,tp,tq);cam.position.lerpVectors(fp,tp,this.tpK);cam.quaternion.copy(fq).slerp(tq,this.tpK)}}
