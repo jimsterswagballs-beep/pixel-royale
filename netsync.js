@@ -9,12 +9,13 @@ export const netMethods={
   if(this.role==='client'){
    {const h=!!this.me.holdI;if(h!==a.holdSent){a.holdSent=h;this.net.toHost({t:'hold',on:h})}}
    a.net+=dt;if(a.net>=1/20){a.net=0;const m=this.me;this.net.toHost({t:'p',x:r2(m.pos.x),y:r2(m.pos.y),z:r2(m.pos.z),yw:r2(m.yaw),pt:r2(m.pitch),f:this.packFlags(m),w:m.wi,vx:r2(m.vel.x),vz:r2(m.vel.z)})}
+   if(this.me.car>=0&&this.me.seat===0){a.carNet=(a.carNet||0)+dt;if(a.carNet>=1/20){a.carNet=0;this.net.toHost({t:'carin',...this.carLocalInput()})}}
    return}
   // host
   if(this.net.peers&&this.net.peers.size>0){
    a.snap+=dt;if(a.snap>=1/16){a.snap=0;const s=this.storm;
     const es=[];for(const e of this.list)es.push([e.id,r2(e.pos.x),r2(e.pos.y),r2(e.pos.z),r2(e.yaw),r2(e.pitch),this.packFlags(e),e.wi,Math.round(e.hp),Math.round(e.sh),Math.round(e.ts),e.alive?1:0,e.kills,e.bot?1:0,r2(e.vel.x),r2(e.vel.z),Math.round((e.kT||0)*10),Math.round((e.reviveT||0)*10),e.reviver===undefined?-1:e.reviver]);
-    this.net.broadcast({t:'s',tm:r2(this.t),bt:r2(this.bus.t),e:es,st:[s.phase,s.state,r2(s.cx),r2(s.cz),r2(s.r),r2(s.tcx),r2(s.tcz),r2(s.tr),r2(s.t),s.dmg||0],ev:this.outEvents.length?this.outEvents:undefined,sp:this.supplyT,cs:[...this.cards.values()].map(c=>[c.id,c.owner,r2(c.x),r2(c.y),r2(c.z),c.carrier,Math.round(c.t)]),vs:[...this.vans.values()].map(v=>[v.id,v.state,Math.round(v.t*10),Math.round(v.cdT),v.user])});this.outEvents=[]}
+    this.net.broadcast({t:'s',tm:r2(this.t),bt:r2(this.bus.t),e:es,st:[s.phase,s.state,r2(s.cx),r2(s.cz),r2(s.r),r2(s.tcx),r2(s.tcz),r2(s.tr),r2(s.t),s.dmg||0],ev:this.outEvents.length?this.outEvents:undefined,sp:this.supplyT,cs:[...this.cards.values()].map(c=>[c.id,c.owner,r2(c.x),r2(c.y),r2(c.z),c.carrier,Math.round(c.t)]),vs:[...this.vans.values()].map(v=>[v.id,v.state,Math.round(v.t*10),Math.round(v.cdT),v.user]),cr:this.carSnap()});this.outEvents=[]}
    else if(this.outEvents.length>40){this.net.broadcast({t:'ev',e:this.outEvents});this.outEvents=[]}
   }else this.outEvents=[];
  },
@@ -27,7 +28,9 @@ export const netMethods={
   const e=this.list.find(x=>x.peer===from);if(!e||!e.alive&&m.t!=='p')return;if(e.knocked&&m.t!=='p'&&m.t!=='hold')return;
   switch(m.t){
    case'hold':e.holdI=!!m.on;break;
-   case'p':{if(!e.alive)return;e.tgt.x=m.x;e.tgt.y=m.y;e.tgt.z=m.z;e.tgt.yaw=m.yw;e.tgt.pitch=m.pt;e.vel.x=m.vx||0;e.vel.z=m.vz||0;this.unpackFlags(e,m.f);if(this.t<(e.noCloakUntil||0)){e.cloakT=0;e.flags&=~4096}e.wi=m.w;if(e.drop==='bus'&&!(m.f&64)){e.drop=m.f&16?'free':'glide'}break}
+   case'car':this.carReq(e,m.k,m.id);break;
+   case'carin':{const c=this.carOf(e);if(c&&e.seat===0)c.inp={th:+m.th||0,st:+m.st||0,br:m.br?1:0};break}
+   case'p':{if(!e.alive)return;if(e.car>=0)break;e.tgt.x=m.x;e.tgt.y=m.y;e.tgt.z=m.z;e.tgt.yaw=m.yw;e.tgt.pitch=m.pt;e.vel.x=m.vx||0;e.vel.z=m.vz||0;this.unpackFlags(e,m.f);if(this.t<(e.noCloakUntil||0)){e.cloakT=0;e.flags&=~4096}e.wi=m.w;if(e.drop==='bus'&&!(m.f&64)){e.drop=m.f&16?'free':'glide'}break}
    case'emo':{if(m.on)this.startEmote(e,m.id);else this.stopEmote(e);break}
    case'fire':{if(m.w<0||!m.d||m.d.length>60)return;this.revealHost(e);const wd=wstat(Math.floor(m.w/10),m.w%10);if(!wd)return;
     const dx=m.o[0]-e.pos.x,dz=m.o[2]-e.pos.z;let o=m.o;if(dx*dx+dz*dz>25||Math.abs(m.o[1]-e.pos.y)>5)o=[e.pos.x,e.pos.y+1.65,e.pos.z];
@@ -58,6 +61,7 @@ export const netMethods={
     if(!a[11]&&e.alive){e.alive=false;e.deadT=0}}}
   const s=this.storm,st=m.st;s.phase=st[0];s.state=st[1];s.tcx=st[5];s.tcz=st[6];s.tr=st[7];s.t=st[8];s.dmg=st[9];
   s.cx=lerp(s.cx,st[2],.5);s.cz=lerp(s.cz,st[3],.5);s.r=lerp(s.r,st[4],.5);if(Math.abs(s.r-st[4])>30){s.r=st[4];s.cx=st[2];s.cz=st[3]}
+  if(m.cr)this.applyCarSnap(m.cr);
   if(m.cs)this.applyFieldSnap(m);
   this.hostT=m.tm;this.supplyT=m.sp;
   // bus sync

@@ -1,9 +1,12 @@
 import * as THREE from 'three';
 import {mulberry32,clamp,lerp} from './data.js';
 import {MATS} from './materials.js';
-export const ISL=300,HALF=430,WATER=0;
+export const ISL=380,HALF=520,WATER=0;
+// cliffs: [x, z, angle, half-length, height]. The ground steps up by `height` across the line; a rock wall stands on the edge.
+export const CLIFFS=[[-40,-60,.7,22,9],[-120,-250,-.4,22,10],[-160,150,1.2,24,8],[230,-60,2.0,20,8],[40,120,.2,18,7],[-250,-150,.3,22,9]];
 const TREE_HP=100;const rockHp=sc=>Math.round(130+50*sc);
-export const ROADS=[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[2,5],[1,6],[3,7],[4,7],[0,8],[8,3],[8,7],[2,9],[9,12],[12,4],[0,12],[0,10],[10,1],[6,11],[11,3],[5,1]];
+export const ROADS=[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[2,5],[1,6],[3,7],[4,7],[0,8],[8,3],[8,7],[2,9],[9,12],[12,4],[0,12],[0,10],[10,1],[6,11],[11,3],[5,1],
+ [2,13],[13,14],[14,4],[14,12],[16,8],[16,7],[17,3],[17,11],[15,10],[18,5],[19,5],[19,1],[13,18],[7,16]];
 export const POIS=[
  {n:'Downtown Dunk',x:0,z:0,r:58,type:'city'},
  {n:'Pleasant Pickle',x:-150,z:95,r:44,type:'suburb'},
@@ -18,6 +21,14 @@ export const POIS=[
  {n:"Farmer's Folly",x:-100,z:5,r:30,type:'farm'},
  {n:'Tomato Town',x:-190,z:-100,r:28,type:'town'},
  {n:'Dusty Depot',x:170,z:-62,r:26,type:'town'},
+ // Season 1 additions
+ {n:'Sandy Cove',x:250,z:150,r:34,type:'resort'},
+ {n:'Pier Point',x:260,z:-120,r:30,type:'town'},
+ {n:'Harbor Heights',x:-270,z:60,r:32,type:'warehouse'},
+ {n:'Gas and Go',x:70,z:-250,r:28,type:'town'},
+ {n:'Sawmill Creek',x:-220,z:-170,r:30,type:'farm'},
+ {n:'Sunset Cabins',x:90,z:235,r:34,type:'cabins'},
+ {n:'Quarry Rock',x:-60,z:240,r:32,type:'warehouse'},
 ];
 function hash(ix,iz){let h=Math.imul(ix,374761393)^Math.imul(iz,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967295}
 function vnoise(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);const a=hash(ix,iz),b=hash(ix+1,iz),c=hash(ix,iz+1),d=hash(ix+1,iz+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
@@ -32,7 +43,9 @@ function rawH(x,z){
   h+=38*Math.exp(-(((x+75)**2+(z+95)**2)/(2*38*38)))*s;
   h+=18*Math.exp(-(((x+215)**2+(z+25)**2)/(2*34*34)))*s;
   h+=14*Math.exp(-(((x-80)**2+(z-30)**2)/(2*45*45)))*s;
-  h-=13*Math.exp(-(((x-95)**2+(z+62)**2)/(2*19*19)))*s;h-=11*Math.exp(-(((x+62)**2+(z-150)**2)/(2*15*15)))*s;h+=9*Math.exp(-(((x-190)**2+(z+40)**2)/(2*22*22)))*s;}
+  h+=26*Math.exp(-(((x-270)**2+(z+200)**2)/(2*50*50)))*s;h+=22*Math.exp(-(((x+250)**2+(z-210)**2)/(2*45*45)))*s;h+=16*Math.exp(-(((x-20)**2+(z+330)**2)/(2*60*60)))*s;
+  h-=13*Math.exp(-(((x-95)**2+(z+62)**2)/(2*19*19)))*s;h-=11*Math.exp(-(((x+62)**2+(z-150)**2)/(2*15*15)))*s;h+=9*Math.exp(-(((x-190)**2+(z+40)**2)/(2*22*22)))*s;
+  for(const[cx,cz,a,L,S]of CLIFFS){const dx=x-cx,dz=z-cz,ca=Math.cos(a),sa=Math.sin(a);const t=dx*ca+dz*sa,n=-dx*sa+dz*ca;h+=S*sstep(-1.2,1.2,n)*(1-sstep(L-4,L,Math.abs(t)))*s}}
  else h=L*14;
  return h;
 }
@@ -43,6 +56,8 @@ export function H(x,z){
   const d=Math.hypot(dx,dz);const w=sstep(p.r*1.25,p.r*.85,d);if(w>0)h=lerp(h,poiY[i],w);}
  return h;
 }
+// point on road a->b at t (0..1), with the same wobble roadDist uses, plus the rough direction
+export function roadPoint(a,b,t){const A=POIS[a],B=POIS[b];const dx=B.x-A.x,dz=B.z-A.z;const l=Math.hypot(dx,dz);const wob=Math.sin(t*9+a*3)*6*Math.sin(t*3.14159);return{x:A.x+dx*t-dz/l*wob,z:A.z+dz*t+dx/l*wob,dx,dz}}
 export function roadDist(x,z){let best=1e9;for(const[a,b]of ROADS){const A=POIS[a],B=POIS[b];const dx=B.x-A.x,dz=B.z-A.z;const l2=dx*dx+dz*dz;let t=((x-A.x)*dx+(z-A.z)*dz)/l2;t=t<0?0:t>1?1:t;const wob=Math.sin(t*9+a*3)*6*Math.sin(t*3.14159);const nx=-dz/Math.sqrt(l2),nz=dx/Math.sqrt(l2);const px=A.x+dx*t+nx*wob,pz=A.z+dz*t+nz*wob;const d=Math.hypot(x-px,z-pz);if(d<best)best=d}return best}
 export function slope(x,z){const e=1.2;return [(H(x+e,z)-H(x-e,z))/(2*e),(H(x,z+e)-H(x,z-e))/(2*e)]}
 export function poiAt(x,z){for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*1.1)return p;return null}
@@ -169,6 +184,11 @@ export function buildMap(){
  POIS.forEach((p,i)=>genPOI(rng,p,i));
  POIS.forEach(p=>{if(p.type==='fort')return; for(let i=0;i<10;i++){const a=rng()*6.283,r=p.r*(.25+rng()*.7);const cx=p.x+Math.cos(a)*r,cz=p.z+Math.sin(a)*r;if(buildings.some(b=>Math.abs(cx-b.x)<b.w/2+2.5&&Math.abs(cz-b.z)<b.d/2+2.5))continue;const y=H(cx,cz);const sz=1.1+rng()*.9;const col=['#9b6a3a','#7a8a9a','#c0463a','#4a8a5a'][Math.floor(rng()*4)];partMat='stone';addBox(cx-sz/2,y,cz-sz/2,cx+sz/2,y+sz,cz+sz/2,col);if(rng()<.4)addBox(cx-sz/3,y+sz,cz-sz/3,cx+sz/3,y+sz*1.6,cz+sz/3,col);partMat=null}
 });
+ // cliff walls: solid rock along the edge of each cliff, from the low ground up to the top
+ {for(const[cx,cz,a,L]of CLIFFS){const ca=Math.cos(a),sa=Math.sin(a);
+  for(let t=-L;t<=L;t+=2){const px=cx+ca*t,pz=cz+sa*t;const lo=[px-sa*-2.5,pz+ca*-2.5],hi=[px-sa*2.5,pz+ca*2.5];
+   const y0=Math.min(H(lo[0],lo[1]),H(hi[0],hi[1]))-.5,y1=Math.max(H(lo[0],lo[1]),H(hi[0],hi[1]))+.5;
+   addBox(px-1.1,y0,pz-1.1,px+1.1,y1,pz+1.1,'#8b8579')}}}
  // lighthouse on the coast
  {let lx=0,lz=0;const a=1.9;for(let r=340;r>120;r-=3){const x=Math.cos(a)*r,z=Math.sin(a)*r;if(H(x,z)>3.4){lx=x;lz=z;break}}const yy=H(lx,lz);addCyl(lx,lz,2.6,yy,yy+24);landmarks.push({k:'lighthouse',x:lx,y:yy,z:lz});lootSpots.push({x:lx+3.5,z:lz,y:yy+.1,inside:false,chest:true,q:1.8})}
  // Mount Muffin summit
@@ -254,7 +274,7 @@ export function pushOutCircles(e,r,h){query(e.pos.x,e.pos.z,r+3,_b);for(let i=0;
 // ---------------- meshes
 export function buildMeshes(scene,quality={}){
  const g=new THREE.Group();scene.add(g);
- const N=300,size=HALF*2;
+ const N=380,size=HALF*2;
  const geo=new THREE.PlaneGeometry(size,size,N,N);geo.rotateX(-Math.PI/2);
  const pos=geo.attributes.position,col=new Float32Array(pos.count*3);const c=new THREE.Color();
  for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i);const h=H(x,z);pos.setY(i,h);
@@ -264,7 +284,7 @@ export function buildMeshes(scene,quality={}){
   else if(h>34)c.set('#f2f5f7').lerp(new THREE.Color('#cfd8de'),n*.5);
   else if(sl>.75||h>26)c.set('#8b8579').lerp(new THREE.Color('#6f6a60'),n);
   else{const pn=vnoise(x*.035+9,z*.035+4);c.set('#6fc04a').lerp(new THREE.Color('#4a9a38'),n*1.3).lerp(new THREE.Color('#9ad45a'),clamp(.5-n,0,.5)).lerp(new THREE.Color('#3f8a42'),clamp((pn-.5)*2,0,.7)).lerp(new THREE.Color('#b8d860'),clamp((.35-pn)*2,0,.5))}
-  if(h>1.8&&h<34){const rd=roadDist(x,z);if(rd<3.4)c.lerp(new THREE.Color(rd<2?'#b09a74':'#9a8c68'),clamp((3.4-rd)/1.4,0,1)*.9)}
+  if(h>1.8&&h<34){const rd=roadDist(x,z);if(rd<4.2)c.lerp(new THREE.Color(rd<2.6?'#4b4e55':'#c4b89a'),clamp((4.2-rd)/1.2,0,1)*.95)}
   for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<p.r*.92&&h>1.8){c.lerp(new THREE.Color(p.type==='suburb'?'#7bb85a':'#9a9a96'),sstep(p.r*.92,p.r*.5,d)*.75)}}
   col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b}
  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();

@@ -1,3 +1,33 @@
+# Pixel Royale: v20 update
+
+- **Gamemodes menu**: the Gamemodes button on the lobby screens opens a menu for team size (Solo, Duos, Trios, Squads), the game mode, and bot filling. In a party, only the host can change it.
+- **Chaos Rising** (game mode): a random chaos event every 30 seconds. Events are a meteor (3 s warning), a gale that pushes everyone, a surprise supply drop, or a car frenzy (three cars on the roads).
+- **Weather** (picked per match from the seed, so everyone gets the same): clear (40%), rain (20%), coastal fog (15%), night (13%) or lightning storm (12%).
+  - Rain: cars have less grip, so they speed up more slowly, top out lower, brake more weakly and steer more sharply. Rain falls around the camera.
+  - Coastal fog: the view closes in when you are near the water.
+  - Night: the sky goes dark, the sun and sky light drop, and cars show headlight beams.
+  - Lightning storm: a strike every 7 seconds on a random spot near a player, with a red warning circle first.
+- **Flare Gun**: a new throwable item. When it lands it lights the area for 25 seconds (up to three flares at once).
+- **Knocked and waiting-for-reboot screens**: no background panels, and the reboot screen is simpler.
+
+Not done: there is no timed day and night cycle (night is a weather type for the whole match). The new events have not been tested with real multiplayer connections.
+
+# Pixel Royale: Season 1
+
+## Season 1 update
+
+- **Bigger map**: the island is about 25% larger, with 7 new places (Sandy Cove, Pier Point, Harbor Heights, Gas and Go, Sawmill Creek, Sunset Cabins, Quarry Rock), 14 new road links, extra hills, and dark asphalt roads with light kerbs.
+- **Bigger starter island**: the waiting area is about 1.5x the size, with more palms, rocks and spawn space.
+- **Cars**: cars spawn on the roads. Up to four players can ride in one car (driver plus three passengers). Cars have 250 hp, catch fire at 90 hp or less, and explode at 0 hp, hurting everyone nearby. Running people over hurts them, and bullets and explosions damage cars.
+- **Car controls** (rebindable in Controls): Enter / Exit Car (default U) and Swap Car Seat (default O). Drive with the normal move keys, and jump to brake.
+- **Multiplayer**: the host runs all car physics, seats and damage, and sends the cars in the snapshot. Guests send their drive input.
+- **Bots**: up to 75 bots in solo, and the party bot slider also goes to 75.
+- **Effects**: smoke and dust while driving, flames on burning cars, and sparkles while using items.
+- **Cliffs**: six cliffs with rock walls and a height step. You can't walk up them; go around.
+- **Waiting for reboot**: when you're knocked, a screen shows your bleed-out timer, where your reboot card is, reboot van availability, and your teammates' status.
+
+Known limits: bots do not drive or ride in cars yet. Multiplayer car sync has only been checked by reading the code, not with real PeerJS connections.
+
 # Pixel Royale
 
 A browser-based 3D battle royale game.

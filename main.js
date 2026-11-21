@@ -13,7 +13,7 @@ import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
 import {makeBotRoster} from './botnames.js';
 const INTER_SECS=10; // seconds everyone waits on the starter island before the bus leaves
-import {buildEntrants,MODES,MODE_KEYS} from './teams.js';
+import {buildEntrants,MODES,MODE_KEYS,GM,GM_KEYS} from './teams.js';
 const $=id=>document.getElementById(id);
 const BOTNAMES=['Noodle','Sir Quacks','Turbo Toast','Pixel Pete','Captain Crunch','Waffle','Sneaky Sam','Big Chungus','Lil Bandit','Dr. Pickle','Banana Joe','Zoomer','Gizmo','Cheese Wiz','Ninja Nan','Boop','Chad','Meatball','Fuzzy','Rocket Raccoon','Grumpy','Sassy','Taco Tim','Doodle','Blip','Moonpie','Toaster','Yeet','Mr. Bean','Gremlin','Skibidi','Potato','Wobbly','Kevin','Bongo','Pancake'];
 const COLORS=['#ffffff','#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a'];
@@ -38,7 +38,7 @@ class App{
  // ---------- state
  loadSettings(){let s={};try{s=JSON.parse(localStorage.getItem('brg_settings')||'{}')}catch(e){}this.settings=Object.assign({},DEFAULT_SETTINGS,s)}
  saveSettings(){try{localStorage.setItem('brg_settings',JSON.stringify(this.settings))}catch(e){}}
- loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,diff:'Normal',mode:'solo',fill:true,tokens:0,ownedChars:['coolguy15','zach'],ownedEmotes:[],equipEmote:''},p);const P=this.profile;P.ownedChars=[...new Set(['coolguy15','zach',...(P.ownedChars||[])])];P.ownedEmotes=P.ownedEmotes||[];if(!P.ownedChars.includes(P.char))P.char='coolguy15';if(P.equipEmote&&!P.ownedEmotes.includes(P.equipEmote))P.equipEmote=''}
+ loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,gm:'br',diff:'Normal',mode:'solo',fill:true,tokens:0,ownedChars:['coolguy15','zach'],ownedEmotes:[],equipEmote:''},p);const P=this.profile;P.ownedChars=[...new Set(['coolguy15','zach',...(P.ownedChars||[])])];P.ownedEmotes=P.ownedEmotes||[];if(!P.ownedChars.includes(P.char))P.char='coolguy15';if(P.equipEmote&&!P.ownedEmotes.includes(P.equipEmote))P.equipEmote=''}
  saveProfile(){try{localStorage.setItem('brg_profile',JSON.stringify(this.profile))}catch(e){}}
  get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote}}
  applySettings(){
@@ -96,13 +96,13 @@ buildTitle(){
   t.innerHTML=`<div class="lb-bg"></div>
   <div class="sl">
    <div class="sl-left">
-    <span class="lb-chip">Solo · Battle Royale</span>
+    <span class="lb-chip">Season 1 · Solo · Battle Royale</span>
     <h1 class="sl-h">Battle <span>Royale</span></h1>
     <p class="sl-p">Drop from the battle bus, loot chests and outlast the storm. Plays fully offline against bots.</p>
     <div class="glass sl-setup">
      <div class="k">Match setup</div>
      <label class="sl-f"><span class="sl-lab">Name</span><input type="text" id="slName" maxlength="14"></label>
-     <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="slBotN"></b></div><input type="range" id="slBots" min="0" max="39"></div>
+     <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="slBotN"></b></div><input type="range" id="slBots" min="0" max="75"></div>
      <div class="sl-f"><div class="sl-lab"><span>Difficulty</span></div><div class="sl-chips" id="slDiff"></div></div><div class="tip">0 bots lets you explore the island alone.</div>
     </div>
    </div>
@@ -120,18 +120,48 @@ buildTitle(){
     </div>
     <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
    </div>
-   <div class="glass sl-modes"><div class="k">Game mode</div><div class="sl-modecards" id="slMode"></div><div class="sl-row" id="slFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="slFill"></div></div></div>
+   <div class="glass sl-modes"><button class="gm-open" id="slGm"></button></div>
   </div>`;
   for(const b of t.querySelectorAll('[data-go]'))b.onclick=()=>{this.sfx('ui');this.go(b.dataset.go)};
   $('playBtn').onclick=()=>this.soloStart();
   $('slName').onchange=e=>{this.profile.name=e.target.value.trim()||'Player';this.saveProfile();this.updateStage()};
   $('slBots').oninput=e=>{this.profile.bots=+e.target.value;$('slBotN').textContent=this.profile.bots;this.saveProfile()};
   const dd=$('slDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.profile.diff=d;this.saveProfile();this.refreshChips(dd,d);this.sfx('ui')};dd.appendChild(c)}
-  const md=$('slMode');for(const k of MODE_KEYS){const c=h(`<span class="chip mc" data-k="${k}"><b>${MODES[k].name}</b><small>${MODES[k].sub}</small></span>`);c.onclick=()=>{this.profile.mode=k;this.saveProfile();this.refreshMode();this.sfx('ui')};md.appendChild(c)}
-  $('slFill').onclick=()=>{this.profile.fill=!this.profile.fill;this.saveProfile();this.refreshMode();this.sfx('click')};
+  $('slGm').onclick=()=>this.openGamemodes('solo');
  }
  enter_title(){const P=this.profile;this.updateStage();$('slName').value=P.name;$('slBots').value=P.bots;$('slBotN').textContent=P.bots;this.refreshChips($('slDiff'),P.diff);this.refreshMode()}
- refreshMode(){const P=this.profile;this.markChips($('slMode'),P.mode);$('slFill').classList.toggle('on',!!P.fill);$('slFillRow').style.display=P.mode==='solo'?'none':'flex'}
+ refreshMode(){this.gmSummary('slGm',this.profile.mode,this.profile.gm)}
+ // ---------- gamemodes menu: team size, game mode and bot filling (solo: your profile; party: the host sets it)
+ gmTarget(){return this.gmWho==='party'?this.lobby:this.profile}
+ gmCanEdit(){return this.gmWho!=='party'||!!(this.lobby&&this.lobby.host)}
+ openGamemodes(who){
+  this.gmWho=who;this.sfx('ui');
+  let m=$('gmModal');if(!m){m=document.createElement('div');m.id='gmModal';document.body.appendChild(m);m.onclick=e=>{if(e.target===m)this.closeGamemodes()}}
+  this.renderGamemodes();m.classList.add('show');
+ }
+ closeGamemodes(){const m=$('gmModal');if(m)m.classList.remove('show');if(this.gmWho==='party')this.lobbyUpdate();else this.refreshMode();this.sfx('click')}
+ gmSet(patch){
+  if(!this.gmCanEdit())return;
+  Object.assign(this.gmTarget(),patch);
+  if(this.gmWho==='party')this.lobbyUpdate();else{this.saveProfile();this.refreshMode()}
+  this.renderGamemodes();this.sfx('ui');
+ }
+ renderGamemodes(){
+  const m=$('gmModal'),T=this.gmTarget(),can=this.gmCanEdit();if(!m)return;
+  const teamChips=MODE_KEYS.map(k=>`<button class="gm-chip${T.mode===k?' sel':''}" data-mode="${k}"><b>${MODES[k].name}</b><small>${MODES[k].sub}</small></button>`).join('');
+  const gmCards=GM_KEYS.map(k=>`<button class="gm-card${(T.gm||'br')===k?' sel':''}" data-gm="${k}"><b>${GM[k].name}</b><small>${GM[k].sub}</small></button>`).join('');
+  m.innerHTML=`<div class="gm-panel"><div class="gm-head"><h2>Gamemodes</h2><button class="gm-done">Done</button></div>`+
+   `<div class="gm-sec"><div class="k">Team size</div><div class="gm-row">${teamChips}</div></div>`+
+   `<div class="gm-sec"><div class="k">Game mode</div><div class="gm-row">${gmCards}</div></div>`+
+   (T.mode==='solo'?'':`<button class="gm-fill" data-fill="1"><span>Fill empty teammate slots with bots</span><span class="tog${T.fill?' on':''}"></span></button>`)+
+   (can?'':'<p class="gm-note">Only the party host can change these.</p>')+`</div>`;
+  m.querySelector('.gm-done').onclick=()=>this.closeGamemodes();
+  m.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>this.gmSet({mode:b.dataset.mode}));
+  m.querySelectorAll('[data-gm]').forEach(b=>b.onclick=()=>this.gmSet({gm:b.dataset.gm}));
+  const f=m.querySelector('[data-fill]');if(f)f.onclick=()=>this.gmSet({fill:!T.fill});
+ }
+ // the button on the lobby screens shows what is picked
+ gmSummary(id,mode,gm){const b=$(id);if(!b)return;const md=(MODES[mode]||MODES.solo).name;b.innerHTML=`<span class="k">Gamemodes</span><b>${md} · ${GM[gm||'br'].name}</b><small>Change</small>`}
  markChips(box,key){for(const c of box.children)c.classList.toggle('sel',c.dataset.k===key)}
  updateStage(){
   const P=this.profile,cd=CHARS.find(x=>x.id===P.char)||CHARS[0];
@@ -305,7 +335,7 @@ buildTitle(){
   const P=this.profile;
   const ents=buildEntrants({mode:P.mode,humans:[{name:P.name,char:P.char,cos:this.cos,hostMe:true}],roster:makeBotRoster(P.bots),fill:P.fill});
   const me=ents.find(e=>e.hostMe);
-  this.net=new LocalNet();const cfg=this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,me.id,P.diff);cfg.mode=P.mode;
+  this.net=new LocalNet();const cfg=this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,me.id,P.diff);cfg.mode=P.mode;cfg.gm=P.gm||'br';
   cfg.crowd=ents.filter(e=>e!==me).map(e=>({name:e.name,char:e.char,nameColor:e.cos&&e.cos.nameColor}));
   return cfg;
  }
@@ -355,7 +385,7 @@ buildTitle(){
  hostLobby(){
   this.saveOnName();$('onErr').textContent='Creating lobby…';const net=new Net();this.net=net;
   net.host((err,code)=>{if(err){$('onErr').textContent='Could not create lobby ('+err+'). Check your internet connection.';return}
-   this.lobby={host:true,code,players:[{pid:'host',name:this.profile.name,char:this.profile.char,cos:this.cos}],bots:0,diff:'Normal',mode:this.profile.mode,fill:this.profile.fill};this.lobbyActive=true;this.go('lobby')});
+   this.lobby={host:true,code,players:[{pid:'host',name:this.profile.name,char:this.profile.char,cos:this.cos}],bots:0,diff:'Normal',mode:this.profile.mode,gm:this.profile.gm||'br',fill:this.profile.fill};this.lobbyActive=true;this.go('lobby')});
   net.onMsg=(pid,m)=>this.lobbyMsgHost(pid,m);this.lobbyOnMsg=net.onMsg;
   net.onLeave=pid=>{if(!this.lobby)return;this.lobby.players=this.lobby.players.filter(p=>p.pid!==pid);if(this.playing)this.game.peerLeft(pid);else this.lobbyUpdate()};
  }
@@ -369,10 +399,10 @@ buildTitle(){
   this.saveOnName();code=(code||'').trim().toUpperCase();if(code.length<4){$('onErr').textContent='Enter the 5-letter room code';return}
   $('onErr').textContent='Connecting…';const net=new Net();this.net=net;
   net.join(code,err=>{if(err){$('onErr').textContent=err==='peer-unavailable'?'Room not found – check the code.':err==='timeout'?'Connection timed out.':'Could not connect ('+err+').';this.net=null;return}
-   this.lobby={host:false,code,players:[],bots:0,diff:'Normal',mode:'solo',fill:true};this.lobbyActive=true;net.toHost({t:'hello',name:this.profile.name,char:this.profile.char,cos:this.cos});this.go('lobby')});
+   this.lobby={host:false,code,players:[],bots:0,diff:'Normal',mode:'solo',gm:'br',fill:true};this.lobbyActive=true;net.toHost({t:'hello',name:this.profile.name,char:this.profile.char,cos:this.cos});this.go('lobby')});
   net.onMsg=(f,m)=>{
    if(this.playing){this.game.onNetMessage(f,m);return}
-   if(m.t==='lobby'){this.lobby.players=m.players;this.lobby.bots=m.bots;this.lobby.diff=m.diff;this.lobby.mode=m.mode||'solo';this.lobby.fill=!!m.fill;this.lobby.myPid=m.you;this.lobbyUpdate()}
+   if(m.t==='lobby'){this.lobby.players=m.players;this.lobby.bots=m.bots;this.lobby.diff=m.diff;this.lobby.mode=m.mode||'solo';this.lobby.gm=m.gm||'br';this.lobby.fill=!!m.fill;this.lobby.myPid=m.you;this.lobbyUpdate()}
    else if(m.t==='inter'){this.guestInter(m)}else if(m.t==='start'){this.startOnlineClient(m)}
    else if(m.t==='full'){this.toast('Lobby is full');this.leaveLobby()}
    else if(m.t==='toLobby'){this.leaveMatch()}};
@@ -391,11 +421,11 @@ buildLobby(){
     <div class="pl-h"><span class="k">Squad</span><b id="lbCount"></b></div>
     <div class="pl-slots" id="lbPlayers"></div>
    </aside>
-   <div class="pl-gap"><div class="glass pl-modes"><div class="k">Game mode</div><div class="sl-modecards" id="lbMode"></div><div class="sl-row" id="lbFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="lbFill"></div></div></div><div class="glass pl-herobar"><div class="pl-h"><span class="k">Your hero</span></div><div id="lbChars"></div></div></div>
+   <div class="pl-gap"><div class="glass pl-modes"><button class="gm-open" id="lbGm"></button></div><div class="glass pl-herobar"><div class="pl-h"><span class="k">Your hero</span></div><div id="lbChars"></div></div></div>
    <aside class="glass pl-side">
     <div id="lbHostCtl">
      <div class="pl-h"><span class="k">Match settings</span></div>
-     <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="lbBotN">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0"></div>
+     <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="lbBotN">0</b></div><input type="range" id="lbBots" min="0" max="75" value="0"></div>
      <div class="sl-f"><div class="sl-lab"><span>Bot difficulty</span></div><div class="sl-chips" id="lbDiff"></div></div>
      <button class="btn play" id="lbStart">Board Bus</button>
     </div>
@@ -408,8 +438,7 @@ buildLobby(){
   $('lbInvite').onclick=()=>{const u=location.href.split('#')[0]+'#join='+this.lobby.code;this.copy(u);this.toast('Invite link copied!')};
   $('lbBots').oninput=e=>{this.lobby.bots=+e.target.value;$('lbBotN').textContent=e.target.value;this.lobbyUpdate(true)};
   const dd=$('lbDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.lobby.diff=d;this.lobbyUpdate()};dd.appendChild(c)}
-  const md=$('lbMode');for(const k of MODE_KEYS){const c=h(`<span class="chip mc" data-k="${k}"><b>${MODES[k].name}</b><small>${MODES[k].sub}</small></span>`);c.onclick=()=>{if(this.lobby.host){this.lobby.mode=k;this.lobbyUpdate()}};md.appendChild(c)}
-  $('lbFill').onclick=()=>{if(this.lobby.host){this.lobby.fill=!this.lobby.fill;this.lobbyUpdate();this.sfx('click')}};
+  $('lbGm').onclick=()=>this.openGamemodes('party');
   $('lbStart').onclick=()=>this.hostStart();
  }
  copy(t){try{navigator.clipboard.writeText(t)}catch(e){const i=document.createElement('input');i.value=t;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove()}}
@@ -418,7 +447,7 @@ lobbyUpdate(noBroadcast,full){
   const L=this.lobby;if(!L||this.screen!=='lobby'&&!full)return;
   $('lbCode').textContent=L.code;$('lbHostCtl').style.display=L.host?'block':'none';$('lbWait').style.display=L.host?'none':'block';
   $('lbBots').value=L.bots;$('lbBotN').textContent=L.bots;this.refreshChips($('lbDiff'),L.diff);
-  {const md=MODES[L.mode]||MODES.solo;$('lbModeTxt').textContent=md.name+' · '+md.sub+(L.mode!=='solo'&&L.fill?' · empty slots get bots':'');this.markChips($('lbMode'),L.mode);$('lbFill').classList.toggle('on',!!L.fill);$('lbFillRow').style.display=L.mode==='solo'?'none':'flex'}
+  this.gmSummary('lbGm',L.mode,L.gm);$('lbModeTxt').textContent=(MODES[L.mode]||MODES.solo).name+' · '+GM[L.gm||'br'].name+(L.mode!=='solo'&&L.fill?' · empty slots get bots':'');
   $('lbCount').textContent=L.players.length+' / 8';
   const n=L.players.length+(L.bots?1:0);
   let html=L.players.map(p=>{const host=p.pid==='host',col=(p.cos&&p.cos.nameColor)||'#fff';
@@ -427,7 +456,7 @@ lobbyUpdate(noBroadcast,full){
   for(let i=n;i<4;i++)html+=`<div class="pl-slot empty"><span class="bi">+</span><div class="pl-who"><div class="pn">Open slot</div><div class="ps">Invite a friend</div></div></div>`;
   $('lbPlayers').innerHTML=html;
   const box=$('lbChars');box.innerHTML='';box.appendChild(this.charPicker(()=>this.profile.char,id=>{this.profile.char=id;this.saveProfile();if(L.host){const me=L.players.find(x=>x.pid==='host');if(me)me.char=id;this.lobbyUpdate()}else this.net.toHost({t:'setchar',char:id})},true));
-  if(L.host)this.net.broadcast({t:'lobby',players:L.players,bots:L.bots,diff:L.diff,mode:L.mode,fill:L.fill});
+  if(L.host)this.net.broadcast({t:'lobby',players:L.players,bots:L.bots,diff:L.diff,mode:L.mode,gm:L.gm,fill:L.fill});
  }
  leaveLobby(silent){this.lobbyActive=false;if(this.net&&this.net.close){this.net.close()}this.net=null;this.lobby=null;this.go('title')}
  // Board Bus (party host): the roster is fixed, guests get the intermission, then 'start' and the bus together.
@@ -441,12 +470,12 @@ lobbyUpdate(noBroadcast,full){
   const me=ents.find(e=>e.hostMe);
   const guests=ents.filter(e=>e.pid&&e.pid!=='host');
   for(const e of guests)this.net.send(e.pid,{t:'inter',ents:slim,secs:INTER_SECS,you:e.id});
-  const cfg=this.makeCfg('host',this.net,seed,ents,me.id,L.diff);cfg.mode=L.mode;
+  const cfg=this.makeCfg('host',this.net,seed,ents,me.id,L.diff);cfg.mode=L.mode;cfg.gm=L.gm||'br';
   this.beginIntermission({crowd:slim.filter(e=>e.id!==me.id),onEnd:()=>{
-   for(const e of guests){this.net.send(e.pid,{t:'start',seed,diff:L.diff,mode:L.mode,ents:slim,you:e.id});const p=L.players.find(x=>x.pid===e.pid);if(p)p.eid=e.id}
+   for(const e of guests){this.net.send(e.pid,{t:'start',seed,diff:L.diff,mode:L.mode,gm:L.gm||'br',ents:slim,you:e.id});const p=L.players.find(x=>x.pid===e.pid);if(p)p.eid=e.id}
    this.endIntermission(()=>this.beginGame(cfg))}});
  }
- startOnlineClient(m){this.audio.init();const cfg=this.makeCfg('client',this.net,m.seed,m.ents,m.you,m.diff);cfg.mode=m.mode;const go=()=>this.beginGame(cfg);if(this.inter)this.endIntermission(go);else go()}
+ startOnlineClient(m){this.audio.init();const cfg=this.makeCfg('client',this.net,m.seed,m.ents,m.you,m.diff);cfg.mode=m.mode;cfg.gm=m.gm||'br';const go=()=>this.beginGame(cfg);if(this.inter)this.endIntermission(go);else go()}
  // ---------- intermission: everyone waits on the starter island, then the bus leaves
  buildInter(){
   const d=document.createElement('div');d.id='inter';

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {charTex,makeBusModel} from './shared.js';
 
-const ISLAND_R=40;               // walkable radius
+const ISLAND_R=62;               // walkable radius (Season 1: bigger island)               // walkable radius
 const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
 const hash=(i,j)=>{let h=Math.imul(i,374761393)^Math.imul(j,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967295};
 const vnoise=(x,z)=>{const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);
@@ -13,8 +13,8 @@ const vnoise=(x,z)=>{const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;con
 // flat plateau in the middle, bumpy grass, sloping down into the sea past r = 33
 export function islandH(x,z){
  const r=Math.hypot(x,z);
- let h=3.4-5*sstep(33,46,r);
- h+=(vnoise(x*.09+3,z*.09+7)-.5)*1.1*sstep(8,20,r)*(1-sstep(24,34,r));
+ let h=3.4-5*sstep(52,72,r);
+ h+=(vnoise(x*.09+3,z*.09+7)-.5)*1.1*sstep(12,30,r)*(1-sstep(38,52,r));
  return h}
 
 const M=(c,opts={})=>new THREE.MeshLambertMaterial(Object.assign({color:c,flatShading:true},opts));
@@ -61,7 +61,7 @@ export class StarterIsland{
  }
 
  buildIsland(){
-  const seg=110,size=96;const geo=new THREE.PlaneGeometry(size,size,seg,seg);geo.rotateX(-Math.PI/2);
+  const seg=150,size=150;const geo=new THREE.PlaneGeometry(size,size,seg,seg);geo.rotateX(-Math.PI/2);
   const pos=geo.attributes.position,col=new Float32Array(pos.count*3),c=new THREE.Color();
   for(let i=0;i<pos.count;i++){
    const x=pos.getX(i),z=pos.getZ(i),h=islandH(x,z);pos.setY(i,h);
@@ -91,21 +91,21 @@ export class StarterIsland{
    for(let i=0;i<6;i++){const piv=new THREE.Group();piv.rotation.y=i/6*6.283;piv.rotation.x=-.35;
     const lf=new THREE.Mesh(leafGeo,leafMat);lf.scale.set(s,s,s);lf.position.set(0,0,1.6*s);lf.castShadow=true;piv.add(lf);top.add(piv)}
    this.scene.add(g)};
-  const pts=[[-24,-6],[22,-12],[26,8],[-20,18],[10,26],[-30,-22],[30,-30],[-8,-26],[16,-28],[-34,6],[34,14],[4,34]];
+  const pts=[[-24,-6],[22,-12],[26,8],[-20,18],[10,26],[-30,-22],[30,-30],[-8,-26],[16,-28],[-34,6],[34,14],[4,34],[-44,30],[46,-40],[-52,-12],[40,44],[-30,52],[56,6]];
   for(const[x,z]of pts)palm(x,z,.9+hash(x|0,z|0)*.35);
   // rocks on the shore
   const rockGeo=new THREE.DodecahedronGeometry(1,0);const rockMat=M('#8a8a85');
-  for(let i=0;i<16;i++){const a=i/16*6.283+hash(i,7)*.4,d=27+hash(i,8)*9;const x=Math.cos(a)*d,z=Math.sin(a)*d;
+  for(let i=0;i<24;i++){const a=i/24*6.283+hash(i,7)*.4,d=42+hash(i,8)*12;const x=Math.cos(a)*d,z=Math.sin(a)*d;
    const s=.9+hash(i,11)*1.6;const m=new THREE.Mesh(rockGeo,rockMat);m.scale.set(s,s*.7,s);m.position.set(x,islandH(x,z)+s*.2,z);m.rotation.set(hash(i,2)*3,hash(i,4)*3,0);m.castShadow=true;this.scene.add(m)}
   // a small cabin with a pyramid roof, door facing the plaza
-  const cabinX=-15,cabinZ=8,cy=islandH(cabinX,cabinZ);
+  const cabinX=-23,cabinZ=12,cy=islandH(cabinX,cabinZ);
   const cabin=new THREE.Group();cabin.position.set(cabinX,cy,cabinZ);cabin.rotation.y=Math.atan2(-cabinX,-cabinZ);this.scene.add(cabin);
   const bx=(c,w,h,d,x,y,z)=>{const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),M(c));m.position.set(x,y,z);m.castShadow=m.receiveShadow=true;cabin.add(m);return m};
   bx('#e8d9b8',6,3,5,0,1.5,0);
   const roof=new THREE.Mesh(new THREE.ConeGeometry(4.7,2.2,4),M('#8a4b3a'));roof.rotation.y=Math.PI/4;roof.position.y=4.1;roof.castShadow=true;cabin.add(roof);
   bx('#5a3418',1,2,.12,0,1,2.52);bx('#bfe8ff',1.2,1,.12,-2,1.7,2.52);bx('#bfe8ff',1.2,1,.12,2,1.7,2.52);
   // training dummies (visual only)
-  for(const[x,z]of[[7,-7],[9.5,-5],[11,-9]]){const y=islandH(x,z);
+  for(const[x,z]of[[10.5,-10.5],[14,-7.5],[16.5,-13.5]]){const y=islandH(x,z);
    const body=new THREE.Mesh(new THREE.CylinderGeometry(.4,.4,1.7,10),M('#e8d9b8'));body.position.set(x,y+.85,z);body.castShadow=true;this.scene.add(body);
    const tg=new THREE.Mesh(new THREE.CircleGeometry(.36,24),new THREE.MeshBasicMaterial({color:'#e2432b'}));tg.position.set(x,y+1.3,z+.41);this.scene.add(tg)}
  }
@@ -114,10 +114,10 @@ export class StarterIsland{
   this.bus=makeBusModel();this.busGroup=this.bus.group;this.busProp=this.bus.prop;
   this.busGroup.scale.setScalar(1.05);this.scene.add(this.busGroup);
   // parked on the plaza's north side, nose towards the sea
-  this.busHome=new THREE.Vector3(0,islandH(0,-22)+1.9,-22);
+  this.busHome=new THREE.Vector3(0,islandH(0,-33)+1.9,-33);
   this.busGroup.rotation.y=Math.PI;
   // runway strip under the bus
-  const strip=new THREE.Mesh(new THREE.BoxGeometry(6,.3,18),M('#4b4f58'));strip.position.set(0,islandH(0,-22)+.02,-22);strip.receiveShadow=true;this.scene.add(strip);
+  const strip=new THREE.Mesh(new THREE.BoxGeometry(6,.3,18),M('#4b4f58'));strip.position.set(0,islandH(0,-33)+.02,-33);strip.receiveShadow=true;this.scene.add(strip);
  }
 
  buildHero(){
@@ -150,6 +150,10 @@ export class StarterIsland{
   if(charId!==this.char)this.setChar(charId);
   this.t+=dt;
   const keys=this.input.keys,pr=this.input.pr;
+  // mouse turns the camera: moving the mouse (pointer locked) or dragging across the island
+  const look=this.input.takeLook(),drag=this.input.takeDrag();
+  const sens=(this.input.app&&this.input.app.settings&&this.input.app.settings.sens)||1;
+  this.camYaw-=(look.dx+drag)*.0022*sens;
   // boarding animation
   if(this.boardT!==null){
    this.boardT+=dt;const p=this.boardT;
@@ -163,9 +167,6 @@ export class StarterIsland{
    if(p>2.4){const cb=this.onBoard;this.boardT=null;this.onBoard=null;if(cb)cb()}
    this.animateWorld(dt);return;
   }
-  // turn the camera with the arrow keys
-  if(keys.has('ArrowLeft'))this.camYaw+=dt*2.2;
-  if(keys.has('ArrowRight'))this.camYaw-=dt*2.2;
   // walk relative to the camera
   const f=(this.input.down('fwd')?1:0)-(this.input.down('back')?1:0);
   const s=(this.input.down('right')?1:0)-(this.input.down('left')?1:0);
@@ -228,7 +229,7 @@ export class StarterIsland{
  }
  // a random spot on the plateau, away from the sea
  spot(){
-  for(let i=0;i<30;i++){const a=Math.random()*6.2832,r=5+Math.sqrt(Math.random())*24,x=Math.cos(a)*r,z=Math.sin(a)*r;if(islandH(x,z)>1)return{x,z}}
+  for(let i=0;i<30;i++){const a=Math.random()*6.2832,r=8+Math.sqrt(Math.random())*36,x=Math.cos(a)*r,z=Math.sin(a)*r;if(islandH(x,z)>1)return{x,z}}
   return{x:0,z:-8}
  }
  updateCrowd(dt){

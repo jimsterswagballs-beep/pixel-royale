@@ -6,6 +6,9 @@ export const MODES={
   trio:{name:'Trios',size:3,sub:'3 players per team'},
   squad:{name:'Squads',size:4,sub:'4 players per team'}};
 export const MODE_KEYS=['solo','duo','trio','squad'];
+// game modes: Battle Royale (the normal game) or Chaos Rising (a random chaos event every 30 seconds)
+export const GM={br:{name:'Battle Royale',sub:'Last one standing'},chaos:{name:'Chaos Rising',sub:'A chaos event every 30 seconds'}};
+export const GM_KEYS=['br','chaos'];
 export const modeSize=m=>(MODES[m]||MODES.solo).size;
 
 // humans: party members in join order (host first): {pid,name,char,cos,hostMe}

@@ -26,7 +26,7 @@ export class HUD{
   <div id="topr"><div class="pill" id="alive"><span>👥</span><b id="aliveN">100</b></div><div class="pill" id="kills"><span>☠</span><b id="killN">0</b></div><div class="pill" id="fps" style="display:none"></div></div>
   <div id="mmwrap"><canvas id="mm" width="340" height="340"></canvas><div id="stormbox"><div id="stormlbl">Storm</div><div id="stormtime">--</div></div><div id="locname"></div></div>
   <div id="wmarks"></div><div id="team"></div><div id="knock"></div><div id="killfeed"></div><div id="toasts"></div><div id="announce"></div>
-  <div id="prompt"><span class="k"></span><span class="t"></span></div>
+  <div id="carhud"></div><div id="rbwait"></div><div id="prompt"><span class="k"></span><span class="t"></span></div>
   <div id="usebar"><div><i></i></div><span></span></div>
   <div id="busHint"></div>
   <div id="bottom">
@@ -49,14 +49,16 @@ export class HUD{
   this.mapImg=c;this.mapK=k;this.mapS=S}
  onStart(g){
   this.g=g;if(!this.mapImg)this.makeMapImage();
-  this.q('#killfeed').innerHTML='';this.q('#toasts').innerHTML='';this.q('#announce').innerHTML='';this.q('#dmgnums').innerHTML='';this.dmgNums=[];
+  this.q('#killfeed').innerHTML='';this.q('#toasts').innerHTML='';this.clearStormFx();this.q('#dmgnums').innerHTML='';this.dmgNums=[];
   this.root.style.display='block';this.q('#fps').style.display=g.settings.fps?'block':'none';
   const me=g.me;this.abilEls=[];const ab=this.q('#abil');ab.innerHTML='';
   me.cdef.ab.forEach((a,i)=>{const d=el('div','abil',`<div class="kk"></div><div class="ico">${a.ic?'<img alt="" src="'+abilityIcon(a)+'">':(ABIL_ICON[a.n]||['①','②','③'][i]||'✦')}</div><div class="nx"></div><div class="an">${a.n}</div><div class="cdo"></div><div class="cdt"></div>`);ab.appendChild(d);this.abilEls.push(d)});
   this.slotsKey='';this.announce('Battle Bus is launching – press SPACE to jump!','#ffd23d');this.board=false;
   this.finished=false;$('elim').style.display='none';$('victory').style.display='none';
  }
- hide(){this.root.style.display='none'}
+ hide(){this.root.style.display='none';this.clearStormFx()}
+ // drop last match's storm warnings: the purple storm vignette and the centre-screen storm banner
+ clearStormFx(){this.q('#vig').classList.remove('storm');const a=this.q('#announce');a.classList.remove('show');a.textContent=''}
  toast(m,c){const t=el('div','toast',m);if(c)t.style.color=c;const box=this.q('#toasts');box.appendChild(t);while(box.children.length>3)box.removeChild(box.firstChild);setTimeout(()=>t.remove(),2200)}
  announce(m,c='#fff'){const a=this.q('#announce');a.textContent=m;a.style.color=c;a.classList.remove('show');void a.offsetWidth;a.classList.add('show')}
  killfeed(k){
@@ -153,6 +155,7 @@ export class HUD{
   this.q('#scope').style.display=this.scope?'block':'none';
   // vignette storm
   const inS=g.insideStorm(tgt.pos.x,tgt.pos.z);this.q('#vig').classList.toggle('storm',!inS);
+  this.carHud(g,me,B);
   // bus hint
   const bh=this.q('#busHint');if(me.drop==='bus'&&me.alive){bh.style.display='block';bh.innerHTML=`Press <b>${keyLabel(B.jump)}</b> to jump from the Battle Bus`}else if(me.drop==='free'||me.drop==='glide'){bh.style.display='block';bh.innerHTML=me.drop==='free'?`Dive with <b>${keyLabel(B.fwd)}</b> + look down · glider auto-deploys low`:'Gliding…';if(me.drop==='free'&&performance.now()%1e9<1e12)bh.innerHTML+=` · <b>${keyLabel(B.jump)}</b> deploys early`}else bh.style.display='none';
   if(!me.alive&&!g.over){bh.style.display='block';bh.innerHTML=`Spectating <b>${tgt.name}</b> · <b>${keyLabel(B.spec)}</b> next player`}
@@ -185,16 +188,38 @@ export class HUD{
   const vig=this.q('#vig');if(vig)vig.classList.toggle('knocked',!!(me.alive&&me.knocked));
   const B=this.app.input.binds;
   if(me.alive&&me.knocked){
-   html=`<div class="kn-card"><div class="kn-top"><span class="kn-t">Knocked</span><b>${Math.ceil(me.kT)}s</b></div>`+
-    `<div class="kn-bleed"><i style="width:${clamp(me.kT/KNOCK_T*100,0,100)}%"></i></div>`+
-    `<div class="kn-s">Bleeding out. Move to crawl · <kbd>${keyLabel(B.roll)}</kbd> to roll · teammates hold <kbd>${keyLabel(B.interact)}</kbd> to revive you</div>`+
-    (me.reviveT>0?`<div class="kn-rv"><div class="kn-bar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div><span>Being revived…</span></div>`:'')+`</div>`;
+   this.renderRebootWait(g,me);html='';
   }else{
    const r=g.list.find(o=>o!==me&&o.alive&&o.knocked&&o.reviver===me.id);
    if(r)html=`<div class="kn-card rv"><div class="kn-top"><span class="kn-t">Reviving ${esc(r.name)}</span></div><div class="kn-bar"><i style="width:${Math.min(100,r.reviveT/REVIVE_T*100)}%"></i></div></div>`;
   }
   if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
   box.style.display=html?'flex':'none';
+ }
+ // car HUD: your seat, car health and the keys (or a prompt when a car is close)
+ carHud(g,me,B){
+  const el=this.q('#carhud');const c=g.carOf(me);
+  if(c){el.style.display='block';el.innerHTML=`<b>${c.seats[0]===me.id?'Driving':'Passenger'}</b> · <kbd>${keyLabel(B.carEnter)}</kbd> get out · <kbd>${keyLabel(B.carSeat)}</kbd> swap seat${c.burn?' · <span class="onfire">ON FIRE</span>':''}<div class="cbar"><i style="width:${clamp(c.hp/250*100,0,100)}%"></i></div>`;return}
+  const n=me.alive&&!me.drop&&g.nearestCar?g.nearestCar(me,5):null;
+  if(n){el.style.display='block';el.innerHTML=`Press <kbd>${keyLabel(B.carEnter)}</kbd> to get in`}else el.style.display='none';
+ }
+ // waiting for reboot: shown while you are knocked (team modes). Countdown, your reboot card, vans and teammates.
+ renderRebootWait(g,me){
+  const box=this.q('#rbwait');
+  if(!(me.alive&&me.knocked)){if(box.style.display!=='none'){box.style.display='none';box.dataset.k=''}return}
+  box.style.display='flex';
+  const card=[...g.cards.values()].find(c=>c.owner===me.id);
+  let cardTxt='You have no reboot card';
+  if(card)cardTxt=(card.carrier>=0?`Being carried by ${esc((g.ents.get(card.carrier)||{}).name||'a teammate')}`:'It is on the ground. A teammate can pick it up')+` · ${Math.ceil(Math.max(0,card.t))}s left`;
+  const mates=g.list.filter(o=>o!==me&&o.team===me.team).map(o=>{const st=!o.alive?'out':o.knocked?'down':'up';return `<span class="rb-m ${st}">${esc(o.name)}${st==='down'?' (down)':st==='out'?' (out)':''}</span>`}).join('');
+  const left=Math.ceil(Math.max(0,me.kT));
+  const html=`<div class="rb-card"><div class="rb-kick">Waiting for reboot</div>`+
+   `<div class="rb-ring" style="--p:${clamp(me.kT/KNOCK_T,0,1)*360}deg"><b>${left}</b><span>seconds</span></div>`+
+   `<div class="rb-line">${cardTxt}</div>`+
+   `<div class="rb-mates">${mates||'No teammates left'}</div>`+
+   (me.reviveT>0?`<div class="rb-rv"><div class="rb-bar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div>A teammate is reviving you…</div>`:'')+
+   `<div class="rb-tip">Teammates can revive you by holding <kbd>${keyLabel(this.app.input.binds.interact)}</kbd></div></div>`;
+  if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
  }
  hideElim(){$('elim').style.display='none'}
  // the reboot waypoint: a teammate's card on the ground, then a reboot van once you carry the card

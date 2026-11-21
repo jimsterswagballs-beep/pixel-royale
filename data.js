@@ -57,6 +57,7 @@ export const ITEMS={
  drone:{n:'Recon Drone',kind:'deploy',col:'#7fe9ff',stack:2,give:1,lw:1.4,ic:'🛸'},
  strike:{n:'Air Strike',kind:'call',col:'#ff4d3d',stack:2,give:1,lw:.9,ic:'🎯'},
  frost:{n:'Frost Grenade',kind:'throw',col:'#8fe9ff',stack:4,give:2,lw:2,ic:'❄️'},
+ flare:{n:'Flare Gun',kind:'throw',col:'#ff6a3d',stack:4,give:2,lw:2,ic:'🧨'},
  shock:{n:'Shock Trap',kind:'place',col:'#ffe14a',stack:4,give:2,lw:1.6,ic:'⚡'},
 };
 // ---------------------------------------------------------------------------------------------
@@ -108,7 +109,7 @@ export const CHARS=[
       {n:'Food Fight',cd:BAL.jay.food.cd,ic:'food',d:'Lob a random food: Burger heals a teammate '+BAL.jay.food.burger.heal+', Pizza makes a healing area, Chilli explodes, Banana makes a slippery patch.'},
       {n:'Kitchen Special',cd:BAL.jay.kitchen.cd,ic:'kitchen',d:'Cook up a healing station that restores teammates nearby for '+BAL.jay.kitchen.dur+' seconds.'}]},
 ];
-export const KILL_NAMES={'-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb'};
+export const KILL_NAMES={'-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor'};
 export const ACTIONS=[
  ['fwd','Move Forward','KeyW'],['back','Move Back','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
  ['jump','Jump / Leave Bus','Space'],['sprint','Sprint','ShiftLeft'],['crouch','Crouch / Slide','KeyC'],
@@ -116,6 +117,7 @@ export const ACTIONS=[
  ['ab1','Ability 1','KeyQ'],['ab2','Ability 2','KeyF'],['ab3','Ability 3','KeyV'],
  ['s1','Slot 1 (Melee)','Digit1'],['s2','Slot 2','Digit2'],['s3','Slot 3','Digit3'],['s4','Slot 4','Digit4'],['s5','Slot 5','Digit5'],['s6','Slot 6','Digit6'],
  ['next','Next Slot','WheelDown'],['prev','Previous Slot','WheelUp'],['drop','Drop Item','KeyX'],['emote','Emote / Cancel','KeyG'],['roll','Roll (when knocked)','KeyZ'],['build','Build Mode','KeyB'],['rotate','Rotate Piece','KeyT'],['matcycle','Cycle Material','KeyY'],['map','Big Map','KeyM'],['score','Scoreboard','Tab'],['spec','Next Spectate Target','Mouse0'],
+ ['carEnter','Enter / Exit Car','KeyU'],['carSeat','Swap Car Seat','KeyO'],
 ];
 export const DEFAULT_SETTINGS={quality:'High',scale:100,res:'native',fov:92,fps:false,master:80,sfx:90,music:40,sens:1,camSens:1,adsSens:.7,invertY:false,crouchToggle:false,aimToggle:false,autoSprint:false,hitmarkers:true,dmgNumbers:true,shake:1,bob:1,mapRotate:true,dist:'Far',particles:'High',pix:'Slight',vib:132,bright:108,xcol:'#ffffff',xsize:1};
 export const POI_NAMES=[];

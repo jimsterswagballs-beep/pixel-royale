@@ -3,7 +3,7 @@
 import * as W from './world.js';
 import {HSTAND} from './shared.js';
 
-const OFF=350,N=700;           // grid covers -350..350 on both axes
+const OFF=420,N=840;           // grid covers -420..420 on both axes (Season 1 island)
 const RN=.42;                   // = real body radius. Doors are 1.9 wide so a 1m grid always keeps >=1 walkable cell in every doorway
 const ST=new Int8Array(N*N);    // 0 unknown, 1 walkable, 2 blocked
 const GY=new Float32Array(N*N); // ground height per cell

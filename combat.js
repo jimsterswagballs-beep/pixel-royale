@@ -94,6 +94,7 @@ export const combatMethods={
    let bestT=maxT,bestE=null,head=false;
    for(const t of this.list){if(t===sh||!t.alive||t.drop==='bus'||this.isAlly(sh,t))continue;const h=this.hbH(t);
     const tt=rayCyl(ox,oy,oz,dx,dy,dz,t.pos.x,t.pos.y,t.pos.z,.46,h,bestT);if(tt<bestT){bestT=tt;bestE=t;const hy=oy+dy*tt;head=hy>t.pos.y+h-.5}}
+   {const ct=this.carShot(ox,oy,oz,dx,dy,dz,bestT,wd);if(ct<bestT){bestT=ct;bestE=null}}
    if(!bestE&&wh)this.onWorldHit(sh,wh,wd,ox+dx*bestT,oy+dy*bestT,oz+dz*bestT);
    const ex=ox+dx*bestT,ey=oy+dy*bestT,ez=oz+dz*bestT;if(p<8)ends.push([ex,ey,ez]);
    if(bestE){
@@ -312,11 +313,12 @@ export const combatMethods={
   if(p.sp2==='potato')this.emit({k:'snd',n:'hit',p:[p.x,p.y,p.z]})},
  projBoom(p,direct){
   if(p.food){this.foodLand(p,direct);return}
+  if(p.kind==='flare'){this.spawnFlare(p.x,p.y,p.z);return}
   const owner=this.ents.get(p.owner);
   if(p.splash<=0){return}
   const col=p.sp2==='banana'?'#ffe14a':p.sp2==='ball'?'#3cd0ff':p.sp2==='chicken'?'#fff08a':p.kind==='boogie'?'#ff55ff':p.kind==='frost'?'#8fe9ff':'#ff9a3c';
   this.emit({k:'ex',x:p.x,y:p.y,z:p.z,r:p.splash,c:col});
-  this.structBlast(p.x,p.y,p.z,p.splash,p.dmg*1.5);
+  this.structBlast(p.x,p.y,p.z,p.splash,p.dmg*1.5);this.carBlast(p.x,p.y,p.z,p.splash,p.dmg*1.5);
   for(const t of this.list){if(!t.alive||t.drop==='bus'||(!p.food&&this.isAlly(this.ents.get(p.owner),t)))continue;
    const dx=t.pos.x-p.x,dy=t.pos.y+.9-p.y,dz=t.pos.z-p.z,d=Math.hypot(dx,dy,dz);const rr=p.splash+.5;if(d>rr&&t!==direct)continue;
    if(t!==direct&&d>1.6&&!W.losClear(p.x,p.y+.2,p.z,t.pos.x,t.pos.y+.9,t.pos.z))continue;
@@ -328,9 +330,9 @@ export const combatMethods={
   if(p.kind==='boogie')return;
  },
  throwItem(e,id,o,d){
-  const wd=id==='frost'?{dmg:30,splash:5,fuse:1.8,grav:16,bounce:.4,n:'Frost',col:'#8fe9ff',life:3,kind:'frost'}:id==='frag'?{dmg:90,splash:5.5,fuse:2.2,grav:16,bounce:.45,n:'Frag',col:'#6b8f3a',life:3}:{dmg:0,splash:6,fuse:1.8,grav:16,bounce:.5,n:'Boogie',col:'#ff55ff',life:3,kind:'boogie'};
-  const s=24;this.spawnProj(e,o[0]+d[0]*.5,o[1]+d[1]*.5-.2,o[2]+d[2]*.5,d[0]*s+e.vel.x*.3,d[1]*s+e.vel.y*.2+3,d[2]*s+e.vel.z*.3,Object.assign(wd,{kind:id==='boogie'||id==='frost'?id:''}),id==='frost'?-16:id==='boogie'?-17:-5);
-  const p=this.projs[this.projs.length-1];p.direct=false;if(id==='boogie'||id==='frost')p.kind=id},
+  const wd=id==='flare'?{dmg:0,splash:0,fuse:1.6,grav:14,bounce:.3,n:'Flare',col:'#ff6a3d',life:4,kind:'flare'}:id==='frost'?{dmg:30,splash:5,fuse:1.8,grav:16,bounce:.4,n:'Frost',col:'#8fe9ff',life:3,kind:'frost'}:id==='frag'?{dmg:90,splash:5.5,fuse:2.2,grav:16,bounce:.45,n:'Frag',col:'#6b8f3a',life:3}:{dmg:0,splash:6,fuse:1.8,grav:16,bounce:.5,n:'Boogie',col:'#ff55ff',life:3,kind:'boogie'};
+  const s=24;this.spawnProj(e,o[0]+d[0]*.5,o[1]+d[1]*.5-.2,o[2]+d[2]*.5,d[0]*s+e.vel.x*.3,d[1]*s+e.vel.y*.2+3,d[2]*s+e.vel.z*.3,Object.assign(wd,{kind:['boogie','frost','flare'].includes(id)?id:''}),id==='frost'?-16:id==='boogie'?-17:-5);
+  const p=this.projs[this.projs.length-1];p.direct=false;if(id==='boogie'||id==='frost'||id==='flare')p.kind=id},
  // ================= items: buffs, air strike, homing, drone and shock trap (host decides, clients predict their own buffs)
  applyBuff(e,it){
   const k=it.buff;

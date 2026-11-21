@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,BAL,mulberry32,clamp,lerp} from './data.js';
+import {WEAPONS,ITEMS,RARITY,CHARS,AMMO,BAL,KILL_NAMES,mulberry32,clamp,lerp} from './data.js';
 import {heroMethods,makeChefHat} from './abilities.js';
 import * as W from './world.js';
 import {FX} from './fx.js';
@@ -12,6 +12,8 @@ import {lootMethods} from './loot.js';
 import {botMethods} from './bots.js';
 import {netMethods} from './netsync.js';
 import {structMethods} from './structures.js';
+import {carMethods} from './cars.js';
+import {chaosMethods} from './chaos.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 const SKY_V=`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
@@ -97,6 +99,12 @@ export class Game{
   this.supplyT=45;this.supplies=[];
   this.genLoot(mulberry32(this.seed+99));this.setupFields();
   this.initStormMesh();
+  // cars: the host places them on the roads, guests wait for the snapshot
+  this.clearCars();if(this.role!=='client')this.seedCars(12);
+  // the storm tint (embers, fog) belongs to the last match: start the new one clear
+  this.fx.stormy=false;this.fx.stormK=0;this.scene.fog.color.set('#b9dcf5');
+  // game mode and weather: Chaos Rising timers, lightning, rain, fog, night and flare lights
+  this.gm=cfg.gm||'br';this.chaosSetup();
   this.me.pos.copy(this.bus.pos);
   this.view.recoilP=this.view.recoilY=0;this.running=true;this.audio.mode='game';
   const me=this.me;me.yaw=Math.atan2(-this.bus.dx,-this.bus.dz);
@@ -107,7 +115,7 @@ export class Game{
   const c=CHARS.find(c=>c.id===info.char)||CHARS[0];
   const e={id:info.id,name:info.name,char:c.id,cdef:c,bot:!!info.bot,peer:info.peer,local:info.id===this.myId,cos:info.cos||{},
    pos:new THREE.Vector3(),vel:new THREE.Vector3(),rpos:new THREE.Vector3(),yaw:0,pitch:0,hp:c.hp,maxHp:c.hp,sh:0,ts:0,tsT:0,alive:true,kills:0,place:0,
-   grounded:false,crouch:false,sliding:false,sprinting:false,slideT:0,swim:false,drop:'bus',flags:0,
+   grounded:false,crouch:false,sliding:false,sprinting:false,slideT:0,swim:false,drop:'bus',flags:0,car:-1,seat:-1,
    inv:[{k:'w',w:0,r:0,mag:0},null,null,null,null,null],cur:0,ammo:{light:0,med:0,shells:0,heavy:0,rockets:0},
    fireCd:0,reload:0,equipT:0,use:null,stun:0,slip:0,dance:0,dazed:0,eatT:0,auraT:0,buffT:0,cd:[0,0,0],dash:null,grap:null,slamming:false,
    hitT:0,shootT:0,landT:0,walkT:0,lastHit:-99,lastBy:-1,padCd:0,airCap:0,wi:-1,bloom:0,deadT:0,spawnT:0,
@@ -255,6 +263,8 @@ export class Game{
    case'slam':{const p=new THREE.Vector3(ev.x,ev.y,ev.z);fx.ring(p,10,'#6ec6ff',.55);fx.ring(p,5,'#fff',.4);fx.burst(p.x,p.y+.3,p.z,60,16,'#6ec6ff',.6,0,.3);au.play('slam',p,1.2);this.view.shake=Math.min(1,this.view.shake+clamp(1-p.distanceTo(this.camera.position)/40,0,.8));break}
    case'burst':{const p=new THREE.Vector3(ev.x,ev.y+1,ev.z);fx.ring(p.clone().setY(ev.y),4.5,'#9be0ff',.35);fx.burst(p.x,p.y,p.z,40,10,'#6ec6ff',.5);au.play('ab',p);break}
    case'bite':{const t=this.ents.get(ev.t);if(t){fx.burst(t.pos.x,t.pos.y+1.2,t.pos.z,25,6,'#ff4a4a',.5,8);au.play('bite',t.pos)}break}
+   case'chaos':this.onChaos(ev);break;
+   case'flare':this.onFlare(ev);break;
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
    case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
@@ -279,7 +289,7 @@ export class Game{
  }
  onMeDead(ev){
   const me=this.me;me.alive=false;const killer=this.ents.get(ev.by);this.spectateId=killer&&killer.alive?killer.id:-1;this.audio.play('lose');
-  const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(ev.w||'the storm'),me.kills,this);this.deathT=this.t;this.awardTokens(false)}
+  const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(KILL_NAMES[ev.w]||ev.w||'the storm'),me.kills,this);this.deathT=this.t;this.awardTokens(false)}
  onEnd(ev){
   if(this.over)return;this.over=true;this.winnerId=ev.win;const w=this.ents.get(ev.win);this.overT=this.t;
   this.awardTokens(this.me.team===ev.tm);if(this.me.team===ev.tm){this.audio.play('win');this.hud.showVictory(this)}
@@ -292,9 +302,10 @@ export class Game{
   this.updateBus(dt);if(this.decor)this.decor.update(this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
+   this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
   else{this.updateClientSim(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
+  this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);
   this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
   this.fx.update(dt);
   this.structUpdateUI(dt);
@@ -381,4 +392,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);
+Object.assign(Game.prototype,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods);
