@@ -57,7 +57,16 @@ The build creates `index.html` in the project root (ready for GitHub Pages) and 
 - **Multiplayer**: the host validates placement, cost and damage and sends the results as events (`bp`, `bh`, `bx`, `mats`, `dec`, `hv`), the same way other effects are sent. Guests send build requests (`build`) to the host.
 - **Bots**: bots damage pieces with their shots and path around new walls. They do not place pieces, and they do not harvest trees or rocks yet.
 
-Known limits: harvesting by melee is not implemented, and multiplayer has only been tested with fake networking, not with real PeerJS.
+## Destruction and mining
+
+- **Destructible**: trees, rocks, boulders, building walls, roofs and props, and everything built by players. Ground slabs, sign posts and the round silos, windmill and lighthouse are not.
+- **Damage**: each part has hp (`PART_RES` in `materials.js` sets how each material resists). Bullets, the pickaxe and explosions all damage parts. Wood is weak to explosions, stone resists bullets, metal resists bullets most. Trees take less from bullets, rocks take less from bullets than from the pickaxe.
+- **Cracks**: a damaged part shows crack overlays that get heavier below 75%, 50% and 25% hp (`cracks.js`).
+- **Collapse**: when a part breaks, anything it was holding up falls, including roofs left without walls and players' pieces without support.
+- **Mining**: the pickaxe mines what it hits. Trees give wood (plus a bonus when felled), rocks give stone (plus a bonus when broken), and buildings and pieces give their own material. Guns and explosions do not give materials.
+- **Multiplayer**: the host decides all damage and breaks. Guests get `ph` / `px` (world part hp / destroyed), `bh` / `bx` (piece hp / destroyed) and `gain` events. Bots shoot and blow things up but do not mine.
+
+Known limits: the multiplayer code has only been tested with fake networking, not with real PeerJS, and the crack visuals have not been checked in a browser.
 
 ## Item models
 
@@ -84,3 +93,14 @@ Known limits: harvesting by melee is not implemented, and multiplayer has only b
 - Teams: party members share team 0. Bots and solo players get a unique negative team, so Jay's healing and banana zones only treat real teammates as allies (in solo, nobody is allied by accident).
 - Bots are drawn from all four characters (`botnames.js`), so Chill Guy and Jay appear in bot matches and use their own bot logic (`botChill`, `botJay`).
 - The HUD shows the hero ability icons, the next food in Jay's bag, and a buffs row (Cloaked, Cold Blooded, Cooking).
+
+## Starter Island and lobby
+
+- **Starter Island** (`starter.js`): the title and party lobby screens show a walkable island behind the menus. Your hero stands on the plaza, the Battle Bus is parked on the north side, and a cabin, palms, rocks and training dummies fill the island. WASD walks (relative to the camera), ← / → turn the camera, and G dances.
+- **Boarding**: Play (solo) or Board Bus (party host) flies the bus off with your hero aboard, fades to black, and then starts the match (`App.boardThen` in `main.js`).
+- **Lobby**: the title plate shows your name and hero over the island, and the party lobby sits over a lighter version of the same scene.
+
+## Dive and glide camera
+
+- While skydiving and gliding the camera is third person, behind the hero. On landing it blends back to first person in about a third of a second (`tpPose` and `tpK` in `game.js`).
+- Gliding shows a glider canopy with strings to the hero's shoulders, coloured by hero (`makeGliderModel` in `game.js`). It opens with a short deploy animation and sways in the wind. Other players see it too.

@@ -1,11 +1,16 @@
 // Building and destruction.
-// The host is authoritative: it validates placements, applies damage and decides what is destroyed.
-// It tells guests through events: 'bp' (piece placed), 'bh' (piece hp), 'bx' (piece destroyed),
-// 'mats' (material counts), 'dec' (tree or rock removed) and 'hv' (harvest sparks).
+// The host is authoritative: it validates placements, applies damage and decides what breaks.
+// Anything that can break is a "part" with hp, tagged by `pk`:
+//   'piece' player-built piece (structAddPiece)     'box' static building wall, roof, prop or boulder (W.wparts)
+//   'tree' / 'rock' trunk or rock (W.treeList / W.rockList)
+// Pickaxes, bullets and explosions all go through partHit(), which scales the damage by material (PART_RES).
+// Events to guests: 'bh' / 'bx' (piece hp / destroyed), 'ph' / 'px' (world part hp / destroyed),
+// 'mats' (material counts), 'gain' (pickup toast), 'hv' (hit sparks).
 import * as THREE from 'three';
 import * as W from './world.js';
 import * as NAV from './botnav.js';
-import {MATS,PIECES,PIECE_KEYS,MAT_KEYS,emptyMats} from './materials.js';
+import {MATS,PIECES,PIECE_KEYS,MAT_KEYS,PART_RES,emptyMats} from './materials.js';
+import {boxCrack,circCrack,removeCrack,clearCracks,stageFor} from './cracks.js';
 
 const GRID=4,WALL_H=3,FLOOR_T=.35,REACH=16,MAX_DEBRIS=420,COLLAPSE_R=10;
 const boxMats=new Map();
@@ -24,6 +29,17 @@ function pieceBoxesRaw(ty,x,y,z,rot){
   out.push(rot?{x0:x-2,y0:y,z0:z+a,x1:x+2,y1:top,z1:z+b}:{x0:x+a,y0:y,z0:z-2,x1:x+b,y1:top,z1:z+2})}
  return out}
 
+// ---- helpers for damage
+const boxDist=(b,x,y,z)=>Math.hypot(x-Math.min(Math.max(x,b.x0),b.x1),y-Math.min(Math.max(y,b.y0),b.y1),z-Math.min(Math.max(z,b.z0),b.z1));
+// the part a ray or blast touched: a player piece, a destructible box, or a tree / rock. null for ground and fixed geometry.
+const partOf=o=>o.piece?o.piece:o.pk?o:null;
+const partColor=T=>T.pk==='tree'?'#8a5a2b':T.pk==='rock'?'#b5b9bd':MATS[T.mat].c;
+const partDist=(T,x,y,z)=>{
+ if(T.pk==='piece'){let m=1e9;for(const b of T.boxes)m=Math.min(m,boxDist(b,x,y,z));return m}
+ if(T.pk==='box')return boxDist(T,x,y,z);
+ const dxz=Math.max(0,Math.hypot(x-T.x,z-T.z)-T.r),dy=y<T.y0?T.y0-y:y>T.y1?y-T.y1:0;
+ return Math.hypot(dxz,dy)};
+
 export const structMethods={
  structEnsure(){if(!this.pieces)this.pieces=new Map();if(!this.debris)this.debris=[];if(!this.bstate)this.bstate={ty:'wall',mat:'wood',rot:0};if(this.building===undefined)this.building=false;return this},
 
@@ -31,7 +47,7 @@ export const structMethods={
  structAddPiece(d){
   this.structEnsure();if(this.pieces.has(d.id))return null;
   const boxes=pieceBoxes(d.ty,d.x,d.y,d.z,d.rot);
-  const p={id:d.id,ty:d.ty,mat:d.mat,rot:d.rot,x:d.x,y:d.y,z:d.z,hp:MATS[d.mat].hp,maxHp:MATS[d.mat].hp,boxes,meshes:[],dead:false,flashT:0};
+  const p={id:d.id,pk:'piece',ty:d.ty,mat:d.mat,rot:d.rot,x:d.x,y:d.y,z:d.z,hp:MATS[d.mat].hp,maxHp:MATS[d.mat].hp,yAcc:0,boxes,meshes:[],dead:false,flashT:0};
   const mat=new THREE.MeshLambertMaterial({color:MATS[d.mat].c});p.mat3=mat;
   for(const b of boxes){b.piece=p;W.addSolid(b);
    const m=new THREE.Mesh(new THREE.BoxGeometry(b.x1-b.x0,b.y1-b.y0,b.z1-b.z0),mat);
@@ -40,7 +56,7 @@ export const structMethods={
  structNav(boxes){let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const b of boxes){x0=Math.min(x0,b.x0);x1=Math.max(x1,b.x1);z0=Math.min(z0,b.z0);z1=Math.max(z1,b.z1)}NAV.invalidateRect(x0-1.5,z0-1.5,x1+1.5,z1+1.5)},
  structDrop(p,big){
   if(!p||p.dead)return;p.dead=true;
-  for(const b of p.boxes)W.removeSolid(b);
+  p.boxes.forEach((b,bi)=>{removeCrack('p'+p.id+':'+bi);W.removeSolid(b)});
   for(const m of p.meshes){this.dynamic.remove(m);m.geometry.dispose()}
   this.pieces.delete(p.id);this.structNav(p.boxes);
   const col=MATS[p.mat].c;
@@ -68,35 +84,82 @@ export const structMethods={
   for(const b of buf){if(b.circ!==false||b.piece===q)continue;if(Math.abs(b.y1-q.y)>.3)continue;
    if(b.x1>x0+.05&&b.x0<x1-.05&&b.z1>z0+.05&&b.z0<z1-.05)return true}
   return false},
- // host only: destroy a piece and anything that loses its support
- structDestroy(p,depth=0){
-  if(!p||p.dead)return;
-  this.emit({k:'bx',id:p.id,big:p.ty==='floor'||depth>0?1:0});
-  if(depth>=10)return;
-  for(const q of [...this.pieces.values()]){
-   if(q.dead||Math.abs(q.x-p.x)>COLLAPSE_R||Math.abs(q.z-p.z)>COLLAPSE_R)continue;
-   if(!this.structSupported(q))this.structDestroy(q,depth+1)}},
- structHit(p,amt){
-  if(!p||p.dead||this.role==='client')return;
-  p.hp-=amt;
-  if(p.hp<=0)this.structDestroy(p);else this.emit({k:'bh',id:p.id,hp:Math.round(p.hp)})},
- structBlast(x,y,z,r,dmg){
-  if(this.role==='client')return;
-  for(const p of [...this.pieces.values()]){if(p.dead)continue;
-   const d=Math.hypot(p.x-x,p.y+1.5-y,p.z-z);if(d<r+3)this.structHit(p,dmg*Math.max(.2,1-d/(r+3)))}},
+ // a static box stays up if it sits on the ground, rests on a solid under its footprint, or is joined to a
+ // neighbour wall at the same height (a lintel over a doorway rests on the jambs, not on the floor)
+ boxSupported(b){
+  const cx=(b.x0+b.x1)/2,cz=(b.z0+b.z1)/2;
+  if(b.y0<=W.H(cx,cz)+.3)return true;
+  const buf=[];W.query(cx,cz,Math.max(b.x1-b.x0,b.z1-b.z0)/2+1.2,buf);
+  for(const o of buf){
+   if(o===b||o.circ!==false||o.gone)continue;
+   if(Math.abs(o.y1-b.y0)<=.3&&o.x1>b.x0+.05&&o.x0<b.x1-.05&&o.z1>b.z0+.05&&o.z0<b.z1-.05)return true;
+   if(o.y0<b.y1-.05&&o.y1>b.y0+.05){
+    const zOver=o.z1>b.z0+.05&&o.z0<b.z1-.05,xOver=o.x1>b.x0+.05&&o.x0<b.x1-.05;
+    if((zOver&&(Math.abs(o.x1-b.x0)<=.05||Math.abs(o.x0-b.x1)<=.05))||(xOver&&(Math.abs(o.z1-b.z0)<=.05||Math.abs(o.z0-b.z1)<=.05)))return true}
+  }
+  return false},
 
- // ------------------------------------------------------------ harvesting and damage from shots (host)
+ // ------------------------------------------------------------ damage (host)
+ // raw: weapon damage before material resistance. src: 'bullet' | 'blast' | 'pick'. by: the entity that swung (pick only)
+ partHit(T,raw,src,by){
+  if(this.role==='client'||!T||T.dead)return 0;
+  const res=PART_RES[T.mat];const amt=raw*(res&&res[src]!==undefined?res[src]:1);
+  const before=T.hp;T.hp-=amt;const dealt=Math.max(0,Math.min(before,amt));
+  const killed=T.hp<=0;if(killed)T.hp=0;
+  if(src==='pick')this.harvestYield(by,T,dealt,killed);
+  if(killed)this.partDestroy(T,0);else this.partSync(T);
+  return dealt},
+ partSync(T){
+  if(T.pk==='piece')this.emit({k:'bh',id:T.id,hp:Math.round(T.hp)});
+  else if(T.pk==='box')this.emit({k:'ph',t:'w',i:T.wi,hp:Math.round(T.hp)});
+  else this.emit({k:'ph',t:T.pk,i:T.idx,hp:Math.round(T.hp)})},
+ // break a part, then let anything it was holding up fall
+ partDestroy(T,depth){
+  if(!T||T.dead||depth>10)return;
+  const big=depth>0||T.ty==='floor'?1:0;
+  if(T.pk==='piece')this.emit({k:'bx',id:T.id,big});
+  else if(T.pk==='box')this.emit({k:'px',t:'w',i:T.wi,big});
+  else this.emit({k:'px',t:T.pk,i:T.idx,big});
+  this.collapseAround(T,depth+1)},
+ collapseAround(T,depth){
+  if(depth>10)return;
+  let cx,cz,R;
+  if(T.pk==='piece'){cx=T.x;cz=T.z;R=COLLAPSE_R}
+  else if(T.pk==='box'){cx=(T.x0+T.x1)/2;cz=(T.z0+T.z1)/2;R=Math.max(T.x1-T.x0,T.z1-T.z0)/2+COLLAPSE_R}
+  else{cx=T.x;cz=T.z;R=T.r+COLLAPSE_R}
+  for(const q of[...this.pieces.values()]){
+   if(q.dead||Math.abs(q.x-cx)>R||Math.abs(q.z-cz)>R)continue;
+   if(!this.structSupported(q))this.partDestroy(q,depth)}
+  const buf=[];W.query(cx,cz,R,buf);
+  for(const b of buf){if(b.pk!=='box'||b.dead||b.gone)continue;if(!this.boxSupported(b))this.partDestroy(b,depth)}},
+ // pickaxe mining pays out the material of whatever was mined (wood from trees, stone from rocks, the part's own material otherwise)
+ harvestYield(e,T,dealt,killed){
+  if(!e||e.bot||!dealt)return;
+  const mat=T.pk==='tree'?'wood':T.pk==='rock'?'stone':T.mat;
+  const rate=T.pk==='tree'?.27:T.pk==='rock'?.3:.1;
+  T.yAcc=(T.yAcc||0)+dealt*rate;
+  let n=Math.floor(T.yAcc);T.yAcc-=n;
+  if(killed)n+=T.pk==='tree'?10:T.pk==='rock'?12:0; // a felled tree or broken rock drops a bonus
+  if(n>0){this.structAddMats(e,mat,n);this.emit({k:'gain',i:e.id,m:mat,n})}},
+ // pickaxe swing that didn't hit an entity: trace the swing and mine whatever is in reach
+ harvestSwing(e,wd,yaw,pitch,x,y,z){
+  const cp=Math.cos(pitch),dx=-Math.sin(yaw)*cp,dy=Math.sin(pitch),dz=-Math.cos(yaw)*cp;
+  const h=W.rayWorld(x,y,z,dx,dy,dz,wd.range+.4);
+  if(!h||h.kind==='ground')return;
+  const T=partOf(h.obj);if(!T)return;
+  this.partHit(T,wd.dmg,'pick',e);
+  this.emit({k:'hv',x:x+dx*h.t,y:y+dy*h.t,z:z+dz*h.t,c:partColor(T)})},
+ // a bullet (or pellet) reached world geometry
  onWorldHit(sh,wh,wd,ex,ey,ez){
   if(this.role==='client'||!wh||!wh.obj)return;
-  if(wh.kind==='box'){if(wh.obj.piece)this.structHit(wh.obj.piece,(wd.dmg||20)*(wd.pellets>1?.45:.8));return}
-  if(wh.kind!=='tree'&&wh.kind!=='rock')return;
-  if(sh.bot)return;
-  const c=wh.obj;if(c.gone)return;
-  const tree=wh.kind==='tree';
-  c.hits=(c.hits||0)+1;
-  this.structAddMats(sh,tree?'wood':'stone',tree?3:2);
-  this.emit({k:'hv',x:ex,y:ey,z:ez,c:tree?'#8a5a2b':'#b5b9bd'});
-  if(c.hits>=(tree?4:6))this.emit({k:'dec',kind:wh.kind,i:(tree?W.treeList:W.rockList).indexOf(c)})},
+  const T=partOf(wh.obj);if(!T)return;
+  if(this.partHit(T,(wd.dmg||20)*(wd.pellets>1?.45:.8),'bullet',null)>0)this.emit({k:'hv',x:ex,y:ey,z:ez,c:partColor(T)})},
+ // explosion: every part in reach takes damage that falls off with distance
+ structBlast(x,y,z,r,dmg){
+  if(this.role==='client')return;
+  const buf=[];W.query(x,z,r+4,buf);const seen=new Set();
+  for(const o of buf){const T=partOf(o);if(!T||T.dead||seen.has(T))continue;seen.add(T);
+   const d=partDist(T,x,y,z);if(d<r+3)this.partHit(T,dmg*Math.max(.2,1-d/(r+3)),'blast',null)}},
  structAddMats(e,mat,n){if(!e.mats)e.mats=emptyMats();e.mats[mat]=Math.min(999,(e.mats[mat]||0)+n);this.emit({k:'mats',i:e.id,m:{...e.mats}})},
  structSpend(e,mat,n){e.mats[mat]=Math.max(0,(e.mats[mat]||0)-n);this.emit({k:'mats',i:e.id,m:{...e.mats}})},
 
@@ -158,14 +221,33 @@ export const structMethods={
   this.structEnsure();
   switch(ev.k){
    case'bp':{const p=this.structAddPiece(ev.p);if(p)this.fx.dust(p.x,p.y+.5,p.z,6,3,MATS[p.mat].dark);break}
-   case'bh':{const p=this.pieces.get(ev.id);if(p){p.hp=ev.hp;p.mat3.emissive.setHex(0x402000);p.flashT=.09}break}
+   case'bh':{const p=this.pieces.get(ev.id);if(p){p.hp=ev.hp;p.mat3.emissive.setHex(0x402000);p.flashT=.09;
+    p.boxes.forEach((b,bi)=>boxCrack(this.dynamic,'p'+p.id+':'+bi,b,stageFor(p)))}break}
    case'bx':{const p=this.pieces.get(ev.id);if(p)this.structDrop(p,ev.big);break}
+   case'ph':{
+    if(ev.t==='w'){const b=W.wparts[ev.i];if(b&&!b.dead){b.hp=ev.hp;boxCrack(this.dynamic,'w'+ev.i,b,stageFor(b))}}
+    else{const c=(ev.t==='tree'?W.treeList:W.rockList)[ev.i];if(c&&!c.dead){c.hp=ev.hp;circCrack(this.dynamic,c,stageFor(c))}}
+    break}
+   case'px':{
+    if(ev.t==='w'){
+     const b=W.wparts[ev.i];if(!b||b.dead)break;
+     b.dead=true;b.hp=0;removeCrack('w'+ev.i);W.removeSolid(b);W.hideBox(b);
+     const cx=(b.x0+b.x1)/2,cy=(b.y0+b.y1)/2,cz=(b.z0+b.z1)/2;
+     this.structDebris(cx,cy,cz,b.c,ev.big?12:6,.45);
+     this.fx.dust(cx,b.y0+1,cz,ev.big?12:6,3,MATS[b.mat].dark);
+     NAV.invalidateRect(b.x0-1.5,b.z0-1.5,b.x1+1.5,b.z1+1.5);
+    }else{
+     const c=(ev.t==='tree'?W.treeList:W.rockList)[ev.i];if(!c||c.dead)break;
+     c.dead=true;c.hp=0;removeCrack((ev.t==='tree'?'t':'r')+ev.i);W.removeDecor(ev.t,c);
+     NAV.invalidateRect(c.x-c.r-1.5,c.z-c.r-1.5,c.x+c.r+1.5,c.z+c.r+1.5);
+     const tree=ev.t==='tree';
+     this.structDebris(c.x,c.y0+1.5,c.z,tree?'#6b4a2b':'#8a8a85',tree?8:10,tree?.4:.5);
+     this.fx.dust(c.x,c.y0+1,c.z,12,3,'#a89a7c');
+    }
+    break}
+   case'gain':{if(ev.i===this.myId){const m=MATS[ev.m];this.hud.toast('+'+ev.n+' '+m.n,m.c)}break}
    case'mats':{const t=this.ents.get(ev.i);if(t)t.mats=ev.m;break}
    case'hv':{this.fx.burst(ev.x,ev.y,ev.z,5,3,ev.c,.3,8);break}
-   case'dec':{const arr=ev.kind==='tree'?W.treeList:W.rockList;const c=arr[ev.i];if(!c||c.gone)break;
-    W.removeDecor(ev.kind,c);NAV.invalidateRect(c.x-c.r-1.5,c.z-c.r-1.5,c.x+c.r+1.5,c.z+c.r+1.5);
-    const tree=ev.kind==='tree';this.structDebris(c.x,c.y0+1.5,c.z,tree?'#6b4a2b':'#8a8a85',tree?8:10,tree?.4:.5);
-    this.fx.dust(c.x,c.y0+1,c.z,12,3,'#a89a7c');break}
   }
  },
  structPieceEvent(ev){this.onBuildEvent(ev)},
@@ -182,7 +264,7 @@ export const structMethods={
   ui.build.style.display=this.building&&alive?'block':'none';
   if(this.building&&alive){
    const s=this.bstate,p=this.structPlan();
-   ui.build.innerHTML=`<b>BUILD</b> &middot; ${PIECES[s.ty].n} &middot; ${MATS[s.mat].n} (${PIECES[s.ty].cost}) <span style="opacity:.7">&middot; wheel piece &middot; T rotate &middot; Y material &middot; click place &middot; B exit</span><br><span style="color:${p.ok?'#7dff9e':'#ff7a7a'}">${p.ok?'Ready':p.why}</span>`;
+   ui.build.innerHTML=`<b>BUILD</b> &middot; ${PIECES[s.ty].n} &middot; ${MATS[s.mat].n} (${PIECES[s.ty].cost}) <span style=\"opacity:.7\">&middot; wheel piece &middot; T rotate &middot; Y material &middot; click place &middot; B exit</span><br><span style=\"color:${p.ok?'#7dff9e':'#ff7a7a'}\">${p.ok?'Ready':p.why}</span>`;
    this.structGhost(s,p)}
   else if(this.ghost)this.ghost.visible=false},
  structGhost(s,p){
@@ -208,6 +290,7 @@ export const structMethods={
   this.pieces.clear();this.pieceSeq=0;
   for(const s of this.debris){this.dynamic.remove(s.m);s.m.geometry.dispose()}this.debris.length=0;
   if(this.ghost){this.dynamic.remove(this.ghost);this.ghost=null}
+  clearCracks();
   W.restoreDecor();NAV.resetAll();
   this.building=false;
   if(this._dom){this._dom.build.style.display='none'}

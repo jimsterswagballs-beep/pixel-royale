@@ -237,7 +237,7 @@ select{background:#0a0e24;border:2px solid #34407f;color:#fff;border-radius:8px;
 .pm.empty{height:64px;border-style:dashed;color:#7f92d8;font-weight:800}.pm.empty i{font-style:normal;width:48px;height:48px;line-height:44px;text-align:center;font-size:30px;border:2px dashed #4a5cb0;border-radius:50%}
 .pm.empty:hover{color:#fff;border-color:var(--cy);background:rgba(42,212,255,.12)}
 .lb-stage{position:absolute;left:50%;top:50%;transform:translate(-50%,-47%);display:flex;flex-direction:column;align-items:center}
-#stage{position:relative;width:min(62vh,40vw);height:min(62vh,40vw)}
+#stage{position:relative;width:min(44vh,28vw);height:min(44vh,28vw)}
 #stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 22px 18px rgba(0,0,0,.55));animation:bob 2.2s ease-in-out infinite}
 #stage .pad{position:absolute;left:8%;right:8%;bottom:1%;height:13%;border-radius:50%;background:radial-gradient(ellipse,rgba(42,212,255,.6),rgba(42,212,255,.08) 60%,transparent 70%);border:2px solid rgba(42,212,255,.7);box-shadow:0 0 40px rgba(42,212,255,.5)}
 #stage .sh{position:absolute;left:25%;right:25%;bottom:4%;height:5%;background:rgba(0,0,0,.4);border-radius:50%;filter:blur(6px)}
@@ -365,3 +365,19 @@ select{background:#0a0e24;border:2px solid #34407f;color:#fff;border-radius:8px;
 .abl.pass{background:rgba(255,216,74,.1)}
 #lkInfo{background:rgba(6,10,30,.84);border-radius:10px;padding:8px 10px}
 #lkName,#lkRole{text-shadow:0 2px 6px #000}
+
+/* ---- lobby remake: starter island behind the title and party screens ---- */
+#title .lb-top{position:absolute;top:82px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:6px;pointer-events:none;text-align:center}
+.lb-chip{background:linear-gradient(90deg,#2ad4ff,#6a7bff);color:#06102a;font:italic 900 13px var(--disp);letter-spacing:2px;text-transform:uppercase;padding:5px 14px;transform:skewX(-8deg)}
+#title .lb-top .sub{color:#cfe0ff;text-shadow:0 2px 6px #000}
+.lb-hero{position:absolute;left:50%;bottom:44px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 46px 12px;background:linear-gradient(90deg,transparent,rgba(5,10,40,.78) 18%,rgba(5,10,40,.78) 82%,transparent);pointer-events:none}
+#stageName{font:italic 900 clamp(24px,3.4vh,34px) var(--disp);text-transform:uppercase;text-shadow:0 3px 0 rgba(0,0,0,.5)}
+.lb-keys{display:flex;gap:10px;margin-top:4px}
+.lb-keys span{background:rgba(255,255,255,.08);border:1px solid var(--line);padding:3px 9px;font-size:12px;font-weight:800;color:#cfe0ff}
+#lobby.page{background:linear-gradient(180deg,rgba(8,12,48,.22),rgba(10,10,52,.46));backdrop-filter:blur(1px)}
+#lobby .pg{background:rgba(8,12,40,.55);border:1px solid var(--line);padding:22px 26px;backdrop-filter:blur(6px)}
+#boardFade{position:fixed;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity .6s ease;z-index:60}
+#boardFade.show{opacity:1;pointer-events:auto}
+@media(max-width:1000px){.lb-hero{display:none}}
+
+#lbStart.btn.play{font-size:26px;padding:14px 22px;letter-spacing:3px;white-space:nowrap}

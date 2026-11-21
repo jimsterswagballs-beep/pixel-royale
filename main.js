@@ -6,6 +6,7 @@ import {Audio} from './audio.js';
 import {HUD} from './hud.js';
 import {Net,LocalNet} from './net.js';
 import {IMG} from './shared.js';
+import {StarterIsland} from './starter.js';
 import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
 import {makeBotRoster} from './botnames.js';
@@ -20,6 +21,8 @@ class App{
   this.renderer.outputColorSpace=THREE.SRGBColorSpace;
   this.loadSettings();this.loadProfile();
   this.input=new Input(this.canvas,this);this.audio=new Audio();this.hud=new HUD(this);
+  this.starter=new StarterIsland(this.renderer,this.input);
+  {const bf=document.createElement('div');bf.id='boardFade';document.body.appendChild(bf)}
   this.game=new Game(this);this.screen='loading';this.paused=false;this.playing=false;this.net=null;this.lobby=null;
   this.menuT=0;this.last=performance.now();
   addEventListener('resize',()=>this.resize());document.addEventListener('fullscreenchange',()=>this.resize());
@@ -89,19 +92,19 @@ class App{
    <div class="pm me"><img id="pmImg" alt=""><div><div class="pn" id="pmName"></div><div class="ps">Party Leader</div></div></div>
    <button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button><button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button><button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button>
   </div>
-  <div class="lb-stage"><div id="stage"><div class="cart" id="stageArt"></div><div class="pad"></div><div class="sh"></div><img id="stageImg" alt=""></div><div class="plate"><div id="stageName"></div><div class="sub" id="stageRole"></div></div></div>
+  <div class="lb-top"><span class="lb-chip">Starter Island</span><span class="sub">Walk around while your party gathers</span></div>
+  <div class="lb-hero"><div id="stageName"></div><div class="sub" id="stageRole"></div><div class="lb-keys"><span>WASD walk</span><span>&larr; &rarr; turn</span><span>G dance</span></div></div>
   <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
   <div class="lb-play"><button class="mode" id="modeCard" data-go="offline"><div class="mk">Game mode</div><div class="mt">Battle Royale</div><div class="ms" id="modeSub"></div><div class="mc">Change &rsaquo;</div></button><button class="btn play" id="playBtn">Play</button></div>
-  <div class="hint">WASD move · Shift sprint · C slide · Q/F/V abilities · E loot · M map</div><div class="ver">v1.3 · Heroes update</div>`;
+  <div class="hint">WASD walk · &larr; &rarr; turn camera · G dance · M map</div><div class="ver">v1.3 · Heroes update</div>`;
   for(const b of t.querySelectorAll('[data-go]'))b.onclick=()=>{this.sfx('ui');this.go(b.dataset.go)};
-  $('playBtn').onclick=()=>{this.sfx('ui');this.startOffline()};
+  $('playBtn').onclick=()=>{this.sfx('ui');this.boardThen(()=>this.startOffline())};
   setInterval(()=>{if(this.screen==='title')this.updateStage()},1400);
  }
  enter_title(){this.updateStage(true);const P=this.profile;$('modeSub').textContent=(P.bots>0?'Solo vs '+P.bots+' bots':'Free roam – no bots')+' · '+P.diff}
- updateStage(swap){const c=this.profile.char;const img=$('stageImg');img.src=IMG[c].front;$('stageArt').style.backgroundImage=`url('${charArt(c)}')`;const cd=CHARS.find(x=>x.id===c);
+ updateStage(){const c=this.profile.char;const cd=CHARS.find(x=>x.id===c);
   const nm=$('stageName');nm.textContent=this.profile.name;nm.style.color=this.profile.nameColor;$('stageRole').textContent=cd.name+' · '+cd.role;
-  $('pmImg').src=IMG[c].front;$('pmName').textContent=this.profile.name;
-  if(swap){const s=$('stage');s.classList.remove('swap');void s.offsetWidth;s.classList.add('swap')}}
+  $('pmImg').src=IMG[c].front;$('pmName').textContent=this.profile.name;}
 
  exit(){try{window.close()}catch(e){}this.toast('You can now close this tab. Thanks for playing!');}
  back(btn){const b=h(`<button class="backbtn">&#9664; Back</button>`);b.onclick=()=>{this.sfx('ui');this.go('title')};return b} mkTile(o){
@@ -247,6 +250,14 @@ class App{
  }
  // ---------- starting matches
  makeCfg(role,net,seed,list,myId,diff){return{role,net,seed,diff,myId,ents:list}}
+ // Play / Board Bus: the starter island's bus flies off, the screen fades out, then the match starts
+ boardThen(fn){
+  if(this.boarding)return;this.boarding=true;this.sfx('ui');
+  this.starter.board(()=>{
+   const f=$('boardFade');f.classList.add('show');
+   setTimeout(()=>{try{fn()}finally{this.boarding=false;this.starter.reset()}
+    requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('show')))},650)});
+ }
  startOffline(){
   this.audio.init();this.audio.resume();const n=this.profile.bots;const ents=[{id:0,name:this.profile.name,char:this.profile.char,cos:this.cos}];
   const roster=makeBotRoster(n);
@@ -320,14 +331,14 @@ class App{
   <div class="lb2"><div class="lb2-main"><div class="codebar"><div><div class="sub">Room code – share with friends</div><div class="code" id="lbCode">-----</div></div><div class="col"><button class="btn sm sec" id="lbCopy">Copy Code</button><button class="btn sm sec" id="lbInvite">Copy Invite Link</button></div></div>
   <div class="sub" style="margin:18px 0 8px">Party</div><div class="plist" id="lbPlayers"></div>
   <div class="sub" style="margin:18px 0 8px">Your outfit</div><div id="lbChars"></div></div>
-  <div class="pg-card lb2-side"><div id="lbHostCtl"><div class="k">Match settings</div><div class="sub">Bots: <b id="lbBotN" style="color:var(--yl)">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0" style="accent-color:var(--cy);width:100%"><div class="sub" style="margin-top:12px">Bot difficulty</div><div id="lbDiff"></div><button class="btn play" id="lbStart" style="margin-top:18px">Start</button></div><div id="lbWait" class="sub" style="display:none">Waiting for host to start…</div></div></div></div>`;
+  <div class="pg-card lb2-side"><div id="lbHostCtl"><div class="k">Match settings</div><div class="sub">Bots: <b id="lbBotN" style="color:var(--yl)">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0" style="accent-color:var(--cy);width:100%"><div class="sub" style="margin-top:12px">Bot difficulty</div><div id="lbDiff"></div><button class="btn play" id="lbStart" style="margin-top:18px">Board Bus</button></div><div id="lbWait" class="sub" style="display:none">Waiting for host to start…</div></div></div></div>`;
 
   $('lbLeave').onclick=()=>this.leaveLobby();
   $('lbCopy').onclick=()=>{this.copy(this.lobby.code);this.toast('Room code copied!')};
   $('lbInvite').onclick=()=>{const u=location.href.split('#')[0]+'#join='+this.lobby.code;this.copy(u);this.toast('Invite link copied!')};
   $('lbBots').oninput=e=>{this.lobby.bots=+e.target.value;$('lbBotN').textContent=e.target.value;this.lobbyUpdate(true)};
   const dd=$('lbDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.lobby.diff=d;this.lobbyUpdate()};dd.appendChild(c)}
-  $('lbStart').onclick=()=>this.startOnlineHost();
+  $('lbStart').onclick=()=>this.boardThen(()=>this.startOnlineHost());
  }
  copy(t){try{navigator.clipboard.writeText(t)}catch(e){const i=document.createElement('input');i.value=t;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove()}}
  enter_lobby(){this.lobbyUpdate(false,true)}
@@ -365,7 +376,7 @@ class App{
     if(act){g.update(dt)}else g.fx.update(dt);
     g.render(dt);
     this.hud.update(g,dt);
-   }else{g.renderMenu(dt)}
+   }else if(this.screen==='title'||this.screen==='lobby'){this.starter.update(dt,this.profile.char);this.starter.render()}else{g.renderMenu(dt)}
   }catch(e){console.error(e);window.__err=(window.__err||'')+e.stack+'\n'}
   this.input.endFrame();
  }

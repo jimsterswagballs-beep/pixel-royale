@@ -27,6 +27,21 @@ function updateSun(g,cam){
  const pr=tx*Rx+tz*Rz,pu=tx*Ux+ty*Uy+tz*Uz,dr=Math.round(pr/ts)*ts-pr,du=Math.round(pu/ts)*ts-pu;
  tx+=Rx*dr+Ux*du;ty+=Uy*du;tz+=Rz*dr+Uz*du;
  sun.target.position.set(tx,ty,tz);sun.position.set(tx+L.x*300,ty+L.y*300,tz+L.z*300);sun.target.updateMatrixWorld()}
+// Glider canopy with strings to the hero's shoulders. Shown while gliding (drop === 'glide').
+function makeGliderModel(col){
+ const g=new THREE.Group();
+ const shape=new THREE.Shape();shape.moveTo(-2.3,0);shape.absarc(0,0,2.3,Math.PI,0,true);shape.lineTo(-2.3,0);
+ const canopyGeo=new THREE.ExtrudeGeometry(shape,{depth:.12,bevelEnabled:false,curveSegments:24});canopyGeo.translate(0,0,-.06);
+ const canopy=new THREE.Mesh(canopyGeo,new THREE.MeshLambertMaterial({color:col,side:THREE.DoubleSide}));canopy.castShadow=true;g.add(canopy);
+ const stripeMat=new THREE.MeshLambertMaterial({color:'#ffffff',transparent:true,opacity:.55});
+ for(const a of[-.9,-.3,.3,.9]){const st=new THREE.Mesh(new THREE.BoxGeometry(.07,2.2,.16),stripeMat);st.position.y=1.1;const piv=new THREE.Group();piv.rotation.z=a;piv.add(st);g.add(piv)}
+ const pts=[[-2.3,0],[2.3,0],[-1.63,1.63],[1.63,1.63]],v=[];
+ for(const[x,y]of pts)v.push(x,y,0,x>0?.2:-.2,-1.4,0);
+ const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
+ g.add(new THREE.LineSegments(sg,new THREE.LineBasicMaterial({color:'#222222'})));
+ g.position.y=3.1;
+ return g}
+
 export class Game{
  constructor(app){
   this.app=app;this.renderer=app.renderer;this.input=app.input;this.audio=app.audio;this.hud=app.hud;
@@ -108,7 +123,8 @@ export class Game{
   const aura=new THREE.Mesh(new THREE.SphereGeometry(1.25,16,12),new THREE.MeshBasicMaterial({color:'#6ec6ff',transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}));aura.position.y=1;aura.visible=false;g.add(aura);
   const cv=document.createElement('canvas');cv.width=256;cv.height=64;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
   const nmat=crispMat(tex);const name=new THREE.Mesh(new THREE.PlaneGeometry(1,1),nmat);name.scale.set(2.8,.7,1);name.position.y=2.45;name.layers.set(1);bb.add(name);
-  e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,hat,cloakK:0,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
+  const glider=makeGliderModel((CHARS.find(c=>c.id===e.char)||{}).color||'#6ec6ff');glider.visible=false;g.add(glider);
+  e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,hat,glider,gK:0,cloakK:0,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
   this.dynamic.add(g);this.drawName(e,true)}
  drawName(e,force){
   const s=e.spr;const key=Math.round(e.hp/5)*1000+Math.round(e.sh/5)+(e.ts>0?7:0);if(!force&&key===s.hpKey)return;s.hpKey=key;
@@ -118,9 +134,11 @@ export class Game{
   s.tex.needsUpdate=true}
  updateSprite(e,dt,cam){
   const s=e.spr;const spectating=!this.me.alive;const camTarget=this.viewEnt();
-  const vis=(e.alive||e.deadT<2)&&e.drop!=='bus'&&!(e===camTarget&&this.fpv);
+  const vis=(e.alive||e.deadT<2)&&e.drop!=='bus'&&!(e===camTarget&&this.fpv&&(this.tpK||0)<.05);
   s.group.visible=vis;if(!vis)return;
   const P=e.rpos;s.group.position.copy(P);
+  {const gl=s.glider,gliding=e.drop==='glide';s.gK=gliding?Math.min(1,(s.gK||0)+dt*4):0;gl.visible=gliding;
+   if(gliding){const k=Math.max(.05,s.gK);gl.scale.set(k,k,k);gl.rotation.y=e.yaw;gl.rotation.z=Math.sin(this.t*2.2+e.id)*.06}}
   const dx=cam.x-P.x,dz=cam.z-P.z,dl=Math.hypot(dx,dz)||1;const nx=dx/dl,nz=dz/dl;
   s.bb.rotation.y=Math.atan2(dx,dz);
   const fx=-Math.sin(e.yaw),fz=-Math.cos(e.yaw);const dot=fx*nx+fz*nz;
@@ -225,7 +243,7 @@ export class Game{
    case'bite':{const t=this.ents.get(ev.t);if(t){fx.burst(t.pos.x,t.pos.y+1.2,t.pos.z,25,6,'#ff4a4a',.5,8);au.play('bite',t.pos)}break}
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
-   case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':this.onBuildEvent(ev);break;
+   case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
    case'end':this.onEnd(ev);break;
    case'snd':au.play(ev.n,ev.p?new THREE.Vector3(...ev.p):null,ev.g||1);break;
    case'quip':break;
@@ -291,10 +309,25 @@ export class Game{
   me.vel.set(0,0,0);
  }
  // ---------- camera & render
+ tpPose(me,pos,quat){
+  const pitch=me.pitch,yaw=me.yaw,cp=Math.cos(pitch);
+  const fwd=[-Math.sin(yaw)*cp,Math.sin(pitch),-Math.cos(yaw)*cp];
+  const tgt=[me.pos.x,me.pos.y+1.5,me.pos.z],dist=4.8;
+  const hit=W.rayWorld(tgt[0],tgt[1],tgt[2],-fwd[0],-fwd[1],-fwd[2],dist+.3);
+  const d=hit?Math.max(.6,hit.t-.3):dist;
+  pos.set(tgt[0]-fwd[0]*d,tgt[1]-fwd[1]*d,tgt[2]-fwd[2]*d);
+  const look=new THREE.Vector3(tgt[0]+fwd[0]*12,tgt[1]+fwd[1]*12,tgt[2]+fwd[2]*12);
+  quat.setFromRotationMatrix(new THREE.Matrix4().lookAt(pos,look,new THREE.Vector3(0,1,0)));
+ }
  render(dt){
   const cam=this.camera,s=this.settings,v=this.view;const tgt=this.viewEnt();if(!tgt)return;
   const fpv=this.fpv;
-  if(fpv){this.positionFPS(dt)}
+  // third person while diving and gliding; blends back to first person when the player lands
+  const me=this.me;if(me)me.rpos.copy(me.pos); // the local hero's sprite is drawn from its live position
+  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide')?1:0;
+  this.tpK=(this.tpK||0)+(tpWant-(this.tpK||0))*(1-Math.exp(-9*dt));
+  if(fpv){this.positionFPS(dt);
+   if(this.tpK>.002){const fp=cam.position.clone(),fq=cam.quaternion.clone(),tp=new THREE.Vector3(),tq=new THREE.Quaternion();this.tpPose(me,tp,tq);cam.position.lerpVectors(fp,tp,this.tpK);cam.quaternion.copy(fq).slerp(tq,this.tpK)}}
   else{ // third person chase
    const yaw=(tgt.id===this.myId)?(this.specYaw||0):(this.specYaw||tgt.yaw)+0;
    const dist=5.5,pitch=this.specPitch||.35;const cx=tgt.rpos.x+Math.sin(yaw)*dist*Math.cos(pitch),cz=tgt.rpos.z+Math.cos(yaw)*dist*Math.cos(pitch),cyy=tgt.rpos.y+1.5+Math.sin(pitch)*dist;
@@ -307,7 +340,7 @@ export class Game{
   for(const e of this.list)this.updateSprite(e,dt,cam.position);
   const st=this.storm;const inStorm=this.insideStorm(cam.position.x,cam.position.z)===false;this.scene.fog.color.set(inStorm?'#7a4ab0':'#b9dcf5');this.fx.stormy=inStorm;
   this.renderWorld(cam);
-  if(fpv&&this.me.drop===null){this.updateViewmodel(dt);this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.vmScene,this.vmCam);this.renderer.autoClear=true}
+  if(fpv&&this.me.drop===null&&(this.tpK||0)<.02){this.updateViewmodel(dt);this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.vmScene,this.vmCam);this.renderer.autoClear=true}
  }
  renderWorld(cam){
   const r=this.renderer,pf=this.app.pf||1,use=pf<.99;

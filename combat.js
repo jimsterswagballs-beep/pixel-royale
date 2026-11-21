@@ -101,6 +101,7 @@ export const combatMethods={
   for(const t of this.list){if(t===e||!t.alive||t.drop==='bus')continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d>wd.range+.5)continue;if(d>.6&&(dx*fx+dz*fz)/d<.45)continue;if(Math.abs(t.pos.y+.9-y)>2)continue;
    this.damage(t,wd.dmg*this.dmgMulOf(e),e,wi,false,[t.pos.x,t.pos.y+1.2,t.pos.z]);hit=true;
    this.emit({k:'st',i:t.id,s:'kb',vx:fx*wd.kb,vy:2,vz:fz*wd.kb},t.id);}
+  if(!hit&&wd.n==='Pickaxe'&&!e.bot)this.harvestSwing(e,wd,yaw,pitch,x,y,z);
   this.emit({k:'snd',n:'melee',p:[x,y,z]})},
  // ================= items
  startUseItem(e,slot){

@@ -21,16 +21,19 @@ export const ICON={
   `<ellipse cx="24" cy="40" rx="7" ry="11" fill="#e8fbff" opacity=".9"/><ellipse cx="40" cy="26" rx="7" ry="11" fill="#e8fbff" opacity=".45"/><path d="M14 18l6 6M20 18l-6 6" stroke="#ff7a7a" stroke-width="2.5" stroke-linecap="round" opacity="0"/>`),
  // ---- Jay (kitchen / chaos)
  pan:icon('#4a1a10','#c4552b',
-  `<circle cx="27" cy="33" r="14" fill="#2a2a2e" stroke="#9aa0a6" stroke-width="3"/><circle cx="27" cy="33" r="8.5" fill="#3a3a40"/><path d="M38 41l17 12" stroke="#8a5a2a" stroke-width="6" stroke-linecap="round"/>
-   <path d="M10 17c10-9 30-9 40 2" fill="none" stroke="#ffe0a0" stroke-width="3" stroke-linecap="round" stroke-dasharray="1 6"/><path d="M47 14l5 6-8 2z" fill="#ffe0a0"/>`),
+  `<path d="M10 46C6 20 36 6 52 20" fill="none" stroke="#ffe0a0" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="1 5"/><path d="M46 13l9 8-12 3z" fill="#ffe0a0"/>
+   <circle cx="28" cy="38" r="12.5" fill="#2a2a2e" stroke="#9aa0a6" stroke-width="3"/><circle cx="28" cy="38" r="7.5" fill="#3a3a40"/><path d="M21 34a8 8 0 0 1 6-4" fill="none" stroke="#c7ccd3" stroke-width="2" stroke-linecap="round" opacity=".7"/>
+   <path d="M37 47l12 10" stroke="#8a5a2a" stroke-width="6" stroke-linecap="round"/>`),
  food:icon('#5a1c12','#d9552b',
-  `<ellipse cx="32" cy="22" rx="17" ry="10" fill="#e0983a"/><circle cx="25" cy="18" r="1.6" fill="#fff3c0"/><circle cx="33" cy="15" r="1.6" fill="#fff3c0"/><circle cx="40" cy="19" r="1.6" fill="#fff3c0"/>
-   <path d="M13 28q6 5 12 0t12 0 14 0v3H13z" fill="#4cd964"/><rect x="14" y="31" width="36" height="7" rx="3.5" fill="#5a2d12"/><path d="M14 38h36l-3 5H17z" fill="#ffd23d"/><path d="M15 43h34a3 6 0 0 1-3 6H18a3 6 0 0 1-3-6z" fill="#e0983a"/>
-   <circle cx="52" cy="12" r="8" fill="#ffd23d" stroke="#8a5a00" stroke-width="2"/><text x="52" y="17" font-family="Arial Black,Arial" font-size="12" font-weight="900" text-anchor="middle" fill="#6b3d00">?</text>`),
+  `<path d="M7 52Q20 6 45 21" fill="none" stroke="#ffe0a0" stroke-width="2.4" stroke-dasharray="2 4" stroke-linecap="round"/>
+   <path d="M17 35a15 13 0 0 1 30 0z" fill="#e0983a"/><circle cx="25" cy="27" r="1.5" fill="#fff3c0"/><circle cx="32" cy="24" r="1.5" fill="#fff3c0"/><circle cx="39" cy="28" r="1.5" fill="#fff3c0"/>
+   <path d="M15 36q4-3 8 0t8 0 8 0 8 0v3H15z" fill="#4cd964"/><rect x="15" y="39" width="34" height="6" rx="3" fill="#5a2d12"/>
+   <path d="M16 46h32a2 4 0 0 1-2 6H18a2 4 0 0 1-2-6z" fill="#e0983a"/>
+   <path d="M52 8l2 5 5 2-5 2-2 5-2-5-5-2 5-2z" fill="#ffd23d"/>`),
  kitchen:icon('#143c2a','#2fae6a',
-  `<ellipse cx="32" cy="46" rx="21" ry="5" fill="#d9e2e8"/><path d="M13 44a19 19 0 0 1 38 0z" fill="#f2f5f7" stroke="#aab4bc" stroke-width="2"/><circle cx="32" cy="22" r="3.6" fill="#aab4bc"/>
-   <path d="M20 16c-4-4 4-6 0-10M32 14c-4-4 4-6 0-10M44 16c-4-4 4-6 0-10" fill="none" stroke="#e8fff0" stroke-width="2.6" stroke-linecap="round" opacity=".85"/>
-   <rect x="29" y="31" width="6" height="14" rx="1.5" fill="#ff5a6a"/><rect x="25" y="35" width="14" height="6" rx="1.5" fill="#ff5a6a"/>`),
+  `<ellipse cx="32" cy="48" rx="23" ry="5" fill="#d9e2e8"/><path d="M11 46a21 21 0 0 1 42 0z" fill="#f2f5f7" stroke="#aab4bc" stroke-width="2"/><circle cx="32" cy="24" r="3.4" fill="#aab4bc"/>
+   <path d="M22 26c-3-4 3-6 0-10M30 26c-3-4 3-6 0-10" fill="none" stroke="#e8fff0" stroke-width="2.4" stroke-linecap="round" opacity=".8"/>
+   <rect x="46" y="8" width="6" height="16" rx="2" fill="#6cff8a"/><rect x="41" y="13" width="16" height="6" rx="2" fill="#6cff8a"/>`),
  chef:icon('#4a1a10','#c4552b',
   `<rect x="20" y="38" width="24" height="12" rx="2" fill="#fff"/><circle cx="22" cy="30" r="9" fill="#fff"/><circle cx="32" cy="25" r="11" fill="#fff"/><circle cx="42" cy="30" r="9" fill="#fff"/><rect x="20" y="44" width="24" height="3" fill="#dde"/>`)
 };
