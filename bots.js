@@ -66,7 +66,7 @@ export const botMethods={
   e.persona=key},
  botCfg(){return DIFF[this.diff]||DIFF.Normal},
  inZoneAt(x,z,m=0){const s=this.storm;if(Math.hypot(x-s.cx,z-s.cz)>s.r-m)return false;const nz=this.nextZone();if(nz&&Math.hypot(x-nz.x,z-nz.z)>nz.r-m)return false;return true},
- onBotHit(t,by){const ai=t.ai;if(!ai||!by||by===t||!by.alive)return;
+ onBotHit(t,by){const ai=t.ai;if(!ai||!by||by===t||!by.alive||this.isAlly(t,by))return;
   ai.hitN=(this.t-ai.hitT<4?ai.hitN:0)+1;ai.hitT=this.t;ai.lastSeenPos={x:by.pos.x,z:by.pos.z,t:this.t};ai.lastSeenT=this.t;
   if(!ai.enemy||Math.random()<.5){ai.enemy=by;ai.react=Math.min(ai.react||0,.25);ai.seen=0}
   ai.glance={x:by.pos.x,z:by.pos.z,t:this.t}},
@@ -78,7 +78,7 @@ export const botMethods={
   else if(ev.k==='ex'){for(const b of this.list){if(!b.bot||!b.alive||b.drop)continue;const d=Math.hypot(b.pos.x-ev.x,b.pos.z-ev.z);if(d<130*b.ai.p.hear){b.ai.noise={x:ev.x+rr(-6,6),z:ev.z+rr(-6,6),t:this.t,d,src:-1};b.ai.glance={x:ev.x,z:ev.z,t:this.t}}}}},
  updateBots(dt){
   NAV.navTime(this.t);this.navMs=0;
-  for(const e of this.list){if(!e.bot||!e.alive)continue;this.botTick(e,dt)}
+  for(const e of this.list){if(!e.bot||!e.alive||e.knocked)continue;this.botTick(e,dt)}
   this.updateLootHost(dt);
  },
  // ------------------------------------------------------------------ helpers
@@ -180,7 +180,7 @@ export const botMethods={
    const dx=ai.dropTgt.x-e.pos.x,dz=ai.dropTgt.z-e.pos.z;e.yaw=Math.atan2(-dx,-dz);e.pitch=-.9;inp.f=1;
    this.move(e,inp,dt);e.flags=this.packFlags(e);e.wi=-1;if(!e.drop){ai.state='loot';ai.think=0;ai.lastX=P.x;ai.lastZ=P.z}return}
   ai.think-=dt;ai.slideCd-=dt;ai.strafeT-=dt;ai.jumpT-=dt;ai.modeT+=dt;
-  if(ai.think<=0){ai.think=rr(.15,.25);this.botThink(e,cfg)}
+  if(ai.think<=0){ai.think=rr(.15,.25);this.botThink(e,cfg);this.botSupport(e)}
   const mode=ai.mode;
   const en=ai.fight&&ai.enemy&&ai.enemy.alive&&ai.seen>0?ai.enemy:null;
   const nz=this.nextZone()||{x:this.storm.cx,z:this.storm.cz,r:this.storm.r};
@@ -317,7 +317,7 @@ export const botMethods={
   const ai=e.ai,P=e.pos,t=this.t,pe=ai.p;let best=null,bd=1e9,heard=null,hd=1e9;
   const fx=-Math.sin(e.yaw),fz=-Math.cos(e.yaw);const half=Math.cos(cfg.fov*(pe.paranoid?1.15:1)*Math.PI/360);
   for(const o of this.list){
-   if(o===e||!o.alive||o.drop==='bus'||(o.drop&&o.pos.y>P.y+30))continue;
+   if(o===e||this.isAlly(e,o)||!o.alive||o.drop==='bus'||(o.drop&&o.pos.y>P.y+30))continue;
    const dx=o.pos.x-P.x,dz=o.pos.z-P.z,d=Math.hypot(dx,dz);
    let vis=cfg.vis*(o.sprinting?1.2:1)*(o.crouch?.7:1)*(o.char==='chillguy'?BAL.chill.quiet.botVisMul:1);if(o.cloakT>0)vis=Math.min(vis,BAL.chill.disappear.botSeeRange);
    let seen=false;
@@ -326,11 +326,45 @@ export const botMethods={
     if(d<hr&&d<hd){hd=d;heard={x:o.pos.x+rr(-3,3),z:o.pos.z+rr(-3,3),d,t,src:o.id}}}}
   return{best,bd,heard}},
  // ------------------------------------------------------------------ decision making
+ // ---------------------------------------------------------------- team play
+ nearestMate(e){let mate=null,d=1e9;for(const o of this.list){if(o===e||!o.alive||o.knocked||o.drop||o.team!==e.team)continue;const q=d2(o.pos.x,o.pos.z,e.pos.x,e.pos.z);if(q<d){d=q;mate=o}}return{mate,d}},
+ healSlot(e){for(let i=1;i<6;i++){const s=e.inv[i];if(s&&s.k==='i'&&(ITEMS[s.id].kind==='heal'||s.id==='chug'))return i}return -1},
+ // an ammo type this bot can spare for a teammate who carries a gun of that type but is nearly out
+ ammoGift(e,o){for(const s of o.inv){if(!s||s.k!=='w'||s.w<=0)continue;const k=WEAPONS[s.w].ammo;if(o.ammo[k]<20&&e.ammo[k]>=60)return k}return null},
+ // the teammate this bot should help now: a hurt one (if we can spare a heal) or one short on ammo
+ supportNeed(e){
+  let best=null,bs=0;
+  for(const o of this.list){
+   if(o===e||!o.alive||o.knocked||o.drop||o.team!==e.team)continue;
+   if(d2(o.pos.x,o.pos.z,e.pos.x,e.pos.z)>45)continue;
+   let s=0;
+   if(o.hp<o.maxHp*.45&&this.healSlot(e)>=0&&e.hp>=e.maxHp*.5)s=2+(1-o.hp/o.maxHp);
+   else if(this.ammoGift(e,o))s=1;
+   if(s>bs){bs=s;best={mate:o,kind:s>=2?'heal':'ammo'}}
+  }
+  return best;
+ },
+ // hands the item over once the bot is next to the teammate (host side; bots only run on the host)
+ botSupport(e){
+  const ai=e.ai,sup=ai.support;if(!sup)return;
+  const o=sup.mate;if(!o||!o.alive){ai.support=null;return}
+  if(d2(o.pos.x,o.pos.z,e.pos.x,e.pos.z)>3.2)return;
+  if(sup.kind==='heal'){
+   const i=this.healSlot(e);if(i<0||o.hp>=o.maxHp*.45){ai.support=null;return}
+   const s=e.inv[i],it=ITEMS[s.id];this.consume(e,s);
+   const amt=Math.max(0,Math.min(it.hp||40,o.maxHp-o.hp));
+   this.healEnt(o,amt,0);this.emit({k:'heal',t:o.id,hp:amt});
+  }else{
+   const k=this.ammoGift(e,o);if(k){const n=Math.min(30,e.ammo[k]-30);if(n>0){e.ammo[k]-=n;o.ammo[k]+=n}}
+  }
+  ai.support=null;
+ },
  botThink(e,cfg){
   const ai=e.ai,pe=ai.p,P=e.pos,t=this.t;
   const eye=this.eyeOf(e);
   const low=(e.hp+e.sh*.6)/e.maxHp;                 // 0..~1.6 ; shields count for a bit
   const {best,bd,heard}=this.botSense(e,cfg,eye);
+  const near=this.nearestMate(e),sup=best?null:this.supportNeed(e);ai.support=sup;
   const hitRecent=t-ai.hitT<4;
   if(best){if(ai.enemy!==best||ai.seen<=0)ai.react=cfg.react*(.7+Math.random()*.6)*pe.twitchy;ai.enemy=best;ai.seen=1;ai.lastSeenPos={x:best.pos.x,z:best.pos.z,t};ai.lastSeenT=t}
   else{if(ai.seen>0)ai.seen-=.34;if(ai.seen<=0&&!hitRecent&&t-ai.lastSeenT>pe.chase+3)ai.enemy=null}
@@ -380,11 +414,13 @@ export const botMethods={
    if(outside&&!(ai.mode==='fight'&&ai.seen>0))next='rotate';
    else if(hurt&&(sinceSeen<14||haveHeal||pe.caution>.5)&&(ai.mode==='hide'?t-ai.hideT0<28:true)&&!(outside)){next='hide'}
    else if(ai.mode==='hide'&&!hurt&&!ai.healing){next='loot'}
+   else if(sup){next='regroup'}
    else if(noise&&armed&&low>pe.fleeHp+.25&&Math.random()<pe.aggr*pe.hear*.12+(pe.key==='opportunist'?.1:0)&&ai.mode!=='camp'){next='investigate'}
    else if(ai.mode==='investigate'&&noise&&t<ai.noiseUntil){next='investigate'}
    else if(ai.lastSeenPos&&sinceSeen<pe.chase&&pe.aggr>.45&&armed&&low>pe.fleeHp+.12&&ai.enemy&&ai.enemy.alive&&ai.mode!=='hide'){next='chase'}
    else if(ai.mode==='camp'&&ai.hold&&t<ai.hold.until&&!outside){next='camp'}
    else if(this.botWantsCamp(e,low,armed,outside)){next='camp'}
+   else if(near.mate&&near.d>(ai.mode==='regroup'?144:576)){next='regroup'}
    else next=this.botLootOrRoam(e)?'loot':'roam';
    if(ai.mode==='chase'&&next==='chase'&&ai.searchT&&t>ai.searchT){next=this.botLootOrRoam(e)?'loot':'roam';ai.lastSeenPos=null}
    if(ai.mode==='investigate'&&next==='investigate'&&ai.searchT&&t>ai.searchT){ai.noise=null;next=this.botLootOrRoam(e)?'loot':'roam'}
@@ -425,6 +461,9 @@ export const botMethods={
     break}
    case'chase':{const p=ai.lastSeenPos;if(p)this.setGoal(e,p.x,p.z,3,'chase');break}
    case'investigate':{if(noise){if(!ai.noiseUntil||t>ai.noiseUntil)ai.noiseUntil=t+12;this.setGoal(e,noise.x,noise.z,5,'investigate')}else this.setMode(e,'roam',0);break}
+   case'regroup':{const tm=sup?sup.mate:near.mate;if(!tm){this.setMode(e,'loot',0);break}
+    if(!ai.goal||ai.goal.why!=='regroup'||t-(ai.regroupAt||0)>1.5){ai.regroupAt=t;const a=rr(0,6.283),r=sup?1.2:rr(3,5);this.setGoal(e,tm.pos.x+Math.cos(a)*r,tm.pos.z+Math.sin(a)*r,2,'regroup')}
+    break}
    case'rotate':{const a=Math.atan2(P.z-nz0(this).z,P.x-nz0(this).x);const z=nz0(this);const k=Math.max(4,z.r*.55);this.setGoal(e,z.x+Math.cos(a)*k*.5,z.z+Math.sin(a)*k*.5,4,'rotate');break}
    case'loot':{if(ai.lootT&&this.loot.has(ai.lootT.id)){const l=ai.lootT;this.setGoal(e,l.x,l.z,1.6,'loot')}else{ai.lootT=null;this.setMode(e,'roam',0)}break}
    case'roam':{

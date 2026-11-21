@@ -3,6 +3,7 @@ import {WEAPONS,ITEMS,RARITY,BAL,clamp,lerp} from './data.js';
 import * as W from './world.js';
 import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,GRAV,JUMP,WALK,SPRINT,CROUCH,wstat,makeWeaponModel,mat} from './shared.js';
 import {makeFloorItem} from './loot.js';
+import {CRAWL} from './knock.js';
 
 export const movementMethods={
  readInput(){
@@ -21,6 +22,7 @@ export const movementMethods={
   const cur=me.inv[me.cur];const wd=cur&&cur.k==='w'?wstat(cur.w,cur.r):null;
   if(active){const ads=v.adsK>.05;const ratio=Math.tan(this.camera.fov*Math.PI/360)/Math.tan(s.fov*Math.PI/360);let k=.0022*s.sens*s.camSens*ratio*(ads?(1-v.adsK)+v.adsK*s.adsSens:1);if(me.eatT>0)k*=.3;me.yaw-=dx*k;me.pitch=clamp(me.pitch-dy*k*(s.invertY?-1:1),-1.5,1.5)}
   const inp=this.readInput();
+  if(me.knocked){inp.jump=false;inp.jumpP=false;inp.sprint=false;inp.crouch=false;inp.crouchP=false}
   // bus
   if(me.drop==='bus'){
    const atEnd=this.bus.t*this.bus.speed>this.bus.len-25;
@@ -42,14 +44,16 @@ export const movementMethods={
    }else{
     if(I.pressed('next'))this.cycleSlot(me,1);if(I.pressed('prev'))this.cycleSlot(me,-1);
    }
-   if(I.pressed('ab1'))this.useAbility(me,0);if(I.pressed('ab2'))this.useAbility(me,1);if(I.pressed('ab3'))this.useAbility(me,2);
-   if(I.pressed('drop'))this.dropCurrent(me);
+   if(!me.knocked&&I.pressed('ab1'))this.useAbility(me,0);if(!me.knocked&&I.pressed('ab2'))this.useAbility(me,1);if(!me.knocked&&I.pressed('ab3'))this.useAbility(me,2);
+   if(!me.knocked&&I.pressed('drop'))this.dropCurrent(me);
    // interact
    this.updateNearLoot(me);
-   if(I.pressed('interact')&&this.near)this.pickupLocal(me,this.near);
-  }else this.near=null;
+   if(I.pressed('interact')&&this.near&&!me.knocked)this.pickupLocal(me,this.near);
+   if(!this.near){const kp=this.knockPrompt(me);this.hud.setPrompt(kp,{})}
+   me.holdI=!!I.down('interact')&&!me.knocked;
+  }else{this.near=null;me.holdI=false}
   const aimHeld=active&&(s.aimToggle?(I.pressed('aim')?(me.aimState=!me.aimState):me.aimState):I.down('aim'));
-  this.tickWeapon(me,{fire:active&&!this.building&&I.down('fire'),firePressed:active&&!this.building&&I.pressed('fire'),reload:active&&!this.building&&I.pressed('reload'),aim:!!aimHeld&&!me.use},dt);
+  this.tickWeapon(me,{fire:active&&!me.knocked&&!this.building&&I.down('fire'),firePressed:active&&!me.knocked&&!this.building&&I.pressed('fire'),reload:active&&!me.knocked&&!this.building&&I.pressed('reload'),aim:!!aimHeld&&!me.use&&!me.knocked},dt);
   // view recoil recovery
   const firing=this.t-(v.lastShot||-9)<.18;const rec=firing?2.2:9;v.recoilP*=Math.exp(-rec*dt);v.recoilY*=Math.exp(-rec*dt);v.kick*=Math.exp(-14*dt);
   v.adsT=clamp((v.adsT||0)+(me.aiming?1:-1)*dt/.15,0,1);v.adsK=v.adsT*v.adsT*(3-2*v.adsT);
@@ -83,7 +87,7 @@ export const movementMethods={
   let f=stunned?0:inp.f,sd=stunned?0:inp.s;
   let wx=-sy*f+cy*sd,wz=-cy*f-sy*sd;const wl=Math.hypot(wx,wz);if(wl>1){wx/=wl;wz/=wl}
   let sp=WALK;const spr=inp.sprint&&f>0&&!e.crouch&&!e.sliding&&!e.use&&!swim&&!(e.cookT>0);
-  if(spr)sp=SPRINT;if(e.crouch)sp=CROUCH;if(e.buffT>0)sp*=1.15;if(e.coldT>0)sp*=BAL.chill.cold.speedMul;if(e.slowT>0)sp*=1-(e.slowK||.4);if(e.cookT>0)sp*=BAL.jay.kitchen.moveMul;if(e.energyT>0)sp*=1.25;if(e.use)sp*=.5;if(swim)sp*=.5;if(e.dazed>0)sp*=.55;if(e.cdef.id==='zach')sp*=1;if(e.botSpeed)sp*=e.botSpeed;
+  if(spr)sp=SPRINT;if(e.crouch)sp=CROUCH;if(e.knocked)sp=CRAWL;if(e.buffT>0)sp*=1.15;if(e.coldT>0)sp*=BAL.chill.cold.speedMul;if(e.slowT>0)sp*=1-(e.slowK||.4);if(e.cookT>0)sp*=BAL.jay.kitchen.moveMul;if(e.energyT>0)sp*=1.25;if(e.use)sp*=.5;if(swim)sp*=.5;if(e.dazed>0)sp*=.55;if(e.cdef.id==='zach')sp*=1;if(e.botSpeed)sp*=e.botSpeed;
   e.sprinting=spr&&wl>.1&&onG;
   let justJumped=false;
   // grapple

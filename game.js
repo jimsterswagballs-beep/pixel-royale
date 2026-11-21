@@ -5,6 +5,7 @@ import * as W from './world.js';
 import {FX} from './fx.js';
 import {R,HSTAND,HCROUCH,EYE,EYEC,EYES,charTex,wstat,makeWeaponModel,mat,angDiff,lerpAng,crispMat,makeBusModel} from './shared.js';
 import {movementMethods} from './movement.js';
+import {knockMethods} from './knock.js';
 import {combatMethods} from './combat.js';
 import {lootMethods} from './loot.js';
 import {botMethods} from './bots.js';
@@ -64,6 +65,7 @@ export class Game{
  get settings(){return this.app.settings}
  get me(){return this.ents.get(this.myId)}
  cleanup(){
+  if(this.fieldMeshes)for(const m of this.fieldMeshes.values())this.dynamic.remove(m);
   for(const e of this.list){if(e.spr)this.dynamic.remove(e.spr.group)}
   for(const l of this.loot.values())if(l.mesh)this.dynamic.remove(l.mesh);
   for(const t of this.traps.values())if(t.mesh)this.dynamic.remove(t.mesh);
@@ -89,7 +91,7 @@ export class Game{
   this.t=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
   this.storm={phase:-1,state:'idle',t:25,cx:0,cz:0,r:480,ocx:0,ocz:0,or:480,tcx:0,tcz:0,tr:480,dmg:0};
   this.supplyT=45;this.supplies=[];
-  this.genLoot(mulberry32(this.seed+99));
+  this.genLoot(mulberry32(this.seed+99));this.setupFields();
   this.initStormMesh();
   this.me.pos.copy(this.bus.pos);
   this.view.recoilP=this.view.recoilY=0;this.running=true;this.audio.mode='game';
@@ -165,7 +167,7 @@ export class Game{
   if(e.hitT>0){e.hitT-=dt;if(e.hitT>.09)s.mat.color.setRGB(2.2,2.2,2.2);else s.mat.color.setRGB(1.5,.45,.45)}else if(e.slowT>0)s.mat.color.setRGB(.7,.9,1.35);else s.mat.color.setRGB(1,1,1);
   if(e.char==='chillguy'){let gr=0,gg=0,gb=0;if(e.hitT>.09){gr=gg=gb=.7}else if(e.hitT>0){gr=.5}if(e.coldT>0){gg+=.12;gb+=.22}if(e.slowT>0){gg+=.1;gb+=.2}s.mat.glow.setRGB(gr,gg,gb)}
   if(!e.alive){e.deadT+=dt;const k=Math.min(1,e.deadT/.5);rz2=(flip>0?-1:1)*1.45*k;sy*=1-.2*k;s.mat.opacity=clamp(1.6-e.deadT,0,1);s.mat.transparent=true}
-  else s.mat.opacity=1;
+  else{s.mat.opacity=1;if(e.knocked)rz2=(flip>0?-1:1)*1.45}
   if(this.over&&e.id===this.winnerId){const em=e.cos.emote||0;const t=this.t*(em===0?5:em===1?3:4);if(em===0){flip*=Math.cos(t)}else if(em===1){py=Math.abs(Math.sin(t*2))*1.1;rz2=Math.sin(t*2)*.15}else{rz2=(t*2)%6.283;py=.5+Math.sin(t)*.2}}
   // ---- hero ability animations
   if(e.animT>0){e.animT=Math.max(0,e.animT-dt);const k=1-e.animT/(e.animDur||.35);
@@ -249,6 +251,8 @@ export class Game{
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
    case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
+   case'ntf':if(this.me&&(ev.tm===undefined||ev.tm===this.me.team))this.hud.toast(ev.t,ev.c);break;
+   case'rb':if(ev.v===this.myId)this.onMeRebooted(ev);break;
    case'end':this.onEnd(ev);break;
    case'snd':au.play(ev.n,ev.p?new THREE.Vector3(...ev.p):null,ev.g||1);break;
    case'quip':break;
@@ -261,12 +265,17 @@ export class Game{
    case'heal':this.healFx(ev);break;
   }
  }
+ onMeRebooted(ev){
+  const me=this.me;me.alive=true;me.knocked=false;me.deadT=0;
+  if(this.role==='client'){me.pos.set(ev.x,ev.y,ev.z);me.rpos.copy(me.pos);me.vel.set(0,0,0)}
+  this.spectateId=-1;this.hud.hideElim();this.app.showCursor(false);this.app.lock();
+ }
  onMeDead(ev){
   const me=this.me;me.alive=false;const killer=this.ents.get(ev.by);this.spectateId=killer&&killer.alive?killer.id:-1;this.audio.play('lose');
   const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(ev.w||'the storm'),me.kills,this)}
  onEnd(ev){
   if(this.over)return;this.over=true;this.winnerId=ev.win;const w=this.ents.get(ev.win);this.overT=this.t;
-  if(this.me.alive&&ev.win===this.myId){this.audio.play('win');this.hud.showVictory(this)}
+  if(this.me.team===ev.tm){this.audio.play('win');this.hud.showVictory(this)}
   else this.hud.announce((w?w.name:'Nobody')+' wins!','#ffd23d');
   this.hud.onEnd(this,ev)}
  // ---------- main update
@@ -276,7 +285,7 @@ export class Game{
   this.updateBus(dt);if(this.decor)this.decor.update(this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.checkWin()}
+   this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.checkWin()}
   else{this.updateClientSim(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
   this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
@@ -324,7 +333,7 @@ export class Game{
   const look=new THREE.Vector3(tgt[0]+fwd[0]*12,tgt[1]+fwd[1]*12,tgt[2]+fwd[2]*12);
   quat.setFromRotationMatrix(new THREE.Matrix4().lookAt(pos,look,new THREE.Vector3(0,1,0)));
  }
- render(dt){
+ render(dt){this.syncFieldVis();
   const cam=this.camera,s=this.settings,v=this.view;const tgt=this.viewEnt();if(!tgt)return;
   const fpv=this.fpv;
   // third person while diving and gliding; blends back to first person when the player lands
@@ -365,4 +374,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);
+Object.assign(Game.prototype,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods);

@@ -94,11 +94,39 @@ Known limits: the multiplayer code has only been tested with fake networking, no
 - Bots are drawn from all four characters (`botnames.js`), so Chill Guy and Jay appear in bot matches and use their own bot logic (`botChill`, `botJay`).
 - The HUD shows the hero ability icons, the next food in Jay's bag, and a buffs row (Cloaked, Cold Blooded, Cooking).
 
-## Starter Island and lobby
+## Team modes and bot teammates
 
-- **Starter Island** (`starter.js`): the title and party lobby screens show a walkable island behind the menus. Your hero stands on the plaza, the Battle Bus is parked on the north side, and a cabin, palms, rocks and training dummies fill the island. WASD walks (relative to the camera), ← / → turn the camera, and G dances.
-- **Boarding**: Play (solo) or Board Bus (party host) flies the bus off with your hero aboard, fades to black, and then starts the match (`App.boardThen` in `main.js`).
-- **Lobby**: the title plate shows your name and hero over the island, and the party lobby sits over a lighter version of the same scene.
+- **Modes**: Solo (1 per team), Duos (2), Trios (3) and Squads (4). Pick one in the solo lobby or the party lobby (host). `MODES` and `buildEntrants` live in `teams.js`.
+- **Party and teams**: in team modes the party is grouped in join order, so a party of 3 in Trios is one team. Extra party members start new teams.
+- **Fill with bots**: when on, bots fill empty teammate slots first. When off, partly filled teams stay partly filled and the bot slider only adds bot teams.
+- **Win condition**: the match ends when one team is left (in Solo, when one player is left). A team's place counts teams still standing.
+- **No friendly fire**: bullets, melee, abilities and explosions never hit a teammate (`isAlly` in `combat.js`). Jay's food still heals teammates.
+- **Team panel**: top-left shows your teammates with health and distance. Teammates show as green dots on the minimap.
+- **Bot teammates** (`bots.js`):
+  - Bots never treat a teammate as an enemy, whether seen or heard.
+  - A bot that is far from its team walks back to it (`regroup`). It follows the nearest teammate and stops when it is close again.
+  - A bot with a healing item gives it to a hurt teammate who is nearby. A bot with spare ammo gives some to a teammate who is nearly out.
+
+## Knocked, revive, reboot cards and vans (team modes)
+
+- **Knocked** (`knock.js`): in team modes a player who runs out of health is knocked instead of eliminated. Knocked players crawl slowly (`CRAWL`), cannot shoot, use abilities, drop or pick up items, and have `KNOCK_T` (30 s) before they are eliminated. Enemies can finish them off with any damage.
+- **Revive**: a standing teammate holds interact within 2.6 m for `REVIVE_T` (4 s). Damage to the reviver cancels the revive, and moving out of range resets the progress. The revived player comes back with `REVIVE_HP` (30).
+- **Team out**: when nobody on a team is standing, its knocked players are finished off.
+- **Reboot cards**: when a player is eliminated and a teammate is still standing, a card drops. A teammate picks it up with interact within 2.4 m. Cards last `CARD_T` (120 s). If the carrier is eliminated, the card falls where they fell.
+- **Reboot vans**: five vans are placed across the map from the match seed, so every client has the same positions. A carrier who presses interact near a ready van starts a `VAN_T` (8 s) reboot. The carrier must stay within about 5.5 m, or the reboot is cancelled and the card goes back to them. A rebooted player returns with `REBOOT_HP` (50), a pistol and 30 light ammo. The van then cools down for `VAN_COOL` (60 s).
+- **HUD**: your own knock shows a countdown and your revive progress. The team panel shows knocked teammates with a revive bar, and eliminated teammates with a reboot card status. Notifications appear as toasts for your team.
+- **Sync**: knocked is a flag bit, and cards and vans are in each snapshot. The host decides everything. Clients send a `hold` message when they press or release interact.
+- **Tests**: `knock.js` logic was checked with a Node harness (timers, revive and interrupts, team out, cards, vans, cooldowns and expiry).
+
+Not built yet: bots reviving or rebooting teammates, pings, and a bot-side knocked response. A knocked bot stands still until it is finished.
+
+## Lobby remake and Starter Island
+
+- **Solo lobby** (the Lobby tab): match setup (name, bots, difficulty) sits on the left next to a hero showcase with stats and a Change hero button. Play drops straight into a match with a quick fade. The battle royale map shows behind the screen.
+- **Party lobby** (after you create or join a party): the squad panel is on the left, match settings and Board Bus are on the right, and your hero picker sits in a bar under the island.
+- **Starter Island** (`starter.js`): a walkable island shown only behind the party lobby. Your hero stands on the plaza, the Battle Bus is parked on the north side, and a cabin, palms, rocks and training dummies fill the island. WASD walks (relative to the camera), ← / → turn the camera, and G dances.
+- **Board Bus** (party host): the bus flies off with your hero aboard, the screen fades to black, and the match starts (`App.boardThen` in `main.js`). Solo Play skips the bus and just fades.
+- Player names in the lobby are escaped before they are written to the page.
 
 ## Dive and glide camera
 

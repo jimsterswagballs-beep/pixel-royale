@@ -10,11 +10,13 @@ import {StarterIsland} from './starter.js';
 import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
 import {makeBotRoster} from './botnames.js';
+import {buildEntrants,MODES,MODE_KEYS} from './teams.js';
 const $=id=>document.getElementById(id);
 const BOTNAMES=['Noodle','Sir Quacks','Turbo Toast','Pixel Pete','Captain Crunch','Waffle','Sneaky Sam','Big Chungus','Lil Bandit','Dr. Pickle','Banana Joe','Zoomer','Gizmo','Cheese Wiz','Ninja Nan','Boop','Chad','Meatball','Fuzzy','Rocket Raccoon','Grumpy','Sassy','Taco Tim','Doodle','Blip','Moonpie','Toaster','Yeet','Mr. Bean','Gremlin','Skibidi','Potato','Wobbly','Kevin','Bongo','Pancake'];
 const COLORS=['#ffffff','#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a'];
 const EMOTES=['Flip-Flop','Victory Hop','Spin Cycle'];
 const h=(html)=>{const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild};
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 class App{
  constructor(){
   this.canvas=$('gl');this.renderer=new THREE.WebGLRenderer({canvas:this.canvas,antialias:false,powerPreference:'high-performance'});
@@ -32,7 +34,7 @@ class App{
  // ---------- state
  loadSettings(){let s={};try{s=JSON.parse(localStorage.getItem('brg_settings')||'{}')}catch(e){}this.settings=Object.assign({},DEFAULT_SETTINGS,s)}
  saveSettings(){try{localStorage.setItem('brg_settings',JSON.stringify(this.settings))}catch(e){}}
- loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,diff:'Normal'},p)}
+ loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,diff:'Normal',mode:'solo',fill:true},p)}
  saveProfile(){try{localStorage.setItem('brg_profile',JSON.stringify(this.profile))}catch(e){}}
  get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote}}
  applySettings(){
@@ -69,7 +71,7 @@ class App{
  // ---------- screens
  buildScreens(){
   $('loading').classList.remove('show');
-  this.buildNav();this.buildTitle();this.buildOffline();this.buildOnline();this.buildLobby();this.buildLocker();this.buildSettings();this.buildCredits();this.buildUpdateLog();
+  this.buildNav();this.buildTitle();this.buildOnline();this.buildLobby();this.buildLocker();this.buildSettings();this.buildCredits();this.buildUpdateLog();
   $('btnSpec').onclick=()=>{$('elim').style.display='none';this.endCursor=false;this.lock()};
   $('btnElimMenu').onclick=()=>this.leaveMatch();$('btnAgain').onclick=()=>this.leaveMatch();
   document.addEventListener('pointerdown',()=>{this.audio.init();this.audio.resume()},{once:false});
@@ -83,29 +85,57 @@ class App{
  }
  updateNav(name){
   const nav=$('nav');if(!nav)return;nav.classList.toggle('show',!['lobby','loading','pause'].includes(name));
-  const act={offline:'title',chars:'locker'}[name]||name;for(const b of $('navTabs').children)b.classList.toggle('on',b.dataset.go===act);
+  const act={chars:'locker'}[name]||name;for(const b of $('navTabs').children)b.classList.toggle('on',b.dataset.go===act);
   const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[c.id].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor}
- buildTitle(){
+buildTitle(){
   const t=$('title');
   t.innerHTML=`<div class="lb-bg"></div>
-  <div class="lb-party"><div class="lb-h">Party <b>1/4</b></div>
-   <div class="pm me"><img id="pmImg" alt=""><div><div class="pn" id="pmName"></div><div class="ps">Party Leader</div></div></div>
-   <button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button><button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button><button class="pm empty" data-go="online"><i>+</i><span>Invite friends</span></button>
-  </div>
-  <div class="lb-top"><span class="lb-chip">Starter Island</span><span class="sub">Walk around while your party gathers</span></div>
-  <div class="lb-hero"><div id="stageName"></div><div class="sub" id="stageRole"></div><div class="lb-keys"><span>WASD walk</span><span>&larr; &rarr; turn</span><span>G dance</span></div></div>
-  <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
-  <div class="lb-play"><button class="mode" id="modeCard" data-go="offline"><div class="mk">Game mode</div><div class="mt">Battle Royale</div><div class="ms" id="modeSub"></div><div class="mc">Change &rsaquo;</div></button><button class="btn play" id="playBtn">Play</button></div>
-  <div class="hint">WASD walk · &larr; &rarr; turn camera · G dance · M map</div><div class="ver">v1.3 · Heroes update</div>`;
+  <div class="sl">
+   <div class="sl-left">
+    <span class="lb-chip">Solo · Battle Royale</span>
+    <h1 class="sl-h">Battle <span>Royale</span></h1>
+    <p class="sl-p">Drop from the battle bus, loot chests and outlast the storm. Plays fully offline against bots.</p>
+    <div class="glass sl-setup">
+     <div class="k">Match setup</div>
+     <label class="sl-f"><span class="sl-lab">Name</span><input type="text" id="slName" maxlength="14"></label>
+     <div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="slBotN"></b></div><input type="range" id="slBots" min="0" max="39"></div>
+     <div class="sl-f"><div class="sl-lab"><span>Difficulty</span></div><div class="sl-chips" id="slDiff"></div></div><div class="sl-f"><div class="sl-lab"><span>Mode</span></div><div class="sl-chips" id="slMode"></div></div><div class="sl-row" id="slFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="slFill"></div></div>
+     <div class="tip">0 bots lets you explore the island alone.</div>
+    </div>
+   </div>
+   <div class="sl-right">
+    <div class="sl-stage"><div class="sl-art" id="slArt"></div><div class="sl-pad"></div><img id="slImg" alt=""></div>
+    <div class="glass sl-card">
+     <div class="sl-hero" id="slHero"></div>
+     <div class="sl-role" id="slRole"></div>
+     <div class="sl-info" id="slInfo"></div>
+     <button class="backbtn" data-go="locker">Change hero &rsaquo;</button>
+    </div>
+    <div class="sl-actions">
+     <button class="btn sec" data-go="online">Play with friends</button>
+     <button class="btn play" id="playBtn">Play</button>
+    </div>
+    <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
+   </div>
+  </div>`;
   for(const b of t.querySelectorAll('[data-go]'))b.onclick=()=>{this.sfx('ui');this.go(b.dataset.go)};
   $('playBtn').onclick=()=>{this.sfx('ui');this.boardThen(()=>this.startOffline())};
-  setInterval(()=>{if(this.screen==='title')this.updateStage()},1400);
+  $('slName').onchange=e=>{this.profile.name=e.target.value.trim()||'Player';this.saveProfile();this.updateStage()};
+  $('slBots').oninput=e=>{this.profile.bots=+e.target.value;$('slBotN').textContent=this.profile.bots;this.saveProfile()};
+  const dd=$('slDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.profile.diff=d;this.saveProfile();this.refreshChips(dd,d);this.sfx('ui')};dd.appendChild(c)}
+  const md=$('slMode');for(const k of MODE_KEYS){const c=h(`<span class="chip" data-k="${k}">${MODES[k].name}</span>`);c.onclick=()=>{this.profile.mode=k;this.saveProfile();this.refreshMode();this.sfx('ui')};md.appendChild(c)}
+  $('slFill').onclick=()=>{this.profile.fill=!this.profile.fill;this.saveProfile();this.refreshMode();this.sfx('click')};
  }
- enter_title(){this.updateStage(true);const P=this.profile;$('modeSub').textContent=(P.bots>0?'Solo vs '+P.bots+' bots':'Free roam – no bots')+' · '+P.diff}
- updateStage(){const c=this.profile.char;const cd=CHARS.find(x=>x.id===c);
-  const nm=$('stageName');nm.textContent=this.profile.name;nm.style.color=this.profile.nameColor;$('stageRole').textContent=cd.name+' · '+cd.role;
-  $('pmImg').src=IMG[c].front;$('pmName').textContent=this.profile.name;}
-
+ enter_title(){const P=this.profile;this.updateStage();$('slName').value=P.name;$('slBots').value=P.bots;$('slBotN').textContent=P.bots;this.refreshChips($('slDiff'),P.diff);this.refreshMode()}
+ refreshMode(){const P=this.profile;this.markChips($('slMode'),P.mode);$('slFill').classList.toggle('on',!!P.fill);$('slFillRow').style.display=P.mode==='solo'?'none':'flex'}
+ markChips(box,key){for(const c of box.children)c.classList.toggle('sel',c.dataset.k===key)}
+ updateStage(){
+  const P=this.profile,cd=CHARS.find(x=>x.id===P.char)||CHARS[0];
+  $('slImg').src=IMG[cd.id].front;$('slArt').style.backgroundImage=`url('${charArt(cd.id)}')`;
+  const n=$('slHero');n.textContent=P.name;n.style.color=P.nameColor||'#fff';
+  $('slRole').textContent=cd.name+' · '+cd.role;
+  $('slInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div><div class="sl-ab">${cd.ab.map(a=>`<span>${esc(a.n)}</span>`).join('')}</div>`;
+ }
  exit(){try{window.close()}catch(e){}this.toast('You can now close this tab. Thanks for playing!');}
  back(btn){const b=h(`<button class="backbtn">&#9664; Back</button>`);b.onclick=()=>{this.sfx('ui');this.go('title')};return b} mkTile(o){
   const d=h(`<div class="tile ${o.sel?'sel':''}" style="--rc:${o.rc}"><div class="tp">${o.pic}</div><div class="tn">${o.label}</div><div class="tick">&#10003;</div></div>`);
@@ -116,20 +146,7 @@ class App{
    const t=this.mkTile({rc:RARITY[rar[c.id]||3].c,pic:`<div class="cart" style="background-image:url('${charArt(c.id)}')"></div><img src="${IMG[c.id].front}" alt="">`,label:c.name,sel:sel()===c.id,fn:()=>{onPick(c.id);for(const x of box.children)x.classList.remove('sel');t.classList.add('sel')}});
    box.appendChild(t)}
   return box}
- buildOffline(){
-  const p=$('offline');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Game Mode</h2><div id="offBack"></div></div>
-  <div class="mode-grid"><div class="mode-big sel"><div class="art"><img id="offArt" alt=""></div><div class="body"><span class="badge">SOLO</span><h3>Battle Royale</h3><p>Drop from the battle bus, loot chests, and outlast the storm against bots. Plays fully offline.</p></div><div class="tick">&#10003;</div></div>
-   <button class="mode-big link" id="offOnline"><div class="art online">&#128101;</div><div class="body"><span class="badge b2">PARTY</span><h3>Online Party</h3><p>Create a private lobby and play with friends across the internet.</p></div></button>
-   <div class="pg-card opts"><div class="k">Match settings</div><div class="sub">Name</div><input type="text" id="offName" maxlength="14"><div class="sub" style="margin-top:12px">Bots: <b id="botN" style="color:var(--yl)">19</b></div><input type="range" id="offBots" min="0" max="39" style="accent-color:var(--cy);width:100%"><div class="sub" style="margin-top:12px">Difficulty</div><div id="offDiff"></div><div class="tip">0 bots lets you explore the island. Change your outfit in the Locker.</div><button class="btn play sm" id="offGo" style="margin-top:14px;align-self:flex-start">Drop In</button></div></div></div>`;
-  $('offBack').appendChild(this.back());
-  const nm=$('offName');nm.onchange=()=>{this.profile.name=nm.value.trim()||'Player';this.saveProfile()};
-  const bots=$('offBots'),bn=$('botN');bots.oninput=()=>{bn.textContent=bots.value;this.profile.bots=+bots.value;this.saveProfile()};
-  const dd=$('offDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.profile.diff=d;this.saveProfile();this.refreshChips(dd,d);this.sfx('ui')};dd.appendChild(c)}
-  $('offOnline').onclick=()=>{this.sfx('ui');this.go('online')};
-  $('offGo').onclick=()=>{nm.onchange();this.startOffline()}
- }
  refreshChips(box,val){for(const c of box.children)c.classList.toggle('sel',c.textContent===val)}
- enter_offline(){$('offName').value=this.profile.name;$('offBots').value=this.profile.bots;$('botN').textContent=this.profile.bots;this.refreshChips($('offDiff'),this.profile.diff);$('offArt').src=IMG[this.profile.char].front}
  buildLocker(){
   const p=$('locker');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Locker</h2><div id="lkBack"></div></div>
   <div class="lk-body"><div class="lk-prev"><div class="cart" id="lkArt"></div><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div></div>
@@ -250,24 +267,24 @@ class App{
  }
  // ---------- starting matches
  makeCfg(role,net,seed,list,myId,diff){return{role,net,seed,diff,myId,ents:list}}
- // Play / Board Bus: the starter island's bus flies off, the screen fades out, then the match starts
+// Board Bus (party lobby) flies the bus off over the island; Play (solo) just fades out. Either way the match starts after the fade.
  boardThen(fn){
   if(this.boarding)return;this.boarding=true;this.sfx('ui');
-  this.starter.board(()=>{
-   const f=$('boardFade');f.classList.add('show');
+  const finish=()=>{const f=$('boardFade');f.classList.add('show');
    setTimeout(()=>{try{fn()}finally{this.boarding=false;this.starter.reset()}
-    requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('show')))},650)});
+    requestAnimationFrame(()=>requestAnimationFrame(()=>f.classList.remove('show')))},650)};
+  if(this.screen==='lobby')this.starter.board(finish);else finish();
  }
  startOffline(){
-  this.audio.init();this.audio.resume();const n=this.profile.bots;const ents=[{id:0,name:this.profile.name,char:this.profile.char,cos:this.cos}];
-  const roster=makeBotRoster(n);
-  for(let i=0;i<n;i++)ents.push({id:i+1,name:roster[i].name,char:roster[i].char,bot:true,persona:roster[i].persona,cos:roster[i].cos});
-  for(const e of ents)if(e.team===undefined)e.team=-(e.id+1);   // unique team per unaffiliated entity: nobody is an ally by accident
-  this.net=new LocalNet();this.beginGame(this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,0,this.profile.diff));
+  this.audio.init();this.audio.resume();const P=this.profile;
+  const ents=buildEntrants({mode:P.mode,humans:[{name:P.name,char:P.char,cos:this.cos,hostMe:true}],roster:makeBotRoster(P.bots),fill:P.fill});
+  const me=ents.find(e=>e.hostMe);
+  this.net=new LocalNet();const cfg=this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,me.id,P.diff);cfg.mode=P.mode;
+  this.beginGame(cfg);
  }
  beginGame(cfg){
   for(const el of document.querySelectorAll('#ui>.screen'))el.classList.remove('show');$('nav').classList.remove('show');
-  this.game.start(cfg);this.net=cfg.net;this.playing=true;this.paused=false;this.endCursor=false;$('bigmap').style.display='none';
+  this.game.teamMode=!!cfg.mode&&cfg.mode!=='solo';this.game.start(cfg);this.net=cfg.net;this.playing=true;this.paused=false;this.endCursor=false;$('bigmap').style.display='none';
   if(this.net)this.net.onMsg=(f,m)=>{
    if(m.t==='toLobby'){this.leaveMatch();return}
    if(m.t==='quit'){if(this.playing&&this.game.peerLeft)this.game.peerLeft(f);return}
@@ -302,7 +319,7 @@ class App{
  hostLobby(){
   this.saveOnName();$('onErr').textContent='Creating lobby…';const net=new Net();this.net=net;
   net.host((err,code)=>{if(err){$('onErr').textContent='Could not create lobby ('+err+'). Check your internet connection.';return}
-   this.lobby={host:true,code,players:[{pid:'host',name:this.profile.name,char:this.profile.char,cos:this.cos}],bots:0,diff:'Normal'};this.lobbyActive=true;this.go('lobby')});
+   this.lobby={host:true,code,players:[{pid:'host',name:this.profile.name,char:this.profile.char,cos:this.cos}],bots:0,diff:'Normal',mode:this.profile.mode,fill:this.profile.fill};this.lobbyActive=true;this.go('lobby')});
   net.onMsg=(pid,m)=>this.lobbyMsgHost(pid,m);this.lobbyOnMsg=net.onMsg;
   net.onLeave=pid=>{if(!this.lobby)return;this.lobby.players=this.lobby.players.filter(p=>p.pid!==pid);if(this.playing)this.game.peerLeft(pid);else this.lobbyUpdate()};
  }
@@ -316,54 +333,78 @@ class App{
   this.saveOnName();code=(code||'').trim().toUpperCase();if(code.length<4){$('onErr').textContent='Enter the 5-letter room code';return}
   $('onErr').textContent='Connecting…';const net=new Net();this.net=net;
   net.join(code,err=>{if(err){$('onErr').textContent=err==='peer-unavailable'?'Room not found – check the code.':err==='timeout'?'Connection timed out.':'Could not connect ('+err+').';this.net=null;return}
-   this.lobby={host:false,code,players:[],bots:0,diff:'Normal'};this.lobbyActive=true;net.toHost({t:'hello',name:this.profile.name,char:this.profile.char,cos:this.cos});this.go('lobby')});
+   this.lobby={host:false,code,players:[],bots:0,diff:'Normal',mode:'solo',fill:true};this.lobbyActive=true;net.toHost({t:'hello',name:this.profile.name,char:this.profile.char,cos:this.cos});this.go('lobby')});
   net.onMsg=(f,m)=>{
    if(this.playing){this.game.onNetMessage(f,m);return}
-   if(m.t==='lobby'){this.lobby.players=m.players;this.lobby.bots=m.bots;this.lobby.diff=m.diff;this.lobby.myPid=m.you;this.lobbyUpdate()}
+   if(m.t==='lobby'){this.lobby.players=m.players;this.lobby.bots=m.bots;this.lobby.diff=m.diff;this.lobby.mode=m.mode||'solo';this.lobby.fill=!!m.fill;this.lobby.myPid=m.you;this.lobbyUpdate()}
    else if(m.t==='start'){this.startOnlineClient(m)}
    else if(m.t==='full'){this.toast('Lobby is full');this.leaveLobby()}
    else if(m.t==='toLobby'){this.leaveMatch()}};
   this.lobbyOnMsg=net.onMsg;
   net.onClosed=()=>{this.toast('Disconnected from host');if(this.playing){this.playing=false;this.game.running=false;this.hud.hide();if(document.pointerLockElement)document.exitPointerLock();for(const id of ['elim','victory'])$(id).style.display='none'}this.leaveLobby(true)};
  }
- buildLobby(){
-  const p=$('lobby');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Party Lobby</h2><div><button class="btn red sm" id="lbLeave">Leave</button></div></div>
-  <div class="lb2"><div class="lb2-main"><div class="codebar"><div><div class="sub">Room code – share with friends</div><div class="code" id="lbCode">-----</div></div><div class="col"><button class="btn sm sec" id="lbCopy">Copy Code</button><button class="btn sm sec" id="lbInvite">Copy Invite Link</button></div></div>
-  <div class="sub" style="margin:18px 0 8px">Party</div><div class="plist" id="lbPlayers"></div>
-  <div class="sub" style="margin:18px 0 8px">Your outfit</div><div id="lbChars"></div></div>
-  <div class="pg-card lb2-side"><div id="lbHostCtl"><div class="k">Match settings</div><div class="sub">Bots: <b id="lbBotN" style="color:var(--yl)">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0" style="accent-color:var(--cy);width:100%"><div class="sub" style="margin-top:12px">Bot difficulty</div><div id="lbDiff"></div><button class="btn play" id="lbStart" style="margin-top:18px">Board Bus</button></div><div id="lbWait" class="sub" style="display:none">Waiting for host to start…</div></div></div></div>`;
-
+buildLobby(){
+  const p=$('lobby');
+  p.innerHTML=`<div class="pl-top">
+   <div class="pl-tt"><span class="lb-chip">Online Party</span><h2>Party Lobby</h2><div class="sub" id="lbModeTxt">Walk the island while your squad gathers</div></div>
+   <div class="pl-code"><div><div class="sub">Room code</div><div class="code" id="lbCode">-----</div></div><div class="col"><button class="btn sm sec" id="lbCopy">Copy code</button><button class="btn sm sec" id="lbInvite">Invite link</button></div></div>
+   <button class="btn red sm" id="lbLeave">Leave</button>
+  </div>
+  <div class="pl-main">
+   <aside class="glass pl-side">
+    <div class="pl-h"><span class="k">Squad</span><b id="lbCount"></b></div>
+    <div class="pl-slots" id="lbPlayers"></div>
+   </aside>
+   <div class="pl-gap"><div class="glass pl-herobar"><div class="pl-h"><span class="k">Your hero</span></div><div id="lbChars"></div></div></div>
+   <aside class="glass pl-side">
+    <div id="lbHostCtl">
+     <div class="pl-h"><span class="k">Match settings</span></div>
+     <div class="sl-f"><div class="sl-lab"><span>Mode</span></div><div class="sl-chips" id="lbMode"></div></div><div class="sl-row" id="lbFillRow"><span class="sl-lab">Fill teammates with bots</span><div class="tog" id="lbFill"></div></div><div class="sl-f"><div class="sl-lab"><span>Bots</span><b id="lbBotN">0</b></div><input type="range" id="lbBots" min="0" max="30" value="0"></div>
+     <div class="sl-f"><div class="sl-lab"><span>Bot difficulty</span></div><div class="sl-chips" id="lbDiff"></div></div>
+     <button class="btn play" id="lbStart">Board Bus</button>
+    </div>
+    <div id="lbWait" class="pl-wait">Waiting for the host to start…</div>
+   </aside>
+  </div>
+  <div class="pl-foot"><span class="lb-keys"><span>WASD walk</span><span>&larr; &rarr; turn</span><span>G dance</span></span></div>`;
   $('lbLeave').onclick=()=>this.leaveLobby();
   $('lbCopy').onclick=()=>{this.copy(this.lobby.code);this.toast('Room code copied!')};
   $('lbInvite').onclick=()=>{const u=location.href.split('#')[0]+'#join='+this.lobby.code;this.copy(u);this.toast('Invite link copied!')};
   $('lbBots').oninput=e=>{this.lobby.bots=+e.target.value;$('lbBotN').textContent=e.target.value;this.lobbyUpdate(true)};
   const dd=$('lbDiff');for(const d of ['Easy','Normal','Hard']){const c=h(`<span class="chip">${d}</span>`);c.onclick=()=>{this.lobby.diff=d;this.lobbyUpdate()};dd.appendChild(c)}
+  const md=$('lbMode');for(const k of MODE_KEYS){const c=h(`<span class="chip" data-k="${k}">${MODES[k].name}</span>`);c.onclick=()=>{if(this.lobby.host){this.lobby.mode=k;this.lobbyUpdate()}};md.appendChild(c)}
+  $('lbFill').onclick=()=>{if(this.lobby.host){this.lobby.fill=!this.lobby.fill;this.lobbyUpdate();this.sfx('click')}};
   $('lbStart').onclick=()=>this.boardThen(()=>this.startOnlineHost());
  }
  copy(t){try{navigator.clipboard.writeText(t)}catch(e){const i=document.createElement('input');i.value=t;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove()}}
  enter_lobby(){this.lobbyUpdate(false,true)}
- lobbyUpdate(noBroadcast,full){
-  const L=this.lobby;if(!L||this.screen!=='lobby'&&!full&&this.screen!=='lobby')return;
+lobbyUpdate(noBroadcast,full){
+  const L=this.lobby;if(!L||this.screen!=='lobby'&&!full)return;
   $('lbCode').textContent=L.code;$('lbHostCtl').style.display=L.host?'block':'none';$('lbWait').style.display=L.host?'none':'block';
   $('lbBots').value=L.bots;$('lbBotN').textContent=L.bots;this.refreshChips($('lbDiff'),L.diff);
-  {const n=L.players.length+(L.bots?1:0);let html=L.players.map(p=>`<div class="pslot"><img src="${IMG[p.char]?IMG[p.char].front:''}" alt="">${p.pid==='host'?'<span class="badge">HOST</span>':''}<div class="pn" style="color:${p.cos&&p.cos.nameColor||'#fff'}">${p.name}</div></div>`).join('');
-   if(L.bots)html+=`<div class="pslot bots"><span class="bi">&#129302;</span><div class="pn">${L.bots} bot${L.bots>1?'s':''} · ${L.diff}</div></div>`;
-   for(let i=n;i<4;i++)html+=`<div class="pslot empty"><span class="bi">+</span><div class="pn">Open slot</div></div>`;$('lbPlayers').innerHTML=html}
+  {const md=MODES[L.mode]||MODES.solo;$('lbModeTxt').textContent=md.name+' · '+md.sub+(L.mode!=='solo'&&L.fill?' · empty slots get bots':'');this.markChips($('lbMode'),L.mode);$('lbFill').classList.toggle('on',!!L.fill);$('lbFillRow').style.display=L.mode==='solo'?'none':'flex'}
+  $('lbCount').textContent=L.players.length+' / 8';
+  const n=L.players.length+(L.bots?1:0);
+  let html=L.players.map(p=>{const host=p.pid==='host',col=(p.cos&&p.cos.nameColor)||'#fff';
+   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[p.char].front:''}" alt=""><div class="pl-who"><div class="pn" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
+  if(L.bots)html+=`<div class="pl-slot"><span class="bi">&#129302;</span><div class="pl-who"><div class="pn">${L.bots} bot${L.bots>1?'s':''}</div><div class="ps">${esc(L.diff)} bots</div></div></div>`;
+  for(let i=n;i<4;i++)html+=`<div class="pl-slot empty"><span class="bi">+</span><div class="pl-who"><div class="pn">Open slot</div><div class="ps">Invite a friend</div></div></div>`;
+  $('lbPlayers').innerHTML=html;
   const box=$('lbChars');box.innerHTML='';box.appendChild(this.charPicker(()=>this.profile.char,id=>{this.profile.char=id;this.saveProfile();if(L.host){const me=L.players.find(x=>x.pid==='host');if(me)me.char=id;this.lobbyUpdate()}else this.net.toHost({t:'setchar',char:id})},true));
-  if(L.host&&!noBroadcast||L.host&&noBroadcast){this.net.broadcast({t:'lobby',players:L.players,bots:L.bots,diff:L.diff})}
+  if(L.host)this.net.broadcast({t:'lobby',players:L.players,bots:L.bots,diff:L.diff,mode:L.mode,fill:L.fill});
  }
  leaveLobby(silent){this.lobbyActive=false;if(this.net&&this.net.close){this.net.close()}this.net=null;this.lobby=null;this.go('title')}
  startOnlineHost(){
-  const L=this.lobby;const ents=[];let id=0;const roster=makeBotRoster(L.bots);
-  for(const p of L.players){ents.push({id:id,name:p.name,char:p.char,cos:p.cos,team:0,peer:p.pid==='host'?undefined:p.pid,hostMe:p.pid==='host'});p.eid=id;id++}
-  for(let i=0;i<L.bots;i++){ents.push({id:id++,name:roster[i].name,char:roster[i].char,bot:true,persona:roster[i].persona,cos:roster[i].cos})}
-  for(const e of ents)if(e.team===undefined)e.team=-(e.id+1);
+  const L=this.lobby;
+  const humans=L.players.map(p=>({pid:p.pid,name:p.name,char:p.char,cos:p.cos,hostMe:p.pid==='host'}));
+  const ents=buildEntrants({mode:L.mode,humans,roster:makeBotRoster(L.bots),fill:L.fill});
   const seed=(Math.random()*1e9)|0;
-  for(const p of L.players)if(p.pid!=='host')this.net.send(p.pid,{t:'start',seed,diff:L.diff,ents:ents.map(e=>({id:e.id,name:e.name,char:e.char,bot:e.bot,cos:e.cos,team:e.team})),you:p.eid});
-  const me=L.players.find(p=>p.pid==='host');
-  this.beginGame(this.makeCfg('host',this.net,seed,ents,me.eid,L.diff));
+  const slim=ents.map(e=>({id:e.id,name:e.name,char:e.char,bot:e.bot,cos:e.cos,team:e.team}));
+  for(const e of ents){if(e.pid&&e.pid!=='host'){this.net.send(e.pid,{t:'start',seed,diff:L.diff,mode:L.mode,ents:slim,you:e.id});const p=L.players.find(x=>x.pid===e.pid);if(p)p.eid=e.id}}
+  const me=ents.find(e=>e.hostMe);
+  const cfg=this.makeCfg('host',this.net,seed,ents,me.id,L.diff);cfg.mode=L.mode;this.beginGame(cfg);
  }
- startOnlineClient(m){this.audio.init();this.beginGame(this.makeCfg('client',this.net,m.seed,m.ents,m.you,m.diff))}
+ startOnlineClient(m){this.audio.init();const cfg=this.makeCfg('client',this.net,m.seed,m.ents,m.you,m.diff);cfg.mode=m.mode;this.beginGame(cfg)}
  // ---------- loop
  loop(now){
   requestAnimationFrame(t=>this.loop(t));
@@ -376,7 +417,7 @@ class App{
     if(act){g.update(dt)}else g.fx.update(dt);
     g.render(dt);
     this.hud.update(g,dt);
-   }else if(this.screen==='title'||this.screen==='lobby'){this.starter.update(dt,this.profile.char);this.starter.render()}else{g.renderMenu(dt)}
+   }else if(this.screen==='lobby'){this.starter.update(dt,this.profile.char);this.starter.render()}else{g.renderMenu(dt)}
   }catch(e){console.error(e);window.__err=(window.__err||'')+e.stack+'\n'}
   this.input.endFrame();
  }

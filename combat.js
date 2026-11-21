@@ -26,8 +26,8 @@ function makeShockMesh(){
  const bolt=new THREE.Mesh(new THREE.ConeGeometry(.1,.3,4),new THREE.MeshBasicMaterial({color:'#fff3a0'}));bolt.position.y=.27;g.add(bolt);
  return g}
 export const combatMethods={
- packFlags(e){return (e.crouch?1:0)|(e.sliding?2:0)|(e.sprinting?4:0)|(e.grounded?8:0)|(e.drop==='free'?16:0)|(e.drop==='glide'?32:0)|(e.drop==='bus'?64:0)|(e.use||e.eatT>0?128:0)|(e.stun>0?256:0)|(e.auraT>0?512:0)|((e.buffT>0||e.ts>0)?1024:0)|(e.dance>0?2048:0)|(e.slip>0?8192:0)|(e.swim?16384:0)|(e.cloakT>0?4096:0)|(e.coldT>0?32768:0)|(e.slowT>0?65536:0)|(e.cookT>0?131072:0)|(e.spicyT>0?262144:0)},
- unpackFlags(e,f){e.flags=f;e.crouch=!!(f&1);e.sliding=!!(f&2);e.sprinting=!!(f&4);e.grounded=!!(f&8);e.drop=(f&16)?'free':(f&32)?'glide':(f&64)?'bus':null;e.eatT=(f&128)?1:0;e.stun=(f&256)?1:0;e.auraT=(f&512)?1:0;e.buffT=(f&1024)?1:0;e.dance=(f&2048)?1:0;e.slip=(f&8192)?1:0;e.swim=!!(f&16384);e.cloakT=(f&4096)?1:0;e.coldT=(f&32768)?1:0;e.slowT=(f&65536)?1:0;e.cookT=(f&131072)?1:0;e.spicyT=(f&262144)?1:0},
+ packFlags(e){return (e.crouch?1:0)|(e.sliding?2:0)|(e.sprinting?4:0)|(e.grounded?8:0)|(e.drop==='free'?16:0)|(e.drop==='glide'?32:0)|(e.drop==='bus'?64:0)|(e.use||e.eatT>0?128:0)|(e.stun>0?256:0)|(e.auraT>0?512:0)|((e.buffT>0||e.ts>0)?1024:0)|(e.dance>0?2048:0)|(e.slip>0?8192:0)|(e.swim?16384:0)|(e.cloakT>0?4096:0)|(e.coldT>0?32768:0)|(e.slowT>0?65536:0)|(e.cookT>0?131072:0)|(e.spicyT>0?262144:0)|(e.knocked?524288:0)},
+ unpackFlags(e,f){e.flags=f;e.crouch=!!(f&1);e.sliding=!!(f&2);e.sprinting=!!(f&4);e.grounded=!!(f&8);e.drop=(f&16)?'free':(f&32)?'glide':(f&64)?'bus':null;e.eatT=(f&128)?1:0;e.stun=(f&256)?1:0;e.auraT=(f&512)?1:0;e.buffT=(f&1024)?1:0;e.dance=(f&2048)?1:0;e.slip=(f&8192)?1:0;e.swim=!!(f&16384);e.cloakT=(f&4096)?1:0;e.coldT=(f&32768)?1:0;e.slowT=(f&65536)?1:0;e.cookT=(f&131072)?1:0;e.spicyT=(f&262144)?1:0;e.knocked=!!(f&524288)},
  eyeOf(e){return e.pos.y+(e.sliding?.85:e.crouch?1.1:1.65)},
  curWeapon(e){const c=e.inv[e.cur];return c&&c.k==='w'?wstat(c.w,c.r):null},
  hbH(e){return (e.crouch||e.sliding)?HCROUCH:HSTAND},
@@ -92,7 +92,7 @@ export const combatMethods={
    const dx=dirs[p*3],dy=dirs[p*3+1],dz=dirs[p*3+2];
    let maxT=wd.range;const wh=W.rayWorld(ox,oy,oz,dx,dy,dz,maxT);if(wh)maxT=wh.t;
    let bestT=maxT,bestE=null,head=false;
-   for(const t of this.list){if(t===sh||!t.alive||t.drop==='bus')continue;const h=this.hbH(t);
+   for(const t of this.list){if(t===sh||!t.alive||t.drop==='bus'||this.isAlly(sh,t))continue;const h=this.hbH(t);
     const tt=rayCyl(ox,oy,oz,dx,dy,dz,t.pos.x,t.pos.y,t.pos.z,.46,h,bestT);if(tt<bestT){bestT=tt;bestE=t;const hy=oy+dy*tt;head=hy>t.pos.y+h-.5}}
    if(!bestE&&wh)this.onWorldHit(sh,wh,wd,ox+dx*bestT,oy+dy*bestT,oz+dz*bestT);
    const ex=ox+dx*bestT,ey=oy+dy*bestT,ez=oz+dz*bestT;if(p<8)ends.push([ex,ey,ez]);
@@ -113,7 +113,7 @@ export const combatMethods={
   this.hostMelee(e,wd,e.yaw,e.pitch,e.pos.x,this.eyeOf(e),e.pos.z,e.wi)},
  hostMelee(e,wd,yaw,pitch,x,y,z,wi){
   const fx=-Math.sin(yaw),fz=-Math.cos(yaw);let hit=false;
-  for(const t of this.list){if(t===e||!t.alive||t.drop==='bus')continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d>wd.range+.5)continue;if(d>.6&&(dx*fx+dz*fz)/d<.45)continue;if(Math.abs(t.pos.y+.9-y)>2)continue;
+  for(const t of this.list){if(t===e||!t.alive||t.drop==='bus'||this.isAlly(e,t))continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d>wd.range+.5)continue;if(d>.6&&(dx*fx+dz*fz)/d<.45)continue;if(Math.abs(t.pos.y+.9-y)>2)continue;
    this.damage(t,wd.dmg*this.dmgMulOf(e),e,wi,false,[t.pos.x,t.pos.y+1.2,t.pos.z]);hit=true;
    this.emit({k:'st',i:t.id,s:'kb',vx:fx*wd.kb,vy:2,vz:fz*wd.kb},t.id);}
   if(!hit&&wd.n==='Pickaxe'&&!e.bot)this.harvestSwing(e,wd,yaw,pitch,x,y,z);
@@ -183,22 +183,27 @@ export const combatMethods={
   t.hp-=rem;t.lastHit=this.t;t.lastBy=by?by.id:-1;if(t.bot)this.onBotHit&&this.onBotHit(t,by);
   const p=pos||[t.pos.x,t.pos.y+1,t.pos.z];
   this.emit({k:'hit',t:t.id,by:by?by.id:-1,d:Math.round(amount),h:head?1:0,sh:shHit,hp:rem>0?1:0,x:p[0],y:p[1],z:p[2]});
-  if(t.hp<=0){t.hp=0;this.killEnt(t,by,wid,head)}},
+  if(t.hp<=0){t.hp=0;if(this.canKnock(t))this.knockEnt(t,by,wid,head);else this.killEnt(t,by,wid,head)}},
  killEnt(t,by,wid,head){
-  if(!t.alive)return;t.alive=false;t.deadT=0;t.use=null;
-  const left=this.aliveCount();t.place=left+1;if(by&&by!==t)by.kills++;
-  this.emit({k:'kill',v:t.id,by:by&&by!==t?by.id:-1,w:wid,h:head?1:0,p:left+1});
+  if(!t.alive)return;t.alive=false;t.knocked=false;t.deadT=0;t.use=null;
+  t.place=this.placeOf(t);if(by&&by!==t)by.kills++;
+  this.emit({k:'kill',v:t.id,by:by&&by!==t?by.id:-1,w:wid,h:head?1:0,p:t.place});
   // drop loot
   for(let i=0;i<6;i++){const s=t.inv[i];if(!s)continue;if(s.k==='w'&&s.w===0)continue;
    const a=Math.random()*6.283;this.spawnLoot(s.k==='w'?{k:'w',w:s.w,r:s.r,mag:s.mag,d:1}:{k:'i',id:s.id,n:s.n},t.pos.x+Math.cos(a)*1.2,t.pos.z+Math.sin(a)*1.2,t.pos.y+.1);t.inv[i]=null}
   for(const k in t.ammo)if(t.ammo[k]>0){const a=Math.random()*6.283;this.spawnLoot({k:'a',t:k,n:t.ammo[k]},t.pos.x+Math.cos(a)*1.5,t.pos.z+Math.sin(a)*1.5,t.pos.y+.1);t.ammo[k]=0}
-  this.checkWin()},
+  this.dropCard(t);this.checkWin()},
  checkWin(){
   if(this.over||this.role==='client'||this.t<8)return;
-  const alive=this.list.filter(e=>e.alive);const humans=this.list.filter(e=>!e.bot);const humAlive=humans.filter(e=>e.alive);
-  if(this.list.length>=2&&alive.length<=1){const w=alive[0];this.emit({k:'end',win:w?w.id:-1});}
-  else if(this.list.length>=2&&humAlive.length===0&&humans.length>0){/* all humans dead: keep sim running for spectating */}
+  // free roam (one team only, e.g. a party with no opponents) never ends by itself
+  if(new Set(this.list.map(e=>e.team)).size<2)return;
+  const alive=this.list.filter(e=>e.alive&&!e.knocked);
+  if(new Set(alive.map(e=>e.team)).size<=1){const w=alive[0];this.emit({k:'end',win:w?w.id:-1,tm:w?w.team:-999});}
  },
+ // true when a and b are on the same team (never true for the same entity, or in solo where every entity has its own team)
+ isAlly(a,b){return !!a&&!!b&&a!==b&&a.team===b.team},
+ // place for someone who just went out: one more than the number of teams still standing
+ placeOf(t){const teams=new Set(this.list.filter(e=>e.alive&&!e.knocked&&e!==t).map(e=>e.team));return teams.size+1},
  // ================= abilities
  useAbility(e,i){
   if(!e.alive||e.drop||e.cd[i]>0||e.stun>0||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0||e.use)return false;
@@ -226,7 +231,7 @@ export const combatMethods={
   const cid=e.cdef.id;if(e.cdef.hero){this.heroEffect(e,i,x,y,z,yaw,extra);return}
   if(cid==='coolguy15'&&i===2){
    const bx=x,bz=z;this.emit({k:'burst',x:bx,y,z:bz});
-   for(const t of this.list){if(t===e||!t.alive||t.drop==='bus')continue;const dx=t.pos.x-bx,dz=t.pos.z-bz,d=Math.hypot(dx,dz);if(d<4.5&&Math.abs(t.pos.y-y)<3){this.damage(t,14,e,-2,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*16,vy:5,vz:dz/l*16},t.id)}}}
+   for(const t of this.list){if(t===e||!t.alive||t.drop==='bus'||this.isAlly(e,t))continue;const dx=t.pos.x-bx,dz=t.pos.z-bz,d=Math.hypot(dx,dz);if(d<4.5&&Math.abs(t.pos.y-y)<3){this.damage(t,14,e,-2,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*16,vy:5,vz:dz/l*16},t.id)}}}
   else if(cid==='zach'&&i===1){
    // find the target the lunge reaches
    const fx=-Math.sin(yaw),fz=-Math.cos(yaw);let best=null,bd=7;
@@ -241,7 +246,7 @@ export const combatMethods={
   if(net)this.net.toHost({t:'slam',x:e.pos.x,y:e.pos.y,z:e.pos.z});else this.hostSlam(e,e.pos.x,e.pos.y,e.pos.z)},
  hostSlam(e,x,y,z){
   this.emit({k:'slam',x,y,z});
-  for(const t of this.list){if(t===e||!t.alive||t.drop==='bus')continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d<5&&Math.abs(t.pos.y-y)<3){this.damage(t,25,e,-1,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*10,vy:7,vz:dz/l*10},t.id)}}
+  for(const t of this.list){if(t===e||!t.alive||t.drop==='bus'||this.isAlly(e,t))continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d<5&&Math.abs(t.pos.y-y)<3){this.damage(t,25,e,-1,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*10,vy:7,vz:dz/l*10},t.id)}}
   const wd={dmg:24,splash:0,speed:22,grav:0,bounce:0,fuse:0,kb:6,shard:1,life:.7};
   for(let i=0;i<16;i++){const a=i/16*6.2832;this.spawnProj(e,x,y+.9,z,Math.cos(a)*22,0,Math.sin(a)*22,wd,-3)}},
  // timers on abilities run for every shooter (host side) – eat heal / bite resolution
@@ -271,7 +276,7 @@ export const combatMethods={
      const dx=nx-p.x,dy=ny-p.y,dz=nz-p.z,dl=Math.hypot(dx,dy,dz)||1e-6;const ux=dx/dl,uy=dy/dl,uz=dz/dl;
      const wh=W.rayWorld(p.x,p.y,p.z,ux,uy,uz,dl);
      let bestT=wh?wh.t:Infinity,bestE=null;
-     for(const t of this.list){if(!t.alive||t.drop==='bus')continue;if(p.food&&(t.id===p.owner||(p.food!=='burger'&&t.team===p.team)))continue;if(t.id===p.owner&&p.age<.25)continue;if(t.id===p.owner&&!p.shard&&p.direct&&p.age<.5)continue;if(p.shard&&t.id===p.owner)continue;
+     for(const t of this.list){if(!t.alive||t.drop==='bus')continue;if(!p.food&&this.isAlly(this.ents.get(p.owner),t))continue;if(p.food&&(t.id===p.owner||(p.food!=='burger'&&t.team===p.team)))continue;if(t.id===p.owner&&p.age<.25)continue;if(t.id===p.owner&&!p.shard&&p.direct&&p.age<.5)continue;if(p.shard&&t.id===p.owner)continue;
       const tt=rayCyl(p.x,p.y,p.z,ux,uy,uz,t.pos.x,t.pos.y,t.pos.z,.55,this.hbH(t)+.1,Math.min(dl,bestT));if(tt<bestT){bestT=tt;bestE=t}}
      if(bestE&&(p.direct||p.stick||p.shard)){
       const hx=p.x+ux*bestT,hy=p.y+uy*bestT,hz=p.z+uz*bestT;p.x=hx;p.y=hy;p.z=hz;
@@ -311,7 +316,7 @@ export const combatMethods={
   const col=p.sp2==='banana'?'#ffe14a':p.sp2==='ball'?'#3cd0ff':p.sp2==='chicken'?'#fff08a':p.kind==='boogie'?'#ff55ff':p.kind==='frost'?'#8fe9ff':'#ff9a3c';
   this.emit({k:'ex',x:p.x,y:p.y,z:p.z,r:p.splash,c:col});
   this.structBlast(p.x,p.y,p.z,p.splash,p.dmg*1.5);
-  for(const t of this.list){if(!t.alive||t.drop==='bus')continue;
+  for(const t of this.list){if(!t.alive||t.drop==='bus'||(!p.food&&this.isAlly(this.ents.get(p.owner),t)))continue;
    const dx=t.pos.x-p.x,dy=t.pos.y+.9-p.y,dz=t.pos.z-p.z,d=Math.hypot(dx,dy,dz);const rr=p.splash+.5;if(d>rr&&t!==direct)continue;
    if(t!==direct&&d>1.6&&!W.losClear(p.x,p.y+.2,p.z,t.pos.x,t.pos.y+.9,t.pos.z))continue;
    let f=t===direct?1:clamp(1-(d/rr)*.65,.25,1);let dmg=p.dmg*f;if(t.id===p.owner)dmg*=.45;
