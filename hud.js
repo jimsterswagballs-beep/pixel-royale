@@ -4,7 +4,7 @@ import {abilityIcon} from './icons.js';
 import * as W from './world.js';
 import {wstat,IMG} from './shared.js';
 import {MATS,MAT_KEYS} from './materials.js';
-import {REVIVE_T,KNOCK_T,VAN_READY} from './knock.js';
+import {REVIVE_T,REVIVE_RANGE,KNOCK_T,CARD_T,VAN_T,VAN_READY,VAN_ACTIVE} from './knock.js';
 
 // one glyph per weapon type and per ability, used in the loadout and ability cards
 const WICON={melee:'⛏',ar:'🔫',smg:'🔫',sg:'💥',sn:'🎯',pi:'🔫',ex:'🚀'};
@@ -54,7 +54,7 @@ export class HUD{
   const me=g.me;this.abilEls=[];const ab=this.q('#abil');ab.innerHTML='';
   me.cdef.ab.forEach((a,i)=>{const d=el('div','abil',`<div class="kk"></div><div class="ico">${a.ic?'<img alt="" src="'+abilityIcon(a)+'">':(ABIL_ICON[a.n]||['①','②','③'][i]||'✦')}</div><div class="nx"></div><div class="an">${a.n}</div><div class="cdo"></div><div class="cdt"></div>`);ab.appendChild(d);this.abilEls.push(d)});
   this.slotsKey='';this.announce('Battle Bus is launching – press SPACE to jump!','#ffd23d');this.board=false;
-  this.finished=false;$('elim').style.display='none';$('victory').style.display='none';
+  this.finished=false;this.pendingElim=null;this.elimShown=false;$('elim').style.display='none';$('victory').style.display='none';
  }
  hide(){this.root.style.display='none';this.clearStormFx()}
  // drop last match's storm warnings: the purple storm vignette and the centre-screen storm banner
@@ -97,10 +97,12 @@ export class HUD{
 
  fmtTime(sec){sec=Math.max(0,Math.floor(sec));return Math.floor(sec/60)+':'+String(sec%60).padStart(2,'0')}
  statTiles(rows){return rows.map(([k,v])=>`<div class="es-st"><small>${k}</small><b>${v}</b></div>`).join('')}
- showElim(place,by,kills,g){setTimeout(()=>{if(g.over)return;const e=$('elim');e.style.display='flex';const r=this.app.lastReward||{total:0,why:''};
-   $('elimPlace').textContent='#'+place;$('elimOf').textContent='of '+g.list.length+' players';$('elimBy').textContent=by?'Eliminated by '+by:'Eliminated';
-   $('elimStats').innerHTML=this.statTiles([['Eliminations',kills],['Survived',this.fmtTime(g.deathT||g.t)],['Players left',g.aliveCount()]]);
-   $('elimTok').textContent=r.total?`+${r.total} Swag Tokens · ${r.why}`:'';this.app.showCursor(true)},1500)}
+ showElim(place,by,kills,g){this.pendingElim={place,by,kills,g,at:performance.now()}}
+ // the elimination card (Play Again, Spectate, Lobby)
+ elimCard(p){const g=p.g;if(g.over)return;const e=$('elim');e.style.display='flex';const r=this.app.lastReward||{total:0,why:''};
+   $('elimPlace').textContent='#'+p.place;$('elimOf').textContent='of '+g.list.length+' players';$('elimBy').textContent=p.by?'Eliminated by '+p.by:'Eliminated';
+   $('elimStats').innerHTML=this.statTiles([['Eliminations',p.kills],['Survived',this.fmtTime(g.deathT||g.t)],['Players left',g.aliveCount()]]);
+   $('elimTok').textContent=r.total?`+${r.total} Swag Tokens · ${r.why}`:'';this.app.showCursor(true)}
  showVictory(g){}
 
  onEnd(g,ev){this.finished=true;$('elim').style.display='none';const won=g.me.team===ev.tm;const v=$('victory');v.classList.toggle('lose',!won);v.style.display='flex';
@@ -182,50 +184,74 @@ export class HUD{
    return `<div class="tm${o.alive?'':' out'}${o.knocked?' kn':''}"><b>${esc(o.name)}</b>${st}</div>`}).join('');
   if(box.dataset.k!==rows){box.dataset.k=rows;box.innerHTML=`<div class="tt">Team</div>${rows}`}
  }
- // your own knock (countdown and being revived) or the revive you are doing
-
+  // ---- revive and reboot screens (team modes)
+ // your own knock (the downed panel), the reboot screen after an elimination, or a card for the revive you are doing
  updateKnock(g,me){
   const box=this.q('#knock');let html='';
   const vig=this.q('#vig');if(vig)vig.classList.toggle('knocked',!!(me.alive&&me.knocked));
-  const B=this.app.input.binds;
-  if(me.alive&&me.knocked){
-   this.renderRebootWait(g,me);html='';
-  }else{
+  const rb=this.q('#rbwait');
+  if(me.alive&&me.knocked){this.renderDowned(g,me)}
+  else if(this.rbWaiting(g,me)){this.renderReboot(g,me)}
+  else{
+   rb.style.display='none';rb.dataset.k='';
    const r=g.list.find(o=>o!==me&&o.alive&&o.knocked&&o.reviver===me.id);
-   if(r)html=`<div class="kn-card rv"><div class="kn-top"><span class="kn-t">Reviving ${esc(r.name)}</span></div><div class="kn-bar"><i style="width:${Math.min(100,r.reviveT/REVIVE_T*100)}%"></i></div></div>`;
+   if(r)html=`<div class="kn-card rv"><div class="kn-top"><span class="kn-t">Reviving ${esc(r.name)}</span><span class="kn-n">${Math.ceil(Math.max(0,REVIVE_T-r.reviveT))}s</span></div><div class="kn-bar"><i style="width:${Math.min(100,r.reviveT/REVIVE_T*100)}%"></i></div></div>`;
   }
   if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
   box.style.display=html?'flex':'none';
+  this.updateAfterDeath(g,me);
  }
- // Chaos Rising: the countdown to the next event
- chaosHud(g){
-  const el=this.q('#chaoslbl');
-  if(g.gm==='chaos'&&g.running&&!g.over&&g.chaosT!==undefined){el.style.display='block';el.textContent=`CHAOS RISING · next event in ${Math.max(0,Math.ceil(g.chaosT))}s`}else el.style.display='none';
+ // you are eliminated but a teammate can still reboot you
+ rbWaiting(g,me){return !!(g.teamMode&&!g.over&&me&&!me.alive&&[...g.cards.values()].some(c=>c.owner===me.id))}
+ // after an elimination: the reboot screen while a reboot is still possible, otherwise the elimination card
+ updateAfterDeath(g,me){
+  if(me.alive){this.pendingElim=null;this.elimShown=false;return}
+  if(this.rbWaiting(g,me)){$('elim').style.display='none';return}
+  // no reboot left: the elimination card (with what we know if the elimination record is missing)
+  const p=this.pendingElim||{place:me.place||0,by:null,kills:me.kills||0,g,at:-1e9};
+  if(!this.elimShown&&performance.now()-p.at>1500){this.elimShown=true;this.elimCard(p)}
+  }
+ setRb(box,html){if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}}
+ // teammates as chips: up, down (bleeding out) or out
+ mateChips(g,me){
+  const mates=g.list.filter(o=>o!==me&&o.team===me.team);
+  if(!mates.length)return '<span class="rb-m out">No teammates left</span>';
+  return mates.map(o=>{const st=!o.alive?'out':o.knocked?'down':'up';return `<span class="rb-m ${st}">${esc(o.name)}${st==='down'?' (down)':st==='out'?' (out)':''}</span>`}).join('');
  }
- // car HUD: your seat, car health and the keys (or a prompt when a car is close)
- carHud(g,me,B){
-  const el=this.q('#carhud');const c=g.carOf(me);
-  if(c){el.style.display='block';el.innerHTML=`<b>${c.spec.name} · ${c.seats[0]===me.id?'Driving':'Passenger'}</b> · <kbd>${keyLabel(B.interact)}</kbd> get out · <kbd>${keyLabel(B.carSeat)}</kbd> swap seat${c.burn?' · <span class="onfire">ON FIRE</span>':''}<div class="cbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i></div>`;return}
-  const n=me.alive&&!me.drop&&g.nearestCar?g.nearestCar(me,5):null;
-  if(n){el.style.display='block';el.innerHTML=`Press <kbd>${keyLabel(B.interact)}</kbd> to get in`}else el.style.display='none';
+ // the downed panel: bleed-out timer, the revive if a teammate is doing one, and what to do
+ renderDowned(g,me){
+  const box=this.q('#rbwait');box.className='rbs dn';box.style.display='flex';
+  const left=Math.ceil(Math.max(0,me.kT));const keyI=keyLabel(this.app.input.binds.interact);
+  const reviving=me.reviveT>0;
+  const msg=reviving?'<b>A teammate is reviving you. Stay still.</b>':`Crawl to cover. A standing teammate can revive you if they stay within ${REVIVE_RANGE} m and hold <kbd>${keyI}</kbd>.`;
+  const html=`<div class="rbs-head"><span class="rbs-tag dn">Downed</span><span class="rbs-time"><b>${left}</b>s to bleed out</span></div>`+
+   `<div class="rbs-bleed dn"><i style="width:${clamp(me.kT/KNOCK_T,0,1)*100}%"></i></div>`+
+   (reviving?`<div class="rbs-revbar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div>`:'')+
+   `<div class="rbs-msg">${msg}</div>`+
+   `<div class="rbs-mates">${this.mateChips(g,me)}</div>`;
+  this.setRb(box,html);
  }
- // waiting for reboot: shown while you are knocked (team modes). Countdown, your reboot card, vans and teammates.
- renderRebootWait(g,me){
-  const box=this.q('#rbwait');
-  if(!(me.alive&&me.knocked)){if(box.style.display!=='none'){box.style.display='none';box.dataset.k=''}return}
-  box.style.display='flex';
+ // the reboot screen: the three steps of getting you back, what is happening now, card and van times
+ renderReboot(g,me){
+  const box=this.q('#rbwait');box.className='rbs rb';box.style.display='flex';
   const card=[...g.cards.values()].find(c=>c.owner===me.id);
-  let cardTxt='You have no reboot card';
-  if(card)cardTxt=(card.carrier>=0?`Being carried by ${esc((g.ents.get(card.carrier)||{}).name||'a teammate')}`:'It is on the ground. A teammate can pick it up')+` · ${Math.ceil(Math.max(0,card.t))}s left`;
-  const mates=g.list.filter(o=>o!==me&&o.team===me.team).map(o=>{const st=!o.alive?'out':o.knocked?'down':'up';return `<span class="rb-m ${st}">${esc(o.name)}${st==='down'?' (down)':st==='out'?' (out)':''}</span>`}).join('');
-  const left=Math.ceil(Math.max(0,me.kT));
-  const html=`<div class="rb-card"><div class="rb-kick">Waiting for reboot</div>`+
-   `<div class="rb-ring" style="--p:${clamp(me.kT/KNOCK_T,0,1)*360}deg"><b>${left}</b><span>seconds</span></div>`+
-   `<div class="rb-line">${cardTxt}</div>`+
-   `<div class="rb-mates">${mates||'No teammates left'}</div>`+
-   (me.reviveT>0?`<div class="rb-rv"><div class="rb-bar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div>A teammate is reviving you…</div>`:'')+
-   `<div class="rb-tip">Teammates can revive you by holding <kbd>${keyLabel(this.app.input.binds.interact)}</kbd></div></div>`;
-  if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
+  const van=[...g.vans.values()].find(v=>v.state===VAN_ACTIVE&&v.card===card.id);
+  const carrier=card.carrier>=0?g.ents.get(card.carrier):null;
+  const stage=van?2:carrier?1:0;
+  const steps=[['Teammate finds your card',stage>=1,stage===0],['Card carried to a reboot van',stage>=2,stage===1],['Rebooted',false,stage===2]];
+  let line;
+  if(stage===0)line='Your card is on the ground. A teammate has to pick it up.';
+  else if(stage===1)line=`${esc(carrier?carrier.name:'A teammate')} is carrying your card to a reboot van.`;
+  else{const rn=(g.ents.get(van.user)||{}).name||'A teammate';line=`${esc(rn)} is rebooting you.`}
+  const vans=[...g.vans.values()];const ready=vans.filter(v=>v.state===VAN_READY).length;
+  const timeTxt=stage===2?`Reboot in ${Math.ceil(Math.max(0,van.t))}s`:`Card lasts ${Math.ceil(Math.max(0,card.t))}s`;
+  const html=`<div class="rbs-head"><span class="rbs-tag rb">Reboot pending</span><span class="rbs-time"><b>${Math.ceil(Math.max(0,card.t))}</b>s</span></div>`+
+   `<div class="rbs-bleed rb"><i style="width:${clamp(card.t/CARD_T,0,1)*100}%"></i></div>`+
+   `<div class="rbs-steps">${steps.map(([t,done,now])=>`<div class="rbs-step${done?' done':now?' now':''}">${done?'&#10003; ':''}${t}</div>`).join('')}</div>`+
+   `<div class="rbs-msg">${line}</div>`+
+   `<div class="rbs-foot"><span>${timeTxt}</span><span>Reboot vans ready: ${ready} of ${vans.length}</span></div>`+
+   `<div class="rbs-mates">${this.mateChips(g,me)}</div>`;
+  this.setRb(box,html);
  }
  hideElim(){$('elim').style.display='none'}
  // the reboot waypoint: a teammate's card on the ground, then a reboot van once you carry the card

@@ -771,3 +771,44 @@ body.look-drag{cursor:grabbing;user-select:none}
 #hud .kn-t,#hud .kn-top b,#hud .kn-s{font-style:normal!important;text-transform:none!important;letter-spacing:.2px!important}
 #hud .kn-s{font-family:'Segoe UI',Arial,sans-serif}
 #bm{width:min(64vh,64vw);height:min(64vh,64vw)}
+
+/* ===================== v26: revive and reboot screens =====================
+   Downed: a panel low on screen with the bleed-out timer, the revive and your teammates.
+   Reboot: a panel higher up with the three steps to get you back, what is happening now and the card and van times.
+   Reviving: a small card for the revive you are doing. The elimination card only shows when no reboot is possible. */
+#rbwait{position:fixed;inset:auto;left:50%;top:auto;bottom:150px;transform:translateX(-50%);width:min(540px,92vw);display:none;flex-direction:column;align-items:stretch;gap:10px;padding:16px 18px;border-radius:16px;background:rgba(34,6,12,.88);border:1px solid rgba(255,120,120,.42);box-shadow:0 14px 40px rgba(0,0,0,.5);color:#fff;z-index:25;pointer-events:none;text-shadow:0 1px 3px #000}
+#rbwait.rb{top:20%;bottom:auto;background:rgba(6,20,50,.9);border-color:rgba(140,200,255,.42)}
+.rbs-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
+.rbs-tag{font:italic 900 24px var(--disp,Impact),Arial Black,sans-serif;letter-spacing:1.5px;text-transform:uppercase}
+.rbs-tag.dn{color:#ff8a8a}
+.rbs-tag.rb{color:#9fd8ff}
+.rbs-time{font-size:13px;font-weight:800;color:#ffe0e0}
+.rbs.rb .rbs-time{color:#d6ecff}
+.rbs-time b{font-size:30px;font-weight:900;color:#fff;margin-right:4px}
+.rbs-bleed{height:10px;background:rgba(255,255,255,.14);border-radius:6px;overflow:hidden}
+.rbs-bleed i{display:block;height:100%;transition:width .25s linear}
+.rbs-bleed.dn i{background:linear-gradient(90deg,#ff4d4d,#ff9a6a)}
+.rbs-bleed.rb i{background:linear-gradient(90deg,#6ec6ff,#c4ecff)}
+.rbs-revbar{height:12px;background:rgba(0,0,0,.45);border-radius:6px;overflow:hidden;border:1px solid rgba(180,255,200,.7)}
+.rbs-revbar i{display:block;height:100%;background:linear-gradient(90deg,#4dff8a,#b6ffcc);transition:width .15s linear}
+.rbs-msg{font-size:14px;font-weight:700;line-height:1.45;color:#ffe6e6;text-align:center}
+.rbs.rb .rbs-msg{color:#e4f3ff}
+.rbs-msg b{color:#b6ffcc}
+.rbs-msg kbd{font-family:inherit;font-weight:900;background:rgba(255,255,255,.16);border-radius:5px;padding:1px 6px;color:#fff}
+.rbs-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rbs-step{padding:9px 6px;border-radius:10px;background:rgba(255,255,255,.08);font-size:12px;font-weight:800;text-align:center;color:#9fb6ff;line-height:1.25}
+.rbs-step.done{color:#b6ffcc;background:rgba(77,255,138,.16)}
+.rbs-step.now{color:#fff;background:rgba(255,210,61,.22);box-shadow:0 0 0 1px #ffd23d}
+.rbs-foot{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;color:#cfe0ff}
+.rbs-mates{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
+.rb-m{padding:3px 9px;border-radius:7px;font-size:12px;font-weight:800;background:rgba(255,255,255,.1);color:#e6eef8}
+.rb-m.up{background:rgba(77,255,138,.2);color:#b6ffcc}
+.rb-m.down{background:rgba(255,107,107,.26);color:#ffd0d0}
+.rb-m.out{background:rgba(255,255,255,.08);color:#9aa6b8}
+/* the revive card (a teammate is reviving you, or you are reviving one) */
+#knock .kn-card.rv{width:min(360px,88vw);margin:0 auto;background:rgba(6,30,18,.9);border:1px solid rgba(120,255,160,.5);border-radius:14px;padding:12px 14px;gap:8px;color:#e6fff0}
+#knock .kn-top{display:flex;justify-content:space-between;align-items:baseline}
+#knock .kn-t{font-size:16px;font-weight:900;letter-spacing:.4px;color:#b6ffcc;text-shadow:none}
+#knock .kn-n{font-size:20px;font-weight:900;color:#fff}
+#knock .kn-card.rv .kn-bar{height:12px;border-radius:6px;background:rgba(255,255,255,.14);border:none}
+#knock .kn-card.rv .kn-bar i{background:linear-gradient(90deg,#4dff8a,#b6ffcc)}

@@ -299,7 +299,11 @@ export const lootMethods={
  updateLootVis(dt){
   this.accum.lv=(this.accum.lv||0)+dt;const cam=this.camera.position;
   if(this.accum.lv>.25){this.accum.lv=0;const R2=(this.settings.dist==='Far'?85:this.settings.dist==='Medium'?65:45)**2;
-   for(const l of this.loot.values()){const dx=l.x-cam.x,dz=l.z-cam.z;const near=dx*dx+dz*dz<R2||(l.chest&&dx*dx+dz*dz<(l.supply?40000:3600));
+   // on the bus and while dropping, chests sit far from the camera. Show them from much further away
+   // so the drop has something to aim for (before, most chests only appeared once you were on the ground).
+   const me=this.me,aloft=this.state==='bus'||!!me&&(me.drop==='bus'||me.drop==='free'||me.drop==='glide');
+   const FAR2=aloft?160*160:R2,CHEST2=aloft?240*240:3600,SUPPLY2=aloft?320*320:40000;
+   for(const l of this.loot.values()){const dx=l.x-cam.x,dz=l.z-cam.z,d2=dx*dx+dz*dz;const near=d2<FAR2||(l.chest&&d2<(l.supply?SUPPLY2:CHEST2));
     if(near&&!l.mesh){l.mesh=this.makeLootMesh(l);this.dynamic.add(l.mesh)}else if(!near&&l.mesh){this.dynamic.remove(l.mesh);l.mesh=null}}}
   for(const l of this.loot.values()){
    if(l.mesh&&l.mesh.userData.float)animLootMesh(l.mesh,dt,this.t);

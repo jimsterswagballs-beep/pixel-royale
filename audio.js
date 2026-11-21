@@ -68,6 +68,7 @@ export class Audio{
    case'step':this.noise(.06,600,200,.12,'lowpass',dest);break;
    case'click':this.tone(700,.04,.3,'square',dest);break;
    case'ui':this.tone(500,.06,.3,'triangle',dest,800);break;
+   case'thunder':this.noise(1.8,400,60,.9,'lowpass',dest);this.tone(70,1.4,.35,'sine',dest,35);break;
    case'storm':this.tone(110,1.2,.5,'sawtooth',dest,90);this.tone(165,1.2,.4,'sawtooth',dest,140);break;
    case'drop':this.tone(440,.3,.5,'triangle',dest);this.tone(660,.3,.5,'triangle',dest,null,.25);this.tone(880,.4,.5,'triangle',dest,null,.5);break;
    case'win':[523,659,784,1047,1319].forEach((f,i)=>this.tone(f,.5,.5,'triangle',dest,null,i*.14));break;

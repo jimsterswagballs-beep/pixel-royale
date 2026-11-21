@@ -209,6 +209,40 @@ buildTitle(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.8</div><h3>Revive &amp; Reboot Screens</h3><ul>
+     <li><b>Downed screen</b>: a clearer panel with your bleed-out timer, the revive progress, and what to do.</li>
+     <li><b>Reboot screen</b>: after you are eliminated, you now see the three steps to get back into the match, what is happening, and the card and van times.</li>
+     <li>The elimination card now waits until a reboot is no longer possible.</li>
+     <li><b>Reviver card</b>: a clearer card with the seconds left for the revive.</li>
+    </ul></section>
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.7</div><h3>Cars Remake</h3><ul>
+     <li><b>Six kinds of car</b>: Hatch, Sedan, Pickup, Van, Sports and Jeep, each with its own body details.</li>
+     <li><b>16 paints</b> with solid, two-tone roof, racing stripe and taxi styles.</li>
+     <li><b>Better tyres</b>: cars slide in fast turns and on wet roads, and grip pulls them back into line.</li>
+     <li><b>Car bumps</b>: cars push apart when they hit each other, and hard hits damage both.</li>
+     <li><b>Getting in</b> is an animation now: walk to a door and climb in. The prompt shows which seat you will get.</li>
+     <li><b>Getting out</b> steps you out to a clear spot beside or behind the car.</li>
+     <li>Your camera switches to third person while you climb in, and nobody can climb into a car going faster than a walk.</li>
+    </ul></section>
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.6</div><h3>Weather Remake</h3><ul>
+     <li><b>Changing weather</b>: the weather now changes during the match. Every match has its own sequence, and everyone plays the same one.</li>
+     <li><b>Seven weather types</b>: Clear, Overcast, Drizzle, Thunderstorm, Coastal fog, Night and Sandstorm.</li>
+     <li><b>Smooth transitions</b>: the sky, clouds, sun, fog and wetness fade into the next weather over about 14 seconds.</li>
+     <li><b>New sky</b>: clouds drift with the wind, stars come out at night, and sandstorms turn the sky yellow-brown.</li>
+     <li><b>Lightning</b>: thunderstorms flash a warning ring near you, then strike with a bolt, a flash and a thunderclap.</li>
+     <li><b>Rain and sand</b> fall around the camera and are blown along by the wind.</li>
+     <li><b>Driving in the wet</b>: cars lose grip and top speed as the roads get wetter, so drizzle is slippery and storms are much worse.</li>
+    </ul></section>
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.5</div><h3>Map Remake</h3><ul>
+     <li><b>New terrain</b>: rolling ground, a sandy east coast with dunes, and hills and ridges across the island.</li>
+     <li><b>Lake Muffin</b> sits in the middle of the island, with Lakeside Docks, a pier and canoes on its shore.</li>
+     <li><b>Better roads</b>: roads route around the lake and the sea, follow gentler slopes, and stay clear of the scenery.</li>
+     <li><b>New districts</b>: Thunder Dome stadium, Old Keep ruins, Camp Pinecone and a church in the towns.</li>
+     <li><b>New landmarks</b>: a radio tower, a windfarm, a water tower, a shipwreck, a stone arch and a sand pyramid.</li>
+     <li><b>Cars</b> now spawn mostly in district car parks, and the rest sit on quiet roads between districts.</li>
+     <li><b>Chests</b> are on hilltops, along the lake and the coast, and at landmarks, instead of scattered at random.</li>
+     <li><b>Fixed</b>: chests now show up during the bus ride and the drop, not only once you land.</li>
+    </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 21, 2026 · VERSION 1.4</div><h3>Shop, Emotes &amp; Lobby Redesign</h3><ul>
      <li><b>Item Shop</b> (first tab): spend Swag Tokens on Chill Guy, Jay and emotes. Skins are coming later.</li>
      <li><b>Swag Tokens</b> are earned from eliminations, surviving longer, finishing in the top 10 and winning.</li>

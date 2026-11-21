@@ -14,10 +14,9 @@ import {netMethods} from './netsync.js';
 import {structMethods} from './structures.js';
 import {carMethods} from './cars.js';
 import {chaosMethods} from './chaos.js';
+import {weatherMethods,makeWeatherSky} from './weather.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
-const SKY_V=`varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`;
-const SKY_F=`varying vec3 vP;void main(){vec3 d=normalize(vP);float h=d.y;vec3 top=vec3(.20,.48,.92),mid=vec3(.60,.80,.97),hz=vec3(.725,.863,.961),bot=vec3(.75,.88,.95);vec3 c=h>0.?mix(mix(hz,mid,smoothstep(0.,.22,h)),top,pow(h,.65)):mix(hz,bot,min(1.,-h*3.));vec3 sd=normalize(vec3(200.,300.,120.));float s=max(dot(d,sd),0.);c+=vec3(1.,.82,.5)*pow(s,8.)*.2+vec3(1.,.9,.7)*pow(s,64.)*.3+vec3(1.,.97,.9)*smoothstep(.9985,.9995,s);c=mix(c,hz,exp(-abs(h)*9.)*.55);gl_FragColor=vec4(c,1.);}`;
 
 // sun shadow: a camera-following ortho shadow map, snapped to whole texels so shadows don't shimmer; resolution follows the quality preset
 const SUN_DIR=new THREE.Vector3(200,300,120).normalize(),SHADOW_R=62,SHADOW_RES={Low:0,Medium:1024,High:2048};
@@ -51,8 +50,8 @@ export class Game{
   this.app=app;this.renderer=app.renderer;this.input=app.input;this.audio=app.audio;this.hud=app.hud;
   this.scene=new THREE.Scene();this.scene.fog=new THREE.Fog('#b9dcf5',80,800);
   this.camera=new THREE.PerspectiveCamera(92,1,.08,1600);this.scene.add(this.camera);
-  const sky=new THREE.Mesh(new THREE.SphereGeometry(1200,20,12),new THREE.ShaderMaterial({vertexShader:SKY_V,fragmentShader:SKY_F,side:THREE.BackSide,depthWrite:false,fog:false}));sky.renderOrder=-10;sky.frustumCulled=false;this.sky=sky;this.scene.add(sky);
-  this.scene.add(new THREE.HemisphereLight('#dcecff','#76865c',1.3));
+  const sky=makeWeatherSky();sky.renderOrder=-10;sky.frustumCulled=false;this.sky=sky;this.scene.add(sky);
+  this.hemi=new THREE.HemisphereLight('#dcecff','#76865c',1.3);this.scene.add(this.hemi);
   const sun=new THREE.DirectionalLight('#ffeac4',2.0);sun.position.set(200,300,120);this.scene.add(sun);this.scene.add(sun.target);this.sun=sun;
   this.renderer.shadowMap.enabled=true;this.renderer.shadowMap.type=THREE.PCFShadowMap;
   sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);{const sc=sun.shadow.camera;sc.left=-SHADOW_R;sc.right=SHADOW_R;sc.top=SHADOW_R;sc.bottom=-SHADOW_R;sc.near=1;sc.far=700;sc.updateProjectionMatrix()}sun.shadow.bias=-.0005;sun.shadow.normalBias=.5;
@@ -102,7 +101,7 @@ export class Game{
   // cars: the host places them on the roads, guests wait for the snapshot
   this.clearCars();if(this.role!=='client')this.seedCars(12);
   // the storm tint (embers, fog) belongs to the last match: start the new one clear
-  this.fx.stormy=false;this.fx.stormK=0;this.scene.fog.color.set('#b9dcf5');
+  this.fx.stormy=false;this.fx.stormK=0;
   // game mode and weather: Chaos Rising timers, lightning, rain, fog, night and flare lights
   this.gm=cfg.gm||'br';this.chaosSetup();
   this.me.pos.copy(this.bus.pos);
@@ -265,6 +264,7 @@ export class Game{
    case'bite':{const t=this.ents.get(ev.t);if(t){fx.burst(t.pos.x,t.pos.y+1.2,t.pos.z,25,6,'#ff4a4a',.5,8);au.play('bite',t.pos)}break}
    case'chaos':this.onChaos(ev);break;
    case'flare':this.onFlare(ev);break;
+   case'bolt':this.onBolt(ev);break;
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
    case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
@@ -305,7 +305,7 @@ export class Game{
    this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
   else{this.updateClientSim(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
-  this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);
+  this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);this.updateChaosVis(dt);
   this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
   this.fx.update(dt);
   this.structUpdateUI(dt);
@@ -328,6 +328,7 @@ export class Game{
  updateRemoteMotion(e,dt){
   if(e.local){e.rpos.copy(e.pos);return}
   if(e.bot&&this.role!=='client'){e.rpos.copy(e.pos);return}
+  if(e.carAnim){e.rpos.copy(e.pos);return}     // climbing in or out: the host's animation sets the position
   // interpolate toward network target
   const k=1-Math.exp(-14*dt);e.pos.x=lerp(e.pos.x,e.tgt.x,k);e.pos.y=lerp(e.pos.y,e.tgt.y,k);e.pos.z=lerp(e.pos.z,e.tgt.z,k);
   if(Math.hypot(e.pos.x-e.tgt.x,e.pos.z-e.tgt.z)>20)e.pos.set(e.tgt.x,e.tgt.y,e.tgt.z);
@@ -357,7 +358,7 @@ export class Game{
   // third person while diving and gliding; blends back to first person when the player lands
   const me=this.me;if(me)me.rpos.copy(me.pos); // the local hero's sprite is drawn from its live position
   // third person while diving, gliding, emoting and while in a car (until you get out)
-  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide'||!!me.emote||me.car>=0)?1:0;
+  const tpWant=fpv&&(me.drop==='free'||me.drop==='glide'||!!me.emote||me.car>=0||!!me.carAnim)?1:0;
   this.tpK=(this.tpK||0)+(tpWant-(this.tpK||0))*(1-Math.exp(-9*dt));
   if(fpv){this.positionFPS(dt);
    if(this.tpK>.002){const fp=cam.position.clone(),fq=cam.quaternion.clone(),tp=new THREE.Vector3(),tq=new THREE.Quaternion();this.tpPose(me,tp,tq);cam.position.lerpVectors(fp,tp,this.tpK);cam.quaternion.copy(fq).slerp(tq,this.tpK)}}
@@ -371,7 +372,7 @@ export class Game{
   this.sky.position.copy(cam.position);updateSun(this,cam);
   this.audio.listener={x:cam.position.x,y:cam.position.y,z:cam.position.z,yaw:fpv?this.me.yaw:(this.specYaw||0)};
   for(const e of this.list)this.updateSprite(e,dt,cam.position);
-  const st=this.storm;const inStorm=this.insideStorm(cam.position.x,cam.position.z)===false;this.scene.fog.color.set(inStorm?'#7a4ab0':'#b9dcf5');this.fx.stormy=inStorm;
+  const st=this.storm;const inStorm=this.insideStorm(cam.position.x,cam.position.z)===false;this.inStormTint=inStorm;this.fx.stormy=inStorm;
   this.renderWorld(cam);
   if(fpv&&this.me.drop===null&&(this.tpK||0)<.02){this.updateViewmodel(dt);this.renderer.autoClear=false;this.renderer.clearDepth();this.renderer.render(this.vmScene,this.vmCam);this.renderer.autoClear=true}
  }
@@ -393,4 +394,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods);
+Object.assign(Game.prototype,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods);

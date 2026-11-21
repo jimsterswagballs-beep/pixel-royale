@@ -2,64 +2,75 @@ import * as THREE from 'three';
 import {mulberry32,clamp,lerp} from './data.js';
 import {MATS} from './materials.js';
 export const ISL=380,HALF=520,WATER=0;
-// cliffs: [x, z, angle, half-length, height]. The ground steps up by `height` across the line; a rock wall stands on the edge.
-export const CLIFFS=[[-80,-120,1.5,20,9],[53,-133,-0.3,20,8],[-185,20,2,20,8],[205,-40,-0.7,20,9],[-20,150,-0.4,18,7],[120,200,0.5,20,8]];
+// v23: no cliff walls. Hills, dips, the lake and the road cuts shape the ground instead.
+export const CLIFFS=[];
 const TREE_HP=100;const rockHp=sc=>Math.round(130+50*sc);
-// Districts (v2 layout). Size tier comes from r: large 50+, medium 30-49, small under 30.
-// Positions are spaced so districts never overlap; the test harness checks this.
+
+// Districts (v23). Size tier comes from r: large 50+, medium 30-49, small under 30.
+// Every district has a clear pad (flattened ground) and keeps off the lake and the sea.
 export const POIS=[
  {n:'Downtown Dunk',x:0,z:0,r:58,type:'city'},
- {n:'Stack Street',x:-120,z:95,r:40,type:'apartments'},
- {n:'Salty Shores Hotel',x:150,z:115,r:34,type:'hotel'},
- {n:'Lonely Lodge',x:-125,z:-150,r:36,type:'cabins'},
- {n:'Retail Rodeo',x:135,z:-140,r:44,type:'mall'},
- {n:'Misty Mill',x:15,z:190,r:34,type:'town'},
- {n:'Radar Ridge',x:-215,z:-25,r:32,type:'base'},
- {n:'Frosty Fort',x:30,z:-218,r:36,type:'fort'},
- {n:"Mc Dongal's",x:-30,z:-168,r:27,type:'diner'},
- {n:'Sunny Sands',x:195,z:20,r:32,type:'resort'},
- {n:"Farmer's Folly",x:-100,z:5,r:30,type:'farm'},
- {n:'Tomato Town',x:-190,z:-100,r:28,type:'suburb'},
- {n:'Dusty Depot',x:170,z:-62,r:26,type:'town'},
- {n:'Sandy Cove',x:250,z:150,r:34,type:'resort'},
- {n:'Pier Point',x:260,z:-120,r:30,type:'town'},
- {n:'Harbor Heights',x:-270,z:60,r:32,type:'warehouse'},
- {n:'Gas and Go',x:100,z:-235,r:28,type:'gas'},
- {n:'Sawmill Creek',x:-220,z:-170,r:30,type:'farm'},
- {n:'Sunset Cabins',x:90,z:235,r:34,type:'cabins'},
- {n:'Quarry Rock',x:-60,z:240,r:32,type:'warehouse'},
- {n:'Skyline Point',x:110,z:-10,r:30,type:'tower'},
- {n:'Pleasant Pickle',x:-200,z:130,r:28,type:'suburb'},
- {n:'Fuel Stop 9',x:-35,z:-95,r:22,type:'gas'},
- {n:'Brick Row',x:60,z:-95,r:30,type:'town'},
+ {n:'Stack Street',x:-125,z:95,r:40,type:'apartments'},
+ {n:'Salty Shores Hotel',x:165,z:110,r:34,type:'hotel'},
+ {n:'Lonely Lodge',x:-130,z:-150,r:36,type:'cabins'},
+ {n:'Retail Rodeo',x:150,z:-150,r:44,type:'mall'},
+ {n:'Misty Mill',x:20,z:205,r:34,type:'town'},
+ {n:'Radar Ridge',x:-225,z:-30,r:32,type:'base'},
+ {n:'Frosty Fort',x:30,z:-240,r:36,type:'fort'},
+ {n:"Mc Dongal's",x:-45,z:-200,r:27,type:'diner'},
+ {n:'Sunny Sands',x:200,z:20,r:32,type:'resort'},
+ {n:"Farmer's Folly",x:-110,z:10,r:30,type:'farm'},
+ {n:'Tomato Town',x:-200,z:-100,r:28,type:'suburb'},
+ {n:'Dusty Depot',x:190,z:-65,r:26,type:'town'},
+ {n:'Sandy Cove',x:250,z:160,r:34,type:'resort'},
+ {n:'Pier Point',x:255,z:-110,r:30,type:'town'},
+ {n:'Harbor Heights',x:-280,z:60,r:32,type:'warehouse'},
+ {n:'Gas and Go',x:105,z:-235,r:28,type:'gas'},
+ {n:'Sawmill Creek',x:-225,z:-175,r:30,type:'farm'},
+ {n:'Sunset Cabins',x:100,z:250,r:34,type:'cabins'},
+ {n:'Quarry Rock',x:-70,z:250,r:32,type:'warehouse'},
+ {n:'Skyline Point',x:115,z:-15,r:30,type:'tower'},
+ {n:'Pleasant Pickle',x:-210,z:140,r:28,type:'suburb'},
+ {n:'Fuel Stop 9',x:-40,z:-95,r:22,type:'gas'},
+ {n:'Brick Row',x:65,z:-95,r:30,type:'town'},
+ // new in v23
+ {n:'Thunder Dome',x:-60,z:160,r:38,type:'stadium'},
+ {n:'Lakeside Docks',x:-5,z:95,r:24,type:'lake'},
+ {n:'Old Keep',x:-120,z:-60,r:24,type:'ruins'},
+ {n:'Camp Pinecone',x:70,z:-180,r:22,type:'camp'},
 ];
-// Roads are generated from the layout: a minimum spanning tree (every district reachable) plus each
-// district's two nearest neighbours (so the network has loops, not just a tree).
-function roadGraph(){
- const n=POIS.length,E=new Map();
- const d=(a,b)=>Math.hypot(POIS[a].x-POIS[b].x,POIS[a].z-POIS[b].z);
- const add=(a,b)=>{if(a===b)return;const lo=Math.min(a,b),hi=Math.max(a,b);const k=lo*1000+hi;if(!E.has(k))E.set(k,[lo,hi])};
- const used=new Set([0]);
- while(used.size<n){let best=null,bd=1e9;for(const a of used)for(let b=0;b<n;b++){if(used.has(b))continue;const dd=d(a,b);if(dd<bd){bd=dd;best=[a,b]}}used.add(best[1]);add(best[0],best[1])}
- for(let a=0;a<n;a++){const near=[...Array(n).keys()].filter(b=>b!==a).sort((x,y)=>d(a,x)-d(a,y)).slice(0,2);for(const b of near)if(d(a,b)<170)add(a,b)}
- return [...E.values()];
-}
-export const ROADS=roadGraph();
+
+// Lakes: a bowl that the sea plane fills. `bed` is the depth at the centre (below 0 is under water).
+export const LAKES=[{n:'Lake Muffin',x:75,z:85,r:30,bed:-3.5}];
+
+// Hills and ridges: [x, z, height, radius]. Negative height would be a dip.
+const TERRAIN=[
+ [-85,-105,46,34],   // Mount Muffin
+ [-150,190,26,34],   // Radio Hill
+ [150,170,22,42],    // south-east ridge (windfarm)
+ [-20,-290,20,40],   // north ridge behind the fort
+ [290,-40,18,30],    // coastal headland
+ [-260,-120,18,36],  // western hills
+];
+
+const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
 function hash(ix,iz){let h=Math.imul(ix,374761393)^Math.imul(iz,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967295}
 function vnoise(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);const a=hash(ix,iz),b=hash(ix+1,iz),c=hash(ix,iz+1),d=hash(ix+1,iz+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
 function fbm(x,z){return vnoise(x,z)*.5+vnoise(x*2.1+7,z*2.1+3)*.25+vnoise(x*4.3+1,z*4.3+9)*.125+vnoise(x*8.7,z*8.7)*.0625}
-const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
-// terrain features: [x, z, height, radius]. Negative height = a dip.
-const TERRAIN=[[-75,-95,38,38],[-215,-25,18,34],[80,30,14,45],[270,-200,26,50],[-250,210,22,45],[20,-330,16,60],[150,-200,20,40],[-120,200,18,40],[230,200,16,40],[95,-62,-13,19],[-62,150,-11,15],[190,-40,9,22]];
+
 function rawH(x,z){
  const r=Math.hypot(x,z),ang=Math.atan2(z,x);
  const edge=ISL*(.8+.22*vnoise(Math.cos(ang)*1.7+10,Math.sin(ang)*1.7+10)+.08*vnoise(ang*4+50,3));
  const L=clamp((edge-r)/60,-1,1);
  let h;
- if(L>0){const s=sstep(0,1,L);h=s*(3+fbm(x*.011,z*.011)*15);   // v2: calmer ground than before
+ if(L>0){
+  const s=sstep(0,1,L);
+  h=s*(2+fbm(x*.009,z*.009)*11);           // gentle rolling ground, low at the coast
   for(const[cx,cz,A,R]of TERRAIN)h+=A*Math.exp(-((x-cx)**2+(z-cz)**2)/(2*R*R))*s;
-  for(const[cx,cz,a,L2,S]of CLIFFS){const dx=x-cx,dz=z-cz,ca=Math.cos(a),sa=Math.sin(a);const t=dx*ca+dz*sa,n=-dx*sa+dz*ca;h+=S*sstep(-1.2,1.2,n)*(1-sstep(L2-4,L2,Math.abs(t)))*s}}
- else h=L*14;
+  // east coast dunes: low, sandy ripples
+  const dn=sstep(170,240,x)*s*(1-sstep(.6*ISL,.85*ISL,r));
+  h+=dn*.9*Math.sin(x*.21+z*.09)*(.5+.5*Math.sin(z*.05));
+ }else h=L*14;
  return h;
 }
 const poiY=POIS.map(p=>clamp(rawH(p.x,p.z),3,30));
@@ -67,14 +78,94 @@ export function H(x,z){
  let h=rawH(x,z);
  for(let i=0;i<POIS.length;i++){const p=POIS[i];const dx=x-p.x,dz=z-p.z;if(dx>p.r*1.3||dx<-p.r*1.3||dz>p.r*1.3||dz<-p.r*1.3)continue;
   const d=Math.hypot(dx,dz);const w=sstep(p.r*1.25,p.r*.85,d);if(w>0)h=lerp(h,poiY[i],w);}
+ for(const L of LAKES){const d=Math.hypot(x-L.x,z-L.z);const w=sstep(L.r*1.7,L.r*.95,d);if(w>0){const t=Math.min(1,d/L.r);h=lerp(h,L.bed+4.6*t*t,w)}}
  return h;
 }
-// point on road a->b at t (0..1), with the same wobble roadDist uses, plus the rough direction
-export function roadPoint(a,b,t){const A=POIS[a],B=POIS[b];const dx=B.x-A.x,dz=B.z-A.z;const l=Math.hypot(dx,dz);const wob=Math.sin(t*9+a*3)*6*Math.sin(t*3.14159);return{x:A.x+dx*t-dz/l*wob,z:A.z+dz*t+dx/l*wob,dx,dz}}
-export function roadDist(x,z){let best=1e9;for(const[a,b]of ROADS){const A=POIS[a],B=POIS[b];const dx=B.x-A.x,dz=B.z-A.z;const l2=dx*dx+dz*dz;let t=((x-A.x)*dx+(z-A.z)*dz)/l2;t=t<0?0:t>1?1:t;const wob=Math.sin(t*9+a*3)*6*Math.sin(t*3.14159);const nx=-dz/Math.sqrt(l2),nz=dx/Math.sqrt(l2);const px=A.x+dx*t+nx*wob,pz=A.z+dz*t+nz*wob;const d=Math.hypot(x-px,z-pz);if(d<best)best=d}return best}
 export function slope(x,z){const e=1.2;return [(H(x+e,z)-H(x-e,z))/(2*e),(H(x,z+e)-H(x,z-e))/(2*e)]}
 export function poiAt(x,z){for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*1.1)return p;return null}
-// ---------------- colliders
+
+// ---- road network: a minimum spanning tree (every district reachable) plus each district's two nearest
+// neighbours (loops). Each road is routed with A* over a height grid, so it avoids the lake and the sea and
+// keeps to gentle slopes, then smoothed into a polyline.
+function roadGraph(){
+ const n=POIS.length,E=new Map();
+ const d=(a,b)=>Math.hypot(POIS[a].x-POIS[b].x,POIS[a].z-POIS[b].z);
+ const add=(a,b)=>{if(a===b)return;const lo=Math.min(a,b),hi=Math.max(a,b);const k=lo*1000+hi;if(!E.has(k))E.set(k,[lo,hi])};
+ const used=new Set([0]);
+ while(used.size<n){let best=null,bd=1e9;for(const a of used)for(let b=0;b<n;b++){if(used.has(b))continue;const dd=d(a,b);if(dd<bd){bd=dd;best=[a,b]}}used.add(best[1]);add(best[0],best[1])}
+ for(let a=0;a<n;a++){const near=[...Array(n).keys()].filter(b=>b!==a).sort((x,y)=>d(a,x)-d(a,y)).slice(0,2);for(const b of near)if(d(a,b)<185)add(a,b)}
+ return [...E.values()];
+}
+const GS=6,GMIN=-ISL-40,GN=Math.ceil((2*ISL+80)/GS);
+const GH=new Float32Array(GN*GN);
+for(let j=0;j<GN;j++)for(let i=0;i<GN;i++)GH[j*GN+i]=H(GMIN+i*GS,GMIN+j*GS);
+const ROAD_OK=h=>h>=.8;    // roads stay on dry land
+
+function heapOps(){
+ const hk=[],hv=[];
+ const push=(k,v)=>{hk.push(k);hv.push(v);let i=hk.length-1;while(i>0){const p=(i-1)>>1;if(hk[p]<=hk[i])break;[hk[p],hk[i]]=[hk[i],hk[p]];[hv[p],hv[i]]=[hv[i],hv[p]];i=p}};
+ const pop=()=>{const v=hv[0];const lk=hk.pop(),lv=hv.pop();if(hk.length){hk[0]=lk;hv[0]=lv;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<hk.length&&hk[l]<hk[m])m=l;if(r<hk.length&&hk[r]<hk[m])m=r;if(m===i)break;[hk[m],hk[i]]=[hk[i],hk[m]];[hv[m],hv[i]]=[hv[i],hv[m]];i=m}}return v};
+ return {push,pop,size:()=>hk.length};
+}
+function astar(sx,sy,gx,gy){
+ const N=GN*GN,g=new Float32Array(N).fill(Infinity),prev=new Int32Array(N).fill(-1),done=new Uint8Array(N);
+ const s=sy*GN+sx,t=gy*GN+gx;const hp=heapOps();
+ const hh=i=>{const x=i%GN,y=(i-x)/GN;const dx=Math.abs(x-gx),dy=Math.abs(y-gy);return GS*(Math.max(dx,dy)+(Math.SQRT2-1)*Math.min(dx,dy))};
+ g[s]=0;hp.push(hh(s),s);
+ const D=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,1,Math.SQRT2],[-1,-1,Math.SQRT2]];
+ while(hp.size()){const c=hp.pop();if(done[c])continue;done[c]=1;if(c===t)break;
+  const cx=c%GN,cy=(c-cx)/GN,hc=GH[c];
+  for(const[dx,dy,L0]of D){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=GN||ny>=GN)continue;const n=ny*GN+nx;if(done[n])continue;
+   const hn=GH[n];if(n!==t&&!ROAD_OK(hn))continue;
+   const len=L0*GS,slope=Math.abs(hn-hc)/len;
+   const cost=len*(1+40*Math.max(0,slope-.04))+(hn>30?8:0);
+   const ng=g[c]+cost;if(ng<g[n]){g[n]=ng;prev[n]=c;hp.push(ng+hh(n),n)}}}
+ if(s!==t&&prev[t]<0)return null;
+ const out=[];for(let c=t;c!==-1;c=prev[c]){out.push(c);if(c===s)break}
+ return out.reverse().map(c=>{const x=c%GN,y=(c-x)/GN;return{x:GMIN+x*GS,z:GMIN+y*GS}});
+}
+function smoothPts(P,passes){for(let k=0;k<passes;k++){const Q=P.map(p=>({...p}));for(let i=1;i<P.length-1;i++)Q[i]={x:(P[i-1].x+2*P[i].x+P[i+1].x)/4,z:(P[i-1].z+2*P[i].z+P[i+1].z)/4};P=Q}return P}
+const PATH=new Map();   // 'a_b' -> {pts, cum, len}
+export const ROADS=roadGraph().filter(([a,b])=>{
+ const A=POIS[a],B=POIS[b];
+ const cells=astar(Math.round((A.x-GMIN)/GS),Math.round((A.z-GMIN)/GS),Math.round((B.x-GMIN)/GS),Math.round((B.z-GMIN)/GS));
+ let pts=cells?smoothPts(cells,8):[{x:A.x,z:A.z},{x:B.x,z:B.z}];
+ pts[0]={x:A.x,z:A.z};pts[pts.length-1]={x:B.x,z:B.z};
+ const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].z-pts[i-1].z));
+ PATH.set(a+'_'+b,{pts,cum,len:cum[cum.length-1]});
+ return true;
+});
+
+// point on road a->b at t (0..1): arc length along the routed polyline, with the unit direction of travel
+export function roadPoint(a,b,t){
+ let P=PATH.get(a+'_'+b),rev=false;if(!P){P=PATH.get(b+'_'+a);rev=!!P;}
+ if(!P){const A=POIS[a],B=POIS[b];return{x:A.x+(B.x-A.x)*t,z:A.z+(B.z-A.z)*t,dx:B.x-A.x,dz:B.z-A.z}}
+ if(rev)t=1-t;
+ const s=clamp(t,0,1)*P.len;let i=1;while(i<P.cum.length-1&&P.cum[i]<s)i++;
+ const p0=P.pts[i-1],p1=P.pts[i],seg=(P.cum[i]-P.cum[i-1])||1;const f=clamp((s-P.cum[i-1])/seg,0,1);
+ const dx=p1.x-p0.x,dz=p1.z-p0.z,l=Math.hypot(dx,dz)||1;
+ return{x:p0.x+dx*f,z:p0.z+dz*f,dx:dx/l,dz:dz/l};
+}
+// distance to the nearest road centre line, from a 2 m field built once from the routed paths
+const RSTEP=2,RMIN=-ISL-40,RN=Math.ceil((2*ISL+80)/RSTEP);
+const RD=new Float32Array(RN*RN).fill(1e9);
+{
+ const mark=(x,z)=>{const ci=Math.round((x-RMIN)/RSTEP),cj=Math.round((z-RMIN)/RSTEP),R=4;
+  for(let j=cj-R;j<=cj+R;j++)for(let i=ci-R;i<=ci+R;i++){if(i<0||j<0||i>=RN||j>=RN)continue;
+   const cx=RMIN+i*RSTEP,cz=RMIN+j*RSTEP,d=Math.hypot(cx-x,cz-z);const k=j*RN+i;if(d<RD[k])RD[k]=d}};
+ for(const P of PATH.values())for(let i=1;i<P.pts.length;i++){const a=P.pts[i-1],b=P.pts[i];const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)));
+  for(let k=0;k<=n;k++)mark(a.x+(b.x-a.x)*k/n,a.z+(b.z-a.z)*k/n)}
+}
+export function roadDist(x,z){
+ const fx=(x-RMIN)/RSTEP-.5,fz=(z-RMIN)/RSTEP-.5;
+ if(fx<0||fz<0||fx>=RN-1||fz>=RN-1)return 1e9;
+ const i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j;
+ const a=RD[j*RN+i],b=RD[j*RN+i+1],c=RD[(j+1)*RN+i],d=RD[(j+1)*RN+i+1];
+ return (a+(b-a)*u)*(1-v)+(c+(d-c)*u)*v;
+}
+// the car park bays (x, z, yaw) that cars spawn in; filled by the district builders
+export const parking=[];
+
 export const boxes=[],circles=[],lootSpots=[],boxVis=[];
 const CELL=16;let grid=new Map();let stamp=0;
 const gk=(ix,iz)=>ix*8192+iz;
@@ -86,7 +177,7 @@ export function query(x,z,r,out){out.length=0;stamp++;const x0=Math.floor((x-r)/
 // Destructible parts: every box added while `partMat` is set (building walls, roofs, props, boulders) gets hp.
 // Thin ground slabs (floors, paving) are shorter than .2 m and are never destructible.
 export const wparts=[];let partMat=null;
-const poiMat=t=>(t==='city'||t==='fort'||t==='diner'||t==='apartments'||t==='tower'||t==='hotel'||t==='mall')?'stone':(t==='base'||t==='warehouse')?'metal':'wood';
+const poiMat=t=>(t==='city'||t==='fort'||t==='diner'||t==='apartments'||t==='tower'||t==='hotel'||t==='mall'||t==='stadium'||t==='ruins')?'stone':(t==='base'||t==='warehouse')?'metal':'wood';
 export let boxInst=null; // instanced mesh of all visible static boxes, so a destroyed box can be hidden
 function addBox(x0,y0,z0,x1,y1,z1,color,vis=true){
  const b={x0,y0,z0,x1,y1,z1,c:color,circ:false};
@@ -191,6 +282,7 @@ function genPOI_(rng,p,idx){
   return}
 
  const yy0=H(p.x,p.z);
+ {const lot={city:[p.x+4,p.z+36,6],hotel:[p.x+8,p.z+20,4],mall:[p.x,p.z+31,7],resort:[p.x,p.z-24,4],diner:[p.x+26,p.z+18,4],gas:[p.x,p.z+14,4],town:[p.x,p.z-22,3],apartments:[p.x,p.z+26,4],tower:[p.x-6,p.z-24,4]}[p.type];if(lot)parkRow(lot[0],lot[1],lot[2])}
  if(p.type==='diner'){
   const yy=yy0;
   buildings.push(makeBuilding(rng,p.x,p.z,22,13,5,'s',{color:'#f0cf2e',q:2.4,props:4,chest:1}));
@@ -261,6 +353,11 @@ function genPOI_(rng,p,idx){
   standSign('RETAIL RODEO',p.x,p.z+27,0,16,2.6,'#e67e22','#fff');
   return}
  if(p.type==='gas'){gasStation(rng,p.x,p.z);return}
+ if(p.type==='stadium'){stadium(rng,p);return}
+ if(p.type==='ruins'){ruins(rng,p);return}
+ if(p.type==='camp'){camp(rng,p);return}
+ if(p.type==='lake'){lakeside(rng,p);return}
+ if(p.type==='town')church(rng,p);
  const n=p.type==='cabins'?2:3;
  const SP={suburb:26,town:24,cabins:28,warehouse:32,base:30}[p.type]||24;
  for(let gx=-n;gx<=n;gx++)for(let gz=-n;gz<=n;gz++){
@@ -276,35 +373,162 @@ function genPOI_(rng,p,idx){
  }
  if(p.type==='base'){const yy=H(p.x,p.z);addBox(p.x-3,yy,p.z-3,p.x+3,yy+16,p.z+3,'#c0c4c8');addBox(p.x-6,yy+16,p.z-.5,p.x+6,yy+17,p.z+.5,'#e04a4a')}
 }
-export const landmarks=[];
-function addCyl(x,z,r,y0,y1){const c={x,z,r,y0,y1};insertCircle(c);circles.push(c);return c}
-const SIGN=(text,x,y,z,rot,w,h,bg,fg)=>landmarks.push({k:'sign',text,x,y,z,rot:rot||0,w,h,bg:bg||'#c0392b',fg:fg||'#fff'});
-function standSign(text,x,z,rot,w,h,bg,fg){const pm=partMat;partMat=null;try{standSign_(text,x,z,rot,w,h,bg,fg)}finally{partMat=pm}}
-function standSign_(text,x,z,rot,w,h,bg,fg){const y=H(x,z);const c=Math.cos(rot),sn=Math.sin(rot);for(const o of[-w/2+.4,w/2-.4]){addBox(x+c*o-.2,y,z-sn*o-.2,x+c*o+.2,y+h+1.6,z-sn*o+.2,'#6b5a45')}SIGN(text,x,y+1.6+h/2,z,rot,w,h,bg,fg)}
-let built=false,treeList=[],rockList=[];
-export const decorInst={tree:[],rock:[]}; // instanced meshes + pristine matrices, so felled trees/rocks can be hidden and restored
+
+// ---- v23 districts and landmarks
+function parkRow(cx,cz,n){for(let i=0;i<n;i++)parking.push({x:cx+(i-(n-1)/2)*3.4,z:cz,yaw:0})}
+function gateAngle(a){const m=a%(Math.PI/2);return m<.16||m>Math.PI/2-.16}   // four walkable gaps through the stands
+// Thunder Dome: a stadium bowl with five tiers of stands, four gates, a pitch and floodlight masts
+function stadium(rng,p){
+ const rx=24,rz=18,Y=H(p.x,p.z);
+ for(let k=0;k<5;k++){
+  const ax=rx+3+k*2.4,az=rz+3+k*2.4,top=Y+(k+1)*.6;
+  const n=Math.round(2*Math.PI*Math.sqrt((ax*ax+az*az)/2)/2.4);
+  for(let i=0;i<n;i++){const a=i/n*6.283;if(gateAngle(a))continue;
+   const x=p.x+Math.cos(a)*ax,z=p.z+Math.sin(a)*az;
+   addBox(x-1.3,Y,z-1.3,x+1.3,top,z+1.3,k%2?'#4f5b6b':'#c9d1da')}
+ }
+ addBox(p.x-rx+2,Y,p.z-rz+2,p.x+rx-2,Y+.05,p.z+rz-2,'#3fa34d');     // the pitch
+ addBox(p.x-.15,Y+.05,p.z-rz+2,p.x+.15,Y+.05,p.z+rz-2,'#ffffff');  // halfway line
+ for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]]){                    // floodlight masts
+  const mx=p.x+sx*(rx+14),mz=p.z+sz*(rz+12);
+  addBox(mx-.5,Y,mz-.5,mx+.5,Y+22,mz+.5,'#8e96a0');addBox(mx-1.6,Y+22,mz-.5,mx+1.6,Y+23,mz+.5,'#fff6c8')}
+ standSign('THUNDER DOME',p.x,p.z-rz-14,0,16,3,'#1d2b4a','#ffd23d');
+ for(const a of[.8,2.4,4.0]){lootSpots.push({x:p.x+Math.cos(a)*(rx-4),z:p.z+Math.sin(a)*(rz-4),y:Y+.1,inside:false,chest:true,q:1.6})}
+}
+// Old Keep: a broken castle with holed walls, four towers, a half-fallen keep and rubble
+function ruins(rng,p){
+ const R=20,Y=H(p.x,p.z),wc='#b3aa98',th=1.2;
+ const holes=(len,n)=>{const o=[];for(let k=0;k<n;k++){const s=-len/2+len*(.15+k*.3)+(rng()-.5)*3;o.push({s,e:s+2.5+rng()*2.5,y0:0,y1:9})}return o};
+ wallX(p.x-R,p.x+R,p.z-R,Y,7,holes(2*R,3),wc,th);
+ wallX(p.x-R,p.x+R,p.z+R,Y,4.5,holes(2*R,4),wc,th);
+ wallZ(p.z-R,p.z+R,p.x-R,Y,6,holes(2*R,2),wc,th);
+ wallZ(p.z-R,p.z+R,p.x+R,Y,5,[{s:p.z-3,e:p.z+3,y0:0,y1:9}],wc,th);   // the gate on the east side
+ for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]]){const tall=sx<0?11:7;
+  addBox(p.x+sx*R-2.6,Y,p.z+sz*R-2.6,p.x+sx*R+2.6,Y+tall,p.z+sz*R+2.6,'#a39a86');
+  addBox(p.x+sx*R-2.9,Y+tall,p.z+sz*R-2.9,p.x+sx*R+2.9,Y+tall+.5,p.z+sz*R+2.9,'#8f8778')}
+ addBox(p.x-4,Y,p.z-4,p.x+4,Y+6,p.z+4,'#9a9284');                 // the keep
+ addBox(p.x-4,Y+6,p.z-4,p.x-1,Y+10,p.z+4,'#9a9284');              // half-fallen top
+ for(let i=0;i<7;i++){const a=i*2.1+.5,d=8+rng()*8,s=.8+rng()*1.4;const x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;const y=H(x,z);
+  addBox(x-s/2,y,z-s/2,x+s/2,y+s*.8,z+s/2,['#8e8778','#a39a86','#7b7467'][i%3])}
+ lootSpots.push({x:p.x-R+4,z:p.z,y:Y+.1,inside:false,chest:true,q:1.8});
+ lootSpots.push({x:p.x+4,z:p.z-R+5,y:Y+.1,inside:false,chest:true,q:1.8});
+ lootSpots.push({x:p.x+R-5,z:p.z+R-5,y:Y+.1,inside:false,chest:true,q:1.8});
+}
+// Camp Pinecone: a clearing with tents, picnic tables and a stone fire ring
+function camp(rng,p){
+ const Y=H(p.x,p.z);
+ for(let i=0;i<7;i++){const a=i/7*6.283+.4,d=9+rng()*4;const x=p.x+Math.cos(a)*d,z=p.z+Math.sin(a)*d;const y=H(x,z);
+  const col=['#e4572e','#f3a712','#2e86ab','#7a9e7e'][i%4];
+  addBox(x-1.6,y,z-1.2,x+1.6,y+1.2,z+1.2,col);addBox(x-1.1,y+1.2,z-.9,x+1.1,y+2.2,z+.9,col);addBox(x-.5,y+2.2,z-.4,x+.5,y+2.9,z+.4,'#f4f1de')}
+ for(let k=0;k<8;k++){const a=k/8*6.283;addBox(p.x+Math.cos(a)*1.6-.4,Y,p.z+Math.sin(a)*1.6-.4,p.x+Math.cos(a)*1.6+.4,Y+.5,p.z+Math.sin(a)*1.6+.4,'#7b7468')}
+ for(let i=0;i<2;i++){const tx=p.x-6+i*12;addBox(tx-1.2,Y,p.z+6,tx+1.2,Y+.9,p.z+7.4,'#a0703e');addBox(tx-1.2,Y+.9,p.z+6,tx+1.2,Y+1.1,p.z+7.4,'#c98a4a')}
+ lootSpots.push({x:p.x-6,z:p.z+8.5,y:Y+.1,inside:false,chest:true,q:1.3});
+ lootSpots.push({x:p.x+7,z:p.z+6,y:Y+.1,inside:false,chest:true,q:1.3});
+ for(let i=0;i<3;i++)lootSpots.push({x:p.x+(rng()-.5)*16,z:p.z+(rng()-.5)*16,y:0,inside:false,chest:false,q:1});
+}
+// Lakeside Docks: houses on the shore, a long pier into Lake Muffin, a boathouse and canoes
+function lakeside(rng,p){
+ const L=LAKES[0];let dx=L.x-p.x,dz=L.z-p.z;const l=Math.hypot(dx,dz);dx/=l;dz/=l;
+ const alongX=Math.abs(dx)>=Math.abs(dz);
+ let t=p.r*.6,x=0,z=0;
+ for(;t<l;t+=2){x=p.x+dx*t;z=p.z+dz*t;if(H(x,z)<.3)break}
+ const shoreT=t;const end=shoreT+9;
+ const deck=1.1;
+ for(let u=p.r*.6;u<end;u+=2.6){
+  const px=p.x+dx*u,pz=p.z+dz*u,ground=Math.max(H(px,pz),0);const top=Math.max(deck,ground+.4);
+  if(alongX)addBox(px-1.3,top-.35,pz-1.4,px+1.3,top,pz+1.4,'#9b7653');
+  else addBox(px-1.4,top-.35,pz-1.3,px+1.4,top,pz+1.3,'#9b7653');
+  if(u%5.2<2.6)addBox(px-.3,-2,pz-.3,px+.3,top-.35,pz+.3,'#5b4530');   // pilings
+ }
+ const ex=p.x+dx*end,ez=p.z+dz*end;
+ const bhx=p.x-dx*6+(-dz)*14,bhz=p.z-dz*6+dx*14;
+ if(H(bhx,bhz)>1.2&&!POIS.some(q=>q!==p&&Math.hypot(q.x-bhx,q.z-bhz)<q.r))
+  buildings.push(makeBuilding(rng,bhx,bhz,10,8,3.6,dx>0?'w':'e',{color:'#c0392b',q:1.5,props:1,chest:.9}));
+ for(let i=0;i<3;i++){const cx=p.x+(-dz)*(-6-i*2.6)+dx*(p.r*.2),cz=p.z+dx*(-6-i*2.6)+dz*(p.r*.2);const y=H(cx,cz);
+  if(alongX)addBox(cx-1.5,y,cz-.45,cx+1.5,y+.5,cz+.45,['#ff8a3d','#2f7de1','#f2c230'][i]);
+  else addBox(cx-.45,y,cz-1.5,cx+.45,y+.5,cz+1.5,['#ff8a3d','#2f7de1','#f2c230'][i])}
+ lootSpots.push({x:p.x+dx*(shoreT-3)+(-dz)*3,z:p.z+dz*(shoreT-3)+dx*3,y:H(p.x,p.z)+.1,inside:false,chest:true,q:1.5});
+ lootSpots.push({x:ex-dz*3,z:ez+dx*3,y:deck+.1,inside:false,chest:true,q:1.7});
+ standSign('LAKE MUFFIN',p.x+dx*(p.r*.4)+(-dz)*-4,p.z+dz*(p.r*.4)+dx*-4,0,11,2.2,'#2a7fb8','#fff');
+}
+// Church (in the town districts): a nave with a steeple
+function church(rng,p){
+ const x=p.x-12,z=p.z+10,Y=H(x,z);
+ if(H(x,z)<2.4||roadDist(x,z)<6)return;
+ buildings.push(makeBuilding(rng,x,z,10,16,5,'s',{color:'#f1ece0',q:1.6,props:0,chest:.9}));
+ addBox(x-1.6,Y,z-9.2,x+1.6,Y+12,z-6.8,'#e9e2d2');addBox(x-1.1,Y+12,z-8.4,x+1.1,Y+15.5,z-7.6,'#c9c0b0');addBox(x-.2,Y+15.5,z-8,x+.2,Y+19.5,z-8,'#8a3b2e');
+ standSign('CHAPEL',x,z-13.5,0,8,1.8,'#7b5a3a','#fff');
+}
+// nearest flat, dry, empty ground with height in [lo, hi] from (x0, z0)
+function findSpot(x0,z0,maxR,lo,hi){
+ for(let r=0;r<=maxR;r+=4){const n=Math.max(1,Math.round(r/2));for(let k=0;k<n;k++){const a=k/n*6.283;const x=x0+Math.cos(a)*r,z=z0+Math.sin(a)*r;const h=H(x,z);if(h<lo||h>hi)continue;
+  const[gx,gz]=slope(x,z);if(Math.hypot(gx,gz)>.45)continue;if(roadDist(x,z)<8)continue;if(POIS.some(p=>Math.hypot(x-p.x,z-p.z)<p.r*1.1))continue;
+  if(LAKES.some(L=>Math.hypot(x-L.x,z-L.z)<L.r+8))continue;return{x,z,y:h}}}
+ return null;
+}
+// highest ground within R of (x0, z0)
+function findPeak(x0,z0,R){let best={x:x0,z:z0,y:-1e9};for(let x=x0-R;x<=x0+R;x+=3)for(let z=z0-R;z<=z0+R;z+=3){if(Math.hypot(x-x0,z-z0)>R)continue;const h=H(x,z);if(h>best.y)best={x,z,y:h}}return best}
+// a lattice radio tower on a hill
+function latticeTower(x,z,y,h){
+ for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]])addBox(x+sx*1.6-.3,y,z+sz*1.6-.3,x+sx*1.6+.3,y+h,z+sz*1.6+.3,'#c9d1da');
+ for(let yy=y+4;yy<y+h-2;yy+=5){addBox(x-1.6,yy,z-.12,x+1.6,yy+.25,z+.12,'#8e96a0');addBox(x-.12,yy,z-1.6,x+.12,yy+.25,z+1.6,'#8e96a0')}
+ addBox(x-.1,y+h,z-.1,x+.1,y+h+9,z+.1,'#dfe5ea');addBox(x-.25,y+h+9,z-.25,x+.25,y+h+9.5,z+.25,'#ff3d3d');
+}
+// Pyramid: stepped sandstone pyramid near the dunes
+function pyramid(x,z,y){
+ for(let k=0;k<6;k++){const h=7*(1-k/6)+.8;addBox(x-h,y+k*1.2,z-h,x+h,y+(k+1)*1.2,z+h,k%2?'#e8c77c':'#dcb865')}
+}
+// Shipwreck on the beach: a broken hull and a mast
+function shipwreck(x,z,y){
+ for(let i=0;i<5;i++){const hx=x-4+i*1.9;addBox(hx-.9,y+(i===0||i===4?.2:0),z-2.4,hx+.9,y+1.6-(i===0||i===4?.6:0),z+2.4,'#7a4a2a')}
+ addBox(x-.2,y+1.6,z-.2,x+.2,y+8,z+.2,'#5a3a22');addBox(x+.2,y+5,z-.1,x+3.6,y+7.8,z+.1,'#f4f1de');
+}
+// Arch: two pillars and a lintel on the beach
+function arch(x,z,y){
+ addBox(x-5,y,z-1.2,x-3,y+9,z+1.2,'#d8d2c4');addBox(x+3,y,z-1.2,x+5,y+9,z+1.2,'#d8d2c4');addBox(x-6,y+9,z-1.5,x+6,y+10.8,z+1.5,'#cfc7b6');
+}
+// Windfarm and water tower landmarks
+function turbine(x,z,y){addCyl(x,z,1.1,y,y+26);landmarks.push({k:'turbine',x,y,z})}
+function watertower(x,z,y){addCyl(x,z,3.4,y,y+17);landmarks.push({k:'tank',x,y,z,r:3.4,h:6})}
+
+function buildLandmarks(rng){
+ // lighthouse on the coast
+ {let lx=0,lz=0;const a=1.9;for(let r=340;r>120;r-=3){const x=Math.cos(a)*r,z=Math.sin(a)*r;if(H(x,z)>3.4){lx=x;lz=z;break}}const yy=H(lx,lz);addCyl(lx,lz,2.6,yy,yy+24);landmarks.push({k:'lighthouse',x:lx,y:yy,z:lz});lootSpots.push({x:lx+3.5,z:lz,y:yy+.1,inside:false,chest:true,q:1.8})}
+ // Mount Muffin summit flag
+ {const s=findPeak(-85,-105,50);landmarks.push({k:'flag',x:s.x,y:s.y,z:s.z});standSign('MOUNT MUFFIN',s.x+3,s.z+3,0.6,8,1.8,'#6a5acd','#fff');lootSpots.push({x:s.x-2,z:s.z+1.5,y:s.y+.1,inside:false,chest:true,q:2.4});lootSpots.push({x:s.x+1,z:s.z-2,y:s.y+.1,inside:false,chest:false,q:2})}
+ // Radio Hill: a lattice tower on the highest ground of the south-west hills
+ {const s=findPeak(-150,190,40);latticeTower(s.x,s.z,s.y,30);lootSpots.push({x:s.x+4,z:s.z+4,y:s.y+.1,inside:false,chest:true,q:2})}
+ // windfarm on the south-east ridge
+ for(const[x0,z0]of[[140,150],[160,172],[126,180]]){const s=findSpot(x0,z0,40,2,34);if(s){turbine(s.x,s.z,s.y);lootSpots.push({x:s.x+3,z:s.z,y:s.y+.1,inside:false,chest:true,q:1.4})}}
+ // water tower beside Dusty Depot
+ {const s=findSpot(195,-45,20,2,20);if(s){watertower(s.x,s.z,s.y);lootSpots.push({x:s.x+4,z:s.z+3,y:s.y+.1,inside:false,chest:true,q:1.3})}}
+ // shipwreck on the beach near Pier Point
+ {const s=findSpot(300,-110,70,.9,2.6);if(s){shipwreck(s.x,s.z,s.y);lootSpots.push({x:s.x+1,z:s.z,y:s.y+.1,inside:false,chest:true,q:1.9})}}
+ // arch on the beach near Sandy Cove
+ {const s=findSpot(235,205,60,2,8);if(s){arch(s.x,s.z,s.y);lootSpots.push({x:s.x,z:s.z+3,y:s.y+.1,inside:false,chest:true,q:1.6})}}
+ // sand pyramid in the dunes east of Sunny Sands
+ {const s=findSpot(245,-30,50,2,8);if(s){pyramid(s.x,s.z,s.y);lootSpots.push({x:s.x+8,z:s.z+8,y:s.y+.1,inside:false,chest:true,q:1.7})}}
+ // lake sign on the far shore
+ {const s=findSpot(LAKES[0].x-34,LAKES[0].z-22,16,1.2,8);if(s)standSign('LAKE MUFFIN',s.x,s.z,0.3,10,2,'#2a7fb8','#fff')}
+}
+
 export function buildMap(){
  if(built)return;built=true;const rng=mulberry32(1337);
  POIS.forEach((p,i)=>genPOI(rng,p,i));
- POIS.forEach(p=>{if(p.type==='fort')return; for(let i=0;i<10;i++){const a=rng()*6.283,r=p.r*(.25+rng()*.7);const cx=p.x+Math.cos(a)*r,cz=p.z+Math.sin(a)*r;if(buildings.some(b=>Math.abs(cx-b.x)<b.w/2+2.5&&Math.abs(cz-b.z)<b.d/2+2.5))continue;const y=H(cx,cz);const sz=1.1+rng()*.9;const col=['#9b6a3a','#7a8a9a','#c0463a','#4a8a5a'][Math.floor(rng()*4)];partMat='stone';addBox(cx-sz/2,y,cz-sz/2,cx+sz/2,y+sz,cz+sz/2,col);if(rng()<.4)addBox(cx-sz/3,y+sz,cz-sz/3,cx+sz/3,y+sz*1.6,cz+sz/3,col);partMat=null}
-});
- // cliff walls: solid rock along the edge of each cliff, from the low ground up to the top
- {for(const[cx,cz,a,L]of CLIFFS){const ca=Math.cos(a),sa=Math.sin(a);
-  for(let t=-L;t<=L;t+=2){const px=cx+ca*t,pz=cz+sa*t;const lo=[px-sa*-2.5,pz+ca*-2.5],hi=[px-sa*2.5,pz+ca*2.5];
-   const y0=Math.min(H(lo[0],lo[1]),H(hi[0],hi[1]))-.5,y1=Math.max(H(lo[0],lo[1]),H(hi[0],hi[1]))+.5;
-   addBox(px-1.1,y0,pz-1.1,px+1.1,y1,pz+1.1,'#8b8579')}}}
- // lighthouse on the coast
- {let lx=0,lz=0;const a=1.9;for(let r=340;r>120;r-=3){const x=Math.cos(a)*r,z=Math.sin(a)*r;if(H(x,z)>3.4){lx=x;lz=z;break}}const yy=H(lx,lz);addCyl(lx,lz,2.6,yy,yy+24);landmarks.push({k:'lighthouse',x:lx,y:yy,z:lz});lootSpots.push({x:lx+3.5,z:lz,y:yy+.1,inside:false,chest:true,q:1.8})}
- // Mount Muffin summit
- {let bx=-75,bz=-95,bh=-9;for(let x=-115;x<=-35;x+=2)for(let z=-135;z<=-55;z+=2){const hh=H(x,z);if(hh>bh){bh=hh;bx=x;bz=z}}landmarks.push({k:'flag',x:bx,y:bh,z:bz});standSign('MOUNT MUFFIN',bx+3,bz+3,0.6,8,1.8,'#6a5acd','#fff');lootSpots.push({x:bx-2,z:bz+1.5,y:bh+.1,inside:false,chest:true,q:2.4});lootSpots.push({x:bx+1,z:bz-2,y:bh+.1,inside:false,chest:false,q:2})}
- // trees
+ // rubble piles around each district (not in forts)
+ POIS.forEach(p=>{if(p.type==='fort')return; for(let i=0;i<10;i++){const a=rng()*6.283,r=p.r*(.25+rng()*.7);const cx=p.x+Math.cos(a)*r,cz=p.z+Math.sin(a)*r;if(buildings.some(b=>Math.abs(cx-b.x)<b.w/2+2.5&&Math.abs(cz-b.z)<b.d/2+2.5))continue;const y=H(cx,cz);const sz=1.1+rng()*.9;const col=['#9b6a3a','#7a8a9a','#c0463a','#4a8a5a'][Math.floor(rng()*4)];partMat='stone';addBox(cx-sz/2,y,cz-sz/2,cx+sz/2,y+sz,cz+sz/2,col);if(rng()<.4)addBox(cx-sz/3,y+sz,cz-sz/3,cx+sz/3,y+sz*1.6,cz+sz/3,col);partMat=null}});
+ buildLandmarks(rng);
+ // trees: not in districts, not on roads, not on beaches or the lake shore
  for(let x=-ISL-20;x<ISL+20;x+=8)for(let z=-ISL-20;z<ISL+20;z+=8){
   const tx=x+(rng()-.5)*7,tz=z+(rng()-.5)*7;const h=H(tx,tz);if(h<2.6||h>34)continue;
   const f=fbm(tx*.03+40,tz*.03+40);if(f<.46&&rng()<.85)continue;if(f<.52&&rng()<.5)continue;
+  if(roadDist(tx,tz)<5)continue;
   let bad=false;for(const p of POIS)if(Math.hypot(tx-p.x,tz-p.z)<p.r*(p.type==='cabins'?.55:1.12)){bad=true;break}if(bad)continue;
+  if(LAKES.some(L=>Math.hypot(tx-L.x,tz-L.z)<L.r+6))continue;
   const[gx,gz]=slope(tx,tz);if(Math.hypot(gx,gz)>.7)continue;
   const sc=.8+rng()*.8;const c={x:tx,z:tz,r:.55*sc,y0:h,y1:h+9*sc,tree:true,sc,kind:rng()<.25?1:0,pk:'tree',mat:'tree',hp:TREE_HP,maxHp:TREE_HP,idx:treeList.length};treeList.push(c);insertCircle(c);circles.push(c)}
- for(let i=0;i<160;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.9;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.9){bad=true;break}if(bad)continue;
+ // rocks
+ for(let i=0;i<160;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.9;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.9){bad=true;break}if(bad)continue;if(roadDist(x,z)<4)continue;
   const sc=1+rng()*2.2;const c={x,z,r:1.1*sc,y0:h-1,y1:h+1.3*sc,rock:true,sc,rot:rng()*6,pk:'rock',mat:'rock',hp:rockHp(sc),maxHp:rockHp(sc),idx:rockList.length};rockList.push(c);insertCircle(c);circles.push(c)}
  // outdoor loot spots
  for(const p of POIS){const cnt=p.r>=50?16:p.r>=30?12:8;for(let i=0;i<cnt;i++){const a=rng()*6.283,r=Math.sqrt(rng())*p.r*.9;lootSpots.push({x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:false,q:.7})}}
@@ -312,7 +536,15 @@ export function buildMap(){
  for(const s of lootSpots)if(!s.inside)s.y=H(s.x,s.z)+.1;
  fixLootSpots();
 }
-// ---- loot spot cleanup + extra chests (runs once after the map is built; uses its own rng so the map layout is unchanged)
+
+export const landmarks=[];
+function addCyl(x,z,r,y0,y1){const c={x,z,r,y0,y1};insertCircle(c);circles.push(c);return c}
+const SIGN=(text,x,y,z,rot,w,h,bg,fg)=>landmarks.push({k:'sign',text,x,y,z,rot:rot||0,w,h,bg:bg||'#c0392b',fg:fg||'#fff'});
+function standSign(text,x,z,rot,w,h,bg,fg){const pm=partMat;partMat=null;try{standSign_(text,x,z,rot,w,h,bg,fg)}finally{partMat=pm}}
+function standSign_(text,x,z,rot,w,h,bg,fg){const y=H(x,z);const c=Math.cos(rot),sn=Math.sin(rot);for(const o of[-w/2+.4,w/2-.4]){addBox(x+c*o-.2,y,z-sn*o-.2,x+c*o+.2,y+h+1.6,z-sn*o+.2,'#6b5a45')}SIGN(text,x,y+1.6+h/2,z,rot,w,h,bg,fg)}
+let built=false,treeList=[],rockList=[];
+export const decorInst={tree:[],rock:[]}; // instanced meshes + pristine matrices, so felled trees/rocks can be hidden and restored
+
 function spotBlocked(x,y,z,r){return blocked(x,y,z,r,1.2,.05)}
 function nudgeSpot(s,r){ // find a nearby clear position, return true if found
  if(!spotBlocked(s.x,s.y,s.z,r))return true;
@@ -331,21 +563,32 @@ function fixLootSpots(){
   if(!nudgeSpot(s,s.chest?.75:.4))continue; // drop spots that are buried in a wall/prop and can't be moved
   keep.push(s)}
  lootSpots.length=0;for(const s of keep)lootSpots.push(s);
- // extra chests: one more in every building that has none, plus outdoor chests scattered around each POI
  const r2=mulberry32(4242);
+ // inside buildings: one extra chest in most buildings that have none
  for(const b of buildings){
   if(lootSpots.some(s=>s.chest&&s.inside&&Math.abs(s.x-b.x)<b.w/2&&Math.abs(s.z-b.z)<b.d/2))continue;
   if(r2()<.55){const s={x:b.x+(r2()-.5)*(b.w-4),z:b.z+(r2()<.5?-1:1)*(b.d/2-1.1),y:b.y0+.1,door:b.door,inside:true,chest:true,q:1.3};if(nudgeSpot(s,.75))lootSpots.push(s)}}
+ // outdoor chests in each district: two (three in the fort), kept apart
  for(const p of POIS){
   const n=p.type==='fort'?3:2;let made=0;
   for(let t=0;t<40&&made<n;t++){const a=r2()*6.283,r=p.r*(.3+r2()*.7);const s={x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:true,q:1.4};
    s.y=H(s.x,s.z)+.1;if(s.y<2.6)continue;const[gx,gz]=slope(s.x,s.z);if(Math.hypot(gx,gz)>.6)continue;
    if(!nudgeSpot(s,.75))continue;if(lootSpots.some(o=>o.chest&&Math.hypot(o.x-s.x,o.z-s.z)<14))continue;lootSpots.push(s);made++}}
- // wilderness chests so the open areas aren't empty
- let w=0;for(let t=0;t<400&&w<18;t++){const a=r2()*6.283,r=Math.sqrt(r2())*ISL*.8;const s={x:Math.cos(a)*r,z:Math.sin(a)*r,y:0,inside:false,chest:true,q:1};
-  s.y=H(s.x,s.z)+.1;if(s.y<3)continue;const[gx,gz]=slope(s.x,s.z);if(Math.hypot(gx,gz)>.5)continue;
-  if(!nudgeSpot(s,.75))continue;if(lootSpots.some(o=>o.chest&&Math.hypot(o.x-s.x,o.z-s.z)<35))continue;lootSpots.push(s);w++}
+ // scenic chests replace the old random wilderness chests: on hilltops, along the lake and the coast, spread out
+ const spread=lootSpots.filter(s=>s.chest).map(s=>[s.x,s.z]);
+ let w=0;
+ for(let t=0;t<900&&w<12;t++){
+  const a=r2()*6.283,r=Math.sqrt(r2())*ISL*.82;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);
+  const dl=LAKES.reduce((m,L)=>Math.min(m,Math.hypot(x-L.x,z-L.z)-L.r),1e9);
+  const hill=h>14,shore=h>.8&&h<2.4&&r>ISL*.7,lake=dl>-2&&dl<10&&h>.9&&h<3;
+  if(!(hill||shore||lake))continue;
+  const[gx,gz]=slope(x,z);if(Math.hypot(gx,gz)>.6)continue;
+  if(spread.some(([sx,sz])=>Math.hypot(sx-x,sz-z)<50))continue;
+  const s={x,z,y:h+.1,inside:false,chest:true,q:1};
+  if(!nudgeSpot(s,.75))continue;
+  lootSpots.push(s);spread.push([s.x,s.z]);w++}
 }
+
 // ---------------- rays
 const _q=[];
 export function rayBoxT(b,ox,oy,oz,dx,dy,dz,maxT){let t0=0,t1=maxT;
@@ -482,6 +725,8 @@ export function addDecor(scene){
   if(l.k==='windmill'){g.add(mk(CY,'#e8dcc0',0,6.5,0,3.4,13,3.4));g.children[0].scale.set(3.4,13,3.4);g.add(mk(SP,'#8a3a2a',0,13.2,0,3.2,2.4,3.2));const bl=new THREE.Group();bl.position.set(0,13,2);for(let i=0;i<4;i++){const b=mk(BX,'#f4f0e6',0,0,0,1.1,7.5,.15,0,0,i*Math.PI/2);b.position.set(-Math.sin(i*Math.PI/2)*3.9,Math.cos(i*Math.PI/2)*3.9,0);bl.add(b)}g.add(bl);scene.add(g);anim.push(t=>{bl.rotation.z=t*.7});continue}
   if(l.k==='silo'){g.add(mk(CY,'#d5dadf',0,5.5,0,5.2,11,5.2));g.add(mk(SP,'#c0392b',0,11,0,5.2,2.6,5.2));scene.add(g);continue}
   if(l.k==='lighthouse'){for(let i=0;i<4;i++){const r=4.8-i*.55;g.add(mk(CY,i%2?'#d93a3a':'#f6f6f6',0,i*5.5+2.75,0,r,5.5,r))}g.add(mk(CY,'#333',0,22.2,0,5,.5,5));g.add(mk(CY,'#fff7a0',0,23.4,0,2.2,2,2.2,0,0,0,'#ffe066'));g.add(mk(SP,'#d93a3a',0,25,0,3,2.4,3));const beam=new THREE.Mesh(new THREE.BoxGeometry(60,1.2,2.6),new THREE.MeshBasicMaterial({color:'#fff3a0',transparent:true,opacity:.22,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}));beam.position.set(0,23.4,0);g.add(beam);scene.add(g);anim.push(t=>{beam.rotation.y=t*1.2});continue}
+  if(l.k==='turbine'){g.add(mk(CY,'#f4f6f8',0,13,0,1.1,26,1.1));const hub=new THREE.Group();hub.position.set(0,26,.6);for(let i=0;i<3;i++){const th=i*2.094;const b=mk(BX,'#fbfdff',0,0,0,.6,12,.12,0,0,-th);b.position.set(Math.sin(th)*6,Math.cos(th)*6,0);hub.add(b)}g.add(hub);scene.add(g);anim.push(t=>{hub.rotation.z=t*.9});continue}
+  if(l.k==='tank'){g.add(mk(CY,'#e9edf1',0,10+l.h/2,0,l.r*2,l.h,l.r*2));g.add(mk(SP,'#e9edf1',0,10+l.h,0,l.r*2,l.r*.9,l.r*2));for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]])g.add(mk(BX,'#8e96a0',sx*l.r*.7,5,sz*l.r*.7,.5,10,.5));scene.add(g);continue}
   if(l.k==='flag'){g.add(mk(CY,'#cfcfcf',0,5,0,.25,10,.25));const cl=mk(BX,'#ff3d6a',1.4,9,0,2.8,1.8,.08);g.add(cl);scene.add(g);anim.push(t=>{cl.rotation.y=Math.sin(t*3)*.25;cl.scale.x=2.8+Math.sin(t*5)*.15});continue}
  }
  return {update(t){for(const a of anim)a(t)}}

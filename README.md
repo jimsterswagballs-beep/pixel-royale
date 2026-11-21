@@ -1,3 +1,51 @@
+# Pixel Royale: v26 revive and reboot screens
+
+- **Downed screen** (you are knocked): a panel low on screen with a bleed-out bar and seconds left, a revive bar when a teammate is reviving you, and what to do (crawl to cover, and where a teammate needs to stand to revive you). Teammates show as chips: up, down or out.
+- **Reboot screen** (you are eliminated but a teammate can still reboot you): three steps to get you back (teammate finds your card, card carried to a reboot van, rebooted), a line saying what is happening now, card time left and van time left, how many reboot vans are ready, and your teammates.
+- **Elimination card**: now only shows when no reboot is possible (no card, or the card has gone). It used to show straight away in team modes, hiding the reboot.
+- **Reviver card**: a clearer card with the seconds left for the revive you are doing.
+
+Known limits: the new screens were checked with a headless test, not in a browser. The reboot screen follows the card and van state the host sends, so it can lag a moment behind on guests.
+
+# Pixel Royale: v25 cars remake
+
+- **Six kinds of car**: Hatch, Sedan, Pickup, Van, Sports and Jeep. Each has its own body: a boot lip on sedans, a bed on pickups, a roof rack and spare wheel on jeeps, a rear wing and side intakes on sports cars, and a tall rear on vans.
+- **16 paints** with four styles: solid, two-tone roof, racing stripe, and taxi (yellow with a roof sign and checker band, sedans only). Each car's look depends only on its id, so everyone sees the same car.
+- **Details**: window pillars, bumpers, grille, plates, door seams, mirrors, hubcaps and tail lights that glow while the car brakes.
+- **Grip and slides**: tyres now have grip. A car slides in fast turns, slides more on wet roads, and braking hard in a turn lets the back end go. Grip pulls the car back into line.
+- **Car bumps**: cars push apart when they hit each other, and a hard bump damages both.
+- **Getting in**: walk to a door and climb in over about half a second. The nearest free door decides the seat (driver's door, passenger door, or the two rear doors). The prompt shows which seat you will get. You can't climb in while the car is doing more than 5 m/s.
+- **Getting out**: step out of the seat to a clear spot beside or behind the car, checked for walls. The seat is freed straight away.
+- **Smooth for everyone**: your own character animates on your screen when you climb in or out, and the host runs the same animation for everyone else. Your camera switches to third person while you climb in.
+
+Known limits: the bump and slide feel has only been checked with headless tests, and the new car models have not been looked at in a browser. Bots still don't drive or ride in cars.
+
+# Pixel Royale: v24 weather remake
+
+- **Changing weather**: each match runs a schedule of weather periods taken from the match seed, so everyone sees the same sequence. Periods last about 70 to 160 seconds and never repeat back to back. The first 70 seconds are always clear.
+- **Seven periods**: Clear, Overcast, Drizzle, Thunderstorm, Coastal fog, Night and Sandstorm. Each has its own sky, cloud cover, sun, fog distance, wetness and wind.
+- **Smooth transitions**: the sky, clouds, sun, fog and wetness blend over 14 seconds. A toast announces each new period.
+- **Sky**: a new sky shader draws clouds that drift with the wind, stars at night, a sun glow, sand haze in sandstorms, and a flash during lightning.
+- **Lightning**: in a thunderstorm, a warning ring appears near a player, then a bolt, a flash and a thunderclap. The host decides where strikes land, so everyone sees the same ones.
+- **Rain and sand**: rain and sand particles fall around the camera and are blown by the period's wind.
+- **Cars**: grip and top speed scale with wetness instead of a single on/off rain flag, so drizzle is only a little slippery and storms are much more so.
+- **Fog**: coastal fog still closes in near the water. Quality and view distance settings still apply to fog distance.
+
+Known limits: the weather timing runs on each player's own match clock. Clocks can drift by a second or two, so the change to a new period may land slightly apart for different players. Lightning strikes are host-decided, so they match for everyone. The sky shader and the new thunder sound have not been checked in a browser.
+
+# Pixel Royale: v23 map remake
+
+- **Terrain**: rolling ground with a low, sandy east coast with dunes, and hills (Mount Muffin, Radio Hill, a south-east ridge, a north ridge and a western range). Cliff walls are gone.
+- **Lake Muffin**: a lake in the middle of the island, with a bank that slopes down to the water. Lakeside Docks has a pier, a boathouse and canoes.
+- **Roads**: each road is routed with A* over the height grid, so it avoids the lake and the sea and keeps to gentle slopes. Roads are smoothed into curves and the road-side scenery keeps clear of them.
+- **New districts**: Thunder Dome (stadium with tiered stands, gates and floodlights), Old Keep (broken castle with towers and rubble), Camp Pinecone (tents, picnic tables and a fire ring), Lakeside Docks, and a church in the town districts.
+- **New landmarks**: a radio lattice tower on Radio Hill, a windfarm on the ridge, a water tower by Dusty Depot, a shipwreck on the beach, a stone arch and a sand pyramid, plus the lighthouse and Mount Muffin flag from before.
+- **Car spawns**: most cars spawn in district car parks (the new `parking` list), and the rest sit on quiet roads outside districts. No car spawns within 55 m of a player or on top of another car.
+- **Chest spawns**: the old random wilderness chests are replaced by scenic chests on hilltops, along the lake and on the coast, kept 50 m apart. Each landmark has its own chest, and districts keep their chests.
+- **Bug fix (chests not showing until the bus ends)**: chests were only created within about 60 m of the camera, so on the bus and during the drop most of them were not drawn. While you are on the bus or in the air, chests now show from up to 240 m away (supply drops 320 m) and floor loot from 160 m.
+
+Known limits: the map was checked with a Node harness (districts on land, no overlaps, all districts connected by road, roads dry, chests not in water), but not played in a browser. The bus fix is based on reading the code, so please check it in a live match.
+
 # Pixel Royale: v23 map
 
 - New layout: 24 districts with spaced positions and size tiers (large, medium, small). Roads are generated from the layout, so they stay connected as districts move.
