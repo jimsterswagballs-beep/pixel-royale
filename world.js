@@ -272,6 +272,49 @@ export function blocked(x,y,z,r,h,step=.65){query(x,z,r+1,_b);
   else{const dx=x-b.x,dz=z-b.z,rr=b.r+r;if(dx*dx+dz*dz<rr*rr&&y<b.y1&&y+h>b.y0)return true}}return false}
 export function pushOutCircles(e,r,h){query(e.pos.x,e.pos.z,r+3,_b);for(let i=0;i<_b.length;i++){const b=_b[i];if(b.circ===false)continue;const dx=e.pos.x-b.x,dz=e.pos.z-b.z,rr=b.r+r,d2=dx*dx+dz*dz;if(d2<rr*rr&&e.pos.y<b.y1&&e.pos.y+h>b.y0){const d=Math.sqrt(d2)||.001;e.pos.x=b.x+dx/d*rr;e.pos.z=b.z+dz/d*rr}}}
 // ---------------- meshes
+// ---- roads: real road surfaces that follow the hills (asphalt, edge lines, a dashed centre line and kerbs)
+function roadSamples(a,b,step){
+ const A=POIS[a],B=POIS[b];const len=Math.hypot(B.x-A.x,B.z-A.z);
+ const n=Math.max(2,Math.ceil(len/step));const out=[];
+ for(let i=0;i<=n;i++){
+  const t=i/n,p=roadPoint(a,b,t),e=.004;
+  const q1=roadPoint(a,b,Math.max(0,t-e)),q2=roadPoint(a,b,Math.min(1,t+e));
+  let tx=q2.x-q1.x,tz=q2.z-q1.z;const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;
+  out.push({x:p.x,z:p.z,nx:-tz,nz:tx,s:t*len});
+ }
+ return out;
+}
+// a band across the road from offset lo to offset hi (metres to the side), on top of the ground
+function roadBand(arr,S,lo,hi,lift,onlyIf){
+ const put=(x,z)=>[x,H(x,z)+lift,z];
+ for(let i=0;i<S.length-1;i++){
+  const A=S[i],B=S[i+1];if(onlyIf&&!onlyIf(A))continue;
+  const v=[put(A.x+A.nx*hi,A.z+A.nz*hi),put(A.x+A.nx*lo,A.z+A.nz*lo),put(B.x+B.nx*lo,B.z+B.nz*lo),put(B.x+B.nx*hi,B.z+B.nz*hi)];
+  if(v.some(q=>q[1]-lift<.6))continue;      // not on land (water or the very edge of the beach)
+  for(const k of[0,1,2,0,2,3])arr.push(v[k][0],v[k][1],v[k][2]);
+ }
+}
+function buildRoads(){
+ const grp=new THREE.Group();
+ const bands={asph:[],edge:[],dash:[],kerb:[]};
+ for(const[a,b]of ROADS){
+  const S=roadSamples(a,b,1.2);
+  roadBand(bands.asph,S,-3.4,3.4,.12);                 // the road surface
+  roadBand(bands.edge,S,3.05,3.3,.14);                 // white edge lines
+  roadBand(bands.edge,S,-3.3,-3.05,.14);
+  roadBand(bands.dash,S,-.14,.14,.15,A=>A.s%7.2<3.6);   // dashed centre line
+  roadBand(bands.kerb,S,3.4,4.0,.2);                   // kerbs on both sides
+  roadBand(bands.kerb,S,-4.0,-3.4,.2);
+ }
+ const mats={asph:'#4a4d54',edge:'#eef0f2',dash:'#f2c94c',kerb:'#c9bd9c'};
+ for(const k in bands){
+  if(!bands[k].length)continue;
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(bands[k],3));geo.computeVertexNormals();
+  const m=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({color:mats[k],side:THREE.DoubleSide}));m.receiveShadow=true;grp.add(m);
+ }
+ return grp;
+}
+
 export function buildMeshes(scene,quality={}){
  const g=new THREE.Group();scene.add(g);
  const N=380,size=HALF*2;
@@ -289,6 +332,7 @@ export function buildMeshes(scene,quality={}){
   col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b}
  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();
  const terrain=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));terrain.receiveShadow=true;g.add(terrain);
+ g.add(buildRoads());
  const water=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshPhongMaterial({color:'#2f86c8',transparent:true,opacity:.82,shininess:90,specular:'#aee'}));water.rotation.x=-Math.PI/2;water.position.y=WATER;g.add(water);
  // boxes
  const bg=new THREE.BoxGeometry(1,1,1),bm=new THREE.MeshLambertMaterial({color:0xffffff});

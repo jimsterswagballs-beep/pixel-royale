@@ -1,38 +1,73 @@
-// Cars (Season 1): they spawn on the roads, seat up to four players, have 250 hp, burn when low and explode at 0 hp.
+// Cars (Season 1): they spawn on the roads, seat up to four players and burn when low, then explode at 0 hp.
+// There are five kinds of car (sedan, pickup, van, sports, jeep). Each has its own health, top speed, acceleration and turning.
 // The host simulates everything (driving, damage, seats, explosions) and sends the cars in the snapshot ('cr').
 // Guests send their drive input ('carin') and seat requests ('car'). Clients only draw the cars they are sent.
 import * as THREE from 'three';
 import * as W from './world.js';
 import {clamp,mulberry32} from './data.js';
 
-export const CAR_HP=250;          // health
-export const CAR_BURN=90;         // at or below this the car catches fire
+export const CAR_HP=250;          // sedan health (the reference for the burn point)
+export const CAR_BURN=90;         // the sedan burns at or below this (other cars burn at the same share of their health)
 export const CAR_MAX=14;          // cars on the map at once
 export const CAR_RESPAWN_T=7;     // seconds between new cars appearing
 const SEATS=[[-.5,.45],[.5,.45],[-.5,-1],[.5,-1]];   // [right, forward] offsets from the car centre (seat 0 is the driver)
 const CAR_COLS=['#e8453c','#2f7de1','#f2c230','#f4f4f4','#3ab56b','#8d5bd6','#ff8a3d'];
+const GLASS='#2b3a4a',TYRE='#1b1b1f',TRIM='#2a2d33';
 const r2=v=>Math.round(v*100)/100;
 // car frame: forward is (-sin yaw, -cos yaw), right is (cos yaw, -sin yaw); the mesh is built facing -z so rotation.y = yaw
 const fwd=yaw=>[-Math.sin(yaw),-Math.cos(yaw)];
 const right=yaw=>[Math.cos(yaw),-Math.sin(yaw)];
 
+// the five car kinds. hw/L = half width / half length, by/bh = body centre height / height, cy/ch/cz/cl = cabin,
+// wr = wheel radius, ly = headlight height. hp, vmax (top speed), acc (pull), turn (steer rate), brake.
+export const CAR_TYPES=[
+ {name:'Sedan', hp:250,vmax:28,acc:13,turn:1.4,brake:4,  hw:1.05,L:2.1, by:.8, bh:.75,cy:1.5, ch:.62,cz:-.15,cl:2.2, wr:.42,ly:.86,extra:null},
+ {name:'Pickup',hp:300,vmax:26,acc:11,turn:1.2,brake:3.6,hw:1.05,L:2.3, by:.8, bh:.7, cy:1.45,ch:.6, cz:-.7, cl:1.7, wr:.44,ly:.9, extra:'bed'},
+ {name:'Van',   hp:330,vmax:22,acc:8.5,turn:1.0,brake:3.2,hw:1.15,L:2.4, by:1.15,bh:1.5,cy:1.7, ch:.45,cz:0,   cl:3.0, wr:.42,ly:.95,extra:null},
+ {name:'Sports',hp:180,vmax:36,acc:18,turn:1.8,brake:5,  hw:.98, L:2.05,by:.65,bh:.5, cy:1.05,ch:.42,cz:.1,  cl:1.5, wr:.36,ly:.62,extra:'spoiler'},
+ {name:'Jeep',  hp:290,vmax:24,acc:11,turn:1.3,brake:4.2,hw:1.1, L:2.1, by:.95,bh:.8, cy:1.7, ch:.6, cz:-.1, cl:1.9, wr:.5, ly:1.0,extra:'rack'},
+];
+
 function box(w,h,d,c,x,y,z){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshLambertMaterial({color:c}));m.position.set(x,y,z);m.castShadow=true;return m}
-function makeCarGroup(col){
- const g=new THREE.Group();
- g.add(box(2.1,.75,4.2,col,0,.8,0));                 // body
- g.add(box(1.8,.62,2.2,'#2b3a4a',0,1.5,-.15));       // glass cabin
- g.add(box(1.9,.08,2.0,col,0,1.85,-.15));            // roof
- for(const x of[-1.05,1.05])for(const z of[-1.35,1.35]){const w=new THREE.Mesh(new THREE.CylinderGeometry(.42,.42,.32,10),new THREE.MeshLambertMaterial({color:'#1b1b1f'}));w.rotation.z=Math.PI/2;w.position.set(x,.42,z);g.add(w)}
- for(const x of[-.7,.7]){g.add(box(.42,.22,.1,'#fff6c8',x,.86,-2.12));g.add(box(.42,.22,.1,'#ff3b3b',x,.86,2.12))}   // headlights and tail lights
+const tyreMat=new THREE.MeshLambertMaterial({color:TYRE});
+function makeCarGroup(col,t){
+ const g=new THREE.Group();const hw=t.hw,L=t.L;
+ g.add(box(hw*2,t.bh,L*2,col,0,t.by,0));                                   // body
+ g.add(box(hw*2*.86,t.ch,t.cl,GLASS,0,t.cy,t.cz));                          // glass cabin
+ g.add(box(hw*2*.9,.08,t.cl*.96,col,0,t.cy+t.ch/2+.04,t.cz));              // roof
+ if(t.extra==='bed'){                                                         // pickup: open bed behind the cab
+  const bz=.25+(L-.25)/2,bl=L-.25;
+  g.add(box(hw*2-.12,.03,bl,'#5b6069',0,t.by+t.bh/2+.02,bz));
+  g.add(box(.1,.4,bl,col,-(hw-.05),t.by+t.bh/2+.2,bz));g.add(box(.1,.4,bl,col,hw-.05,t.by+t.bh/2+.2,bz));
+  g.add(box(hw*2,.4,.1,col,0,t.by+t.bh/2+.2,L-.05));
+ }
+ if(t.extra==='spoiler'){                                                     // sports: rear wing
+  for(const x of[-.7,.7])g.add(box(.08,.4,.08,TRIM,x*hw,t.by+t.bh/2+.2,L-.3));
+  g.add(box(hw*2*.9,.06,.35,col,0,t.by+t.bh/2+.42,L-.25));
+ }
+ if(t.extra==='rack'){                                                        // jeep: roof rack and spare wheel
+  g.add(box(hw*2*.9,.05,t.cl*.9,TRIM,0,t.cy+t.ch/2+.14,t.cz));
+  g.add(box(.24,.5,.5,TRIM,0,t.by,L+.22));
+ }
+ // wheels: each sits on a pivot that spins (and steers, at the front)
+ const wheels=[];
+ for(const x of[-1,1])for(const z of[-1,1]){
+  const pivot=new THREE.Group();pivot.rotation.order='YXZ';pivot.position.set(x*(hw-.02),t.wr,z*L*.62);
+  const w=new THREE.Mesh(new THREE.CylinderGeometry(t.wr,t.wr,.32,10),tyreMat);w.rotation.z=Math.PI/2;w.castShadow=true;pivot.add(w);
+  const stripe=box(.03,t.wr*1.5,.12,'#c9ced6',x*.17,0,0);pivot.add(stripe);     // a stripe so the spin shows
+  g.add(pivot);wheels.push({pivot,front:z<0});
+ }
+ // headlights and tail lights
+ for(const x of[-.67,.67]){g.add(box(.42,.22,.1,'#fff6c8',x*hw,t.ly,-L-.01));g.add(box(.42,.22,.1,'#ff3b3b',x*hw,t.ly,L+.01))}
  // flames for a burning car: three flickering cones
  const flame=new THREE.Group();flame.visible=false;
- for(let i=0;i<3;i++){const f=new THREE.Mesh(new THREE.ConeGeometry(.55,1.6,6),new THREE.MeshBasicMaterial({color:i===1?'#ffd23d':'#ff7a2b',transparent:true,opacity:.9}));f.position.set((i-1)*.6,2.2,(i%2?.4:-.4));flame.add(f)}
+ for(let i=0;i<3;i++){const f=new THREE.Mesh(new THREE.ConeGeometry(.55,1.6,6),new THREE.MeshBasicMaterial({color:i===1?'#ffd23d':'#ff7a2b',transparent:true,opacity:.9}));f.position.set((i-1)*.6,t.by+t.bh/2+1.2,(i%2?.4:-.4));flame.add(f)}
  g.add(flame);
  // headlight beams: only visible at night
  const beams=new THREE.Group();beams.visible=false;const bm=new THREE.MeshBasicMaterial({color:'#fff6c8',transparent:true,opacity:.16,depthWrite:false});
- for(const x of[-.7,.7]){const cone=new THREE.Mesh(new THREE.ConeGeometry(1.5,9,12,1,true),bm);cone.rotation.x=Math.PI/2;cone.position.set(x,.86,-6.6);beams.add(cone)}
+ for(const x of[-.67,.67]){const cone=new THREE.Mesh(new THREE.ConeGeometry(1.5,9,12,1,true),bm);cone.rotation.x=-Math.PI/2;cone.position.set(x*hw,t.ly,-(L+4.6));beams.add(cone)}
  g.add(beams);
- return{g,flame,beams}
+ return{g,flame,beams,wheels}
 }
 
 export const carMethods={
@@ -41,10 +76,12 @@ export const carMethods={
   if(this.cars)for(const c of this.cars.values())this.dynamic.remove(c.group);
   this.cars=new Map();this.carRespawnT=2;
  },
- spawnCar(id,x,z,yaw){
-  const cols=CAR_COLS[(id*7)%CAR_COLS.length];const built=makeCarGroup(cols);
-  const c={id,x,y:W.H(x,z),z,yaw,v:0,hp:CAR_HP,seats:[-1,-1,-1,-1],inp:{th:0,st:0,br:0},hitT:new Map(),
-   tx:x,ty:W.H(x,z),tz:z,tyaw:yaw,burn:false,group:built.g,flame:built.flame,beams:built.beams,dustT:0,fireT:0,lights:false};
+ spawnCar(id,x,z,yaw,type=0){
+  const ti=CAR_TYPES[type]?type:0,spec=CAR_TYPES[ti];
+  const cols=CAR_COLS[(id*7)%CAR_COLS.length];const built=makeCarGroup(cols,spec);
+  const c={id,x,y:W.H(x,z),z,yaw,v:0,yr:0,type:ti,spec,hp:spec.hp,maxHp:spec.hp,seats:[-1,-1,-1,-1],inp:{th:0,st:0,br:0},hitT:new Map(),
+   tx:x,ty:W.H(x,z),tz:z,tyaw:yaw,burn:false,group:built.g,flame:built.flame,beams:built.beams,wheels:built.wheels,dustT:0,fireT:0,lights:false,
+   pitch:0,roll:0,spin:0,sw:0,vyaw:yaw,vv:0};
   built.g.position.set(c.x,c.y,c.z);built.g.rotation.y=yaw;this.dynamic.add(built.g);
   this.cars.set(id,c);return c;
  },
@@ -61,7 +98,8 @@ export const carMethods={
    const [fx,fz]=fwd(yaw);let clear=!W.blocked(p.x,W.H(p.x,p.z)+.2,p.z,1.3,1.3,.6);
    for(let d=2;d<=12&&clear;d+=2){const x=p.x+fx*d,z=p.z+fz*d;if(W.blocked(x,W.H(x,z)+.2,z,1.3,1.3,.6))clear=false}
    if(!clear)continue;
-   this.spawnCar(this.carSeq=(this.carSeq||0)+1,p.x,p.z,yaw);return true}
+   const type=Math.floor(rng()*CAR_TYPES.length);
+   this.spawnCar(this.carSeq=(this.carSeq||0)+1,p.x,p.z,yaw,type);return true}
   return false;
  },
  // host: the first cars at the start of a match
@@ -102,13 +140,17 @@ export const carMethods={
   if(this.role==='client'){this.net.toHost({t:'car',k:kind,id});return}
   if(kind==='enter')this.carEnter(e,id);else if(kind==='exit')this.carExit(e);else if(kind==='seat')this.carSwap(e);
  },
- // the local player's keys: enter/exit and seat swap (the car actions are rebindable in Controls)
- carLocalKeys(){
-  const me=this.me,I=this.input;if(!me||!this.app.inputActive())return;
-  const enter=I.pressed('carEnter'),swap=I.pressed('carSeat');
-  if(!enter&&!swap)return;
-  if(me.car>=0){if(enter)this.carReq(me,'exit');else if(swap)this.carReq(me,'seat');return}
-  if(enter){const c=this.nearestCar(me,5);if(c)this.carReq(me,'enter',c.id)}
+ // interact gets out of a car (returns true when it used the press, so it does not also pick anything up).
+ // swap seat is its own key (rebindable in Controls).
+ carInCarKeys(){
+  const me=this.me,I=this.input;if(!me||me.car<0||!this.app.inputActive())return false;
+  if(I.pressed('interact')){this.carReq(me,'exit');return true}
+  if(I.pressed('carSeat'))this.carReq(me,'seat');
+  return false;
+ },
+ // interact outside a car: get in the nearest car within reach (loot on the ground comes first, see movement)
+ carEnterNearby(){
+  const c=this.nearestCar(this.me,5);if(c)this.carReq(this.me,'enter',c.id);
  },
  carLocalInput(){
   const I=this.input;if(!this.app.inputActive())return{th:0,st:0,br:0};
@@ -123,19 +165,28 @@ export const carMethods={
   for(const c of [...this.cars.values()])this.driveCar(c,dt);
  },
  driveCar(c,dt){
+  const spec=c.spec;
   const driver=this.ents.get(c.seats[0]);
   let inp=c.inp;if(driver&&driver===this.me&&this.role!=='client')inp=this.carLocalInput();
   const th=clamp(inp.th||0,-1,1),st=clamp(inp.st||0,-1,1),br=!!inp.br;
   c.lights=th<0||br;
-  // speed: throttle, reverse, brake, and rolling drag
-  let v=c.v;
   // rain: less grip, so slower to speed up, lower top speed, weaker brakes and sharper steering
   const wet=this.weather==='rain',grip=wet?.6:1;
-  if(th>0)v+=th*13*grip*dt;else if(th<0)v+=th*(v>0?16:7)*dt;else v*=(1-.5*dt);
-  if(br)v*=(1-4*grip*dt);
-  v*=(1-.12*dt);v=clamp(v,-9,wet?20:28);
+  let v=c.v;
+  // engine: pulls hard from a stop and tapers off near the top speed; reverse is slow
+  if(th>0)v+=th*spec.acc*grip*(1-.5*clamp(v/spec.vmax,0,1))*dt;
+  else if(th<0)v+=th*(v>0?spec.brake*3.2:spec.acc*.5)*dt;
+  else v*=(1-.5*dt);                                              // coasting slows down a little
+  if(br)v*=(1-spec.brake*grip*dt);
+  // hills: going uphill slows the car, going downhill speeds it up
+  const [sx,sz]=W.slope(c.x,c.z);const [fx0,fz0]=fwd(c.yaw);
+  v-=(sx*fx0+sz*fz0)*4.5*dt;
+  v*=(1-.12*dt);v=clamp(v,-spec.vmax*.3,spec.vmax*(wet?.72:1));
+  // steering: the turn builds up and fades (inertia), and only turns the car once it is moving
   const sp=Math.abs(v);
-  if(sp>.5)c.yaw-=st*Math.sign(v)*Math.min(1,sp/10)*1.4*(wet?1.3:1)*dt;   // D turns right
+  const tyr=sp>.5?-st*Math.sign(v)*Math.min(1,sp/10)*spec.turn*(wet?1.3:1):0;
+  c.yr=(c.yr||0)+(tyr-(c.yr||0))*Math.min(1,dt*(wet?3.5:6));
+  c.yaw+=c.yr*dt;
   const [fx,fz]=fwd(c.yaw);
   const nx=c.x+fx*v*dt,nz=c.z+fz*v*dt,ny=W.H(nx,nz);
   const [gx,gz]=W.slope(nx,nz);
@@ -162,8 +213,8 @@ export const carMethods={
    e.car=c.id;e.seat=i;const [px,pz]=this.seatPos(c,i);
    e.pos.set(px,c.y+.05,pz);e.vel.set(0,0,0);if(e.tgt){e.tgt.x=px;e.tgt.y=c.y+.05;e.tgt.z=pz}
   });
-  // burning, then explode at 0 hp
-  if(c.hp<=CAR_BURN){c.burn=true}
+  // burning (at the same share of health for every kind of car), then explode at 0 hp
+  if(c.hp<=c.maxHp*CAR_BURN/CAR_HP){c.burn=true}
   if(c.hp<=0){this.carExplode(c,driver);return}
   if(c.burn){this.fx.emit(c.x+(Math.random()-.5)*1.4,c.y+1.8,c.z+(Math.random()-.5)*1.4,0,1.6,0,'#5a5a60',1.1,0,.6,1.6,.4,.7)}
  },
@@ -198,30 +249,43 @@ export const carMethods={
  // ---- snapshot (host -> guests) and applying it on guests
  carSnap(){
   if(!this.cars)return[];
-  return[...this.cars.values()].map(c=>[c.id,r2(c.x),r2(c.y),r2(c.z),r2(c.yaw),Math.round(c.hp),c.burn?1:0,r2(c.v),c.seats[0],c.seats[1],c.seats[2],c.seats[3]]);
+  return[...this.cars.values()].map(c=>[c.id,r2(c.x),r2(c.y),r2(c.z),r2(c.yaw),Math.round(c.hp),c.burn?1:0,r2(c.v),c.seats[0],c.seats[1],c.seats[2],c.seats[3],c.type]);
  },
  applyCarSnap(list){
   if(!this.cars)this.cars=new Map();
   const seen=new Set();
   for(const a of list){
    const id=a[0];seen.add(id);
-   let c=this.cars.get(id);if(!c)c=this.spawnCar(id,a[1],a[3],a[4]);
+   let c=this.cars.get(id);if(!c)c=this.spawnCar(id,a[1],a[3],a[4],a[12]||0);
    c.tx=a[1];c.ty=a[2];c.tz=a[3];c.tyaw=a[4];c.hp=a[5];c.burn=!!a[6];c.v=a[7];c.seats=[a[8],a[9],a[10],a[11]];
   }
   for(const [id,c] of [...this.cars]){if(!seen.has(id)){this.dynamic.remove(c.group);this.cars.delete(id)}}
   for(const e of this.list)e.car=-1;
   for(const c of this.cars.values())c.seats.forEach((sid,i)=>{const e=this.ents.get(sid);if(e){e.car=c.id;e.seat=i}});
  },
- // every frame, everywhere: move the drawn cars toward their state and place the people in them
+ // every frame, everywhere: move the drawn cars toward their state, tilt them over the ground and turn the wheels
  updateCarVis(dt){
   if(!this.cars)return;
-  const me=this.me;
   for(const c of this.cars.values()){
    if(this.role==='client'){
     const k=Math.min(1,dt*14);c.x+=(c.tx-c.x)*k;c.z+=(c.tz-c.z)*k;c.y+=(c.ty-c.y)*k;let dy=c.tyaw-c.yaw;dy=Math.atan2(Math.sin(dy),Math.cos(dy));c.yaw+=dy*k;
     c.seats.forEach((sid,i)=>{const e=this.ents.get(sid);if(!e)return;const[px,pz]=this.seatPos(c,i);e.pos.set(px,c.y+.05,pz);if(e.tgt){e.tgt.x=px;e.tgt.y=c.y+.05;e.tgt.z=pz}})
    }
-   c.group.position.set(c.x,c.y,c.z);c.group.rotation.y=c.yaw;
+   // how fast it is turning and accelerating (measured, so guests see the same lean)
+   let dyw=c.yaw-c.vyaw;dyw=Math.atan2(Math.sin(dyw),Math.cos(dyw));
+   const yr=dt>0?clamp(dyw/dt,-2,2):0;c.vyaw=c.yaw;
+   const acc=dt>0?clamp((c.v-c.vv)/dt,-12,12):0;c.vv=c.v;
+   // tilt: follow the ground (nose up going uphill, right side up on a side slope), plus squat/dip and lean in a turn
+   const [gx,gz]=W.slope(c.x,c.z);const [fx,fz]=fwd(c.yaw),[rx,rz]=right(c.yaw);
+   const tp=clamp(Math.atan(gx*fx+gz*fz)*.6+acc*.008,-.22,.22);
+   const tr=clamp(Math.atan(gx*rx+gz*rz)*.6-yr*c.v*.006,-.14,.14);
+   const k2=Math.min(1,dt*8);c.pitch+=(tp-c.pitch)*k2;c.roll+=(tr-c.roll)*k2;
+   c.group.position.set(c.x,c.y,c.z);
+   c.group.rotation.set(c.pitch,c.yaw,c.roll,'YXZ');
+   // wheels spin with the speed; the front ones turn with the steering
+   c.spin+=c.v*dt/c.spec.wr;
+   c.sw+=(clamp(yr/c.spec.turn,-1,1)*.5-c.sw)*Math.min(1,dt*10);
+   for(const w of c.wheels)w.pivot.rotation.set(c.spin,w.front?c.sw:0,0,'YXZ');
    c.group.visible=true;     // the car body is always drawn (you are in third person while driving)
    c.flame.visible=c.burn;
    if(c.beams)c.beams.visible=this.weather==='night';
@@ -238,5 +302,3 @@ export const carMethods={
   for(let k=0;k<2;k++){const ang=a+k*Math.PI;this.fx.emit(me.pos.x+Math.cos(ang)*.8,me.pos.y+.9,me.pos.z+Math.sin(ang)*.8,0,1.6,0,col,.55,0,.28,-.5,.25,1)}
  },
 };
-
-

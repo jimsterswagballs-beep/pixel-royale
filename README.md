@@ -1,4 +1,12 @@
-# Pixel Royale: v21 update
+# Pixel Royale: v22 update
+
+- Interact (E by default) gets in and out of cars. Loot on the ground still comes first when you stand on it. The separate "Enter / Exit Car" key is gone; swap seat is still its own key.
+- Five car kinds: Sedan, Pickup, Van, Sports and Jeep. Each has its own health, top speed, acceleration and handling. The kind is sent to everyone in the match.
+- Driving feel: the engine pulls hard from a stop and tapers near top speed, hills slow you going up and speed you going down, turns build up and fade, and the wheels spin and steer.
+- Cars tilt over slopes and lean in turns.
+- Roads have real surfaces: asphalt, white edge lines, a dashed centre line and kerbs. They follow the hills.
+
+## v21 update
 
 Fixes from the v20 report:
 - Joining a match no longer leaves the map invisible. Night and fog weather used to close the view while the Battle Bus was still far out. The view now stays open during the bus ride.

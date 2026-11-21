@@ -205,9 +205,9 @@ export class HUD{
  // car HUD: your seat, car health and the keys (or a prompt when a car is close)
  carHud(g,me,B){
   const el=this.q('#carhud');const c=g.carOf(me);
-  if(c){el.style.display='block';el.innerHTML=`<b>${c.seats[0]===me.id?'Driving':'Passenger'}</b> · <kbd>${keyLabel(B.carEnter)}</kbd> get out · <kbd>${keyLabel(B.carSeat)}</kbd> swap seat${c.burn?' · <span class="onfire">ON FIRE</span>':''}<div class="cbar"><i style="width:${clamp(c.hp/250*100,0,100)}%"></i></div>`;return}
+  if(c){el.style.display='block';el.innerHTML=`<b>${c.spec.name} · ${c.seats[0]===me.id?'Driving':'Passenger'}</b> · <kbd>${keyLabel(B.interact)}</kbd> get out · <kbd>${keyLabel(B.carSeat)}</kbd> swap seat${c.burn?' · <span class="onfire">ON FIRE</span>':''}<div class="cbar"><i style="width:${clamp(c.hp/c.maxHp*100,0,100)}%"></i></div>`;return}
   const n=me.alive&&!me.drop&&g.nearestCar?g.nearestCar(me,5):null;
-  if(n){el.style.display='block';el.innerHTML=`Press <kbd>${keyLabel(B.carEnter)}</kbd> to get in`}else el.style.display='none';
+  if(n){el.style.display='block';el.innerHTML=`Press <kbd>${keyLabel(B.interact)}</kbd> to get in`}else el.style.display='none';
  }
  // waiting for reboot: shown while you are knocked (team modes). Countdown, your reboot card, vans and teammates.
  renderRebootWait(g,me){

@@ -18,7 +18,7 @@ export const movementMethods={
  },
  updateLocal(dt){
   const me=this.me,I=this.input,s=this.settings,v=this.view;const active=this.app.inputActive();
-  this.carLocalKeys();   // enter, exit and swap seats before looting so the car keys win
+  const leftCar=this.carInCarKeys();   // interact gets out of a car first; swap seat is its own key
   const{dx,dy}=I.takeLook();
   const cur=me.inv[me.cur];const wd=cur&&cur.k==='w'?wstat(cur.w,cur.r):null;
   if(active){const ads=v.adsK>.05;const ratio=Math.tan(this.camera.fov*Math.PI/360)/Math.tan(s.fov*Math.PI/360);let k=.0022*s.sens*s.camSens*ratio*(ads?(1-v.adsK)+v.adsK*s.adsSens:1);if(me.eatT>0)k*=.3;me.yaw-=dx*k;me.pitch=clamp(me.pitch-dy*k*(s.invertY?-1:1),-1.5,1.5)}
@@ -49,7 +49,8 @@ export const movementMethods={
    if(!me.knocked&&I.pressed('drop'))this.dropCurrent(me);
    // interact
    this.updateNearLoot(me);
-   if(I.pressed('interact')&&this.near&&!me.knocked&&!me.emote)this.pickupLocal(me,this.near);
+   // interact: loot on the ground first, otherwise get into the nearest car
+   if(I.pressed('interact')&&!leftCar&&!me.knocked&&!me.emote){if(this.near)this.pickupLocal(me,this.near);else if(me.car<0)this.carEnterNearby()}
    if(!this.near){const kp=this.knockPrompt(me);this.hud.setPrompt(kp,{})}
    me.holdI=!!I.down('interact')&&!me.knocked;
   }else{this.near=null;me.holdI=false}
