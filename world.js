@@ -3,49 +3,62 @@ import {mulberry32,clamp,lerp} from './data.js';
 import {MATS} from './materials.js';
 export const ISL=380,HALF=520,WATER=0;
 // cliffs: [x, z, angle, half-length, height]. The ground steps up by `height` across the line; a rock wall stands on the edge.
-export const CLIFFS=[[-40,-60,.7,22,9],[-120,-250,-.4,22,10],[-160,150,1.2,24,8],[230,-60,2.0,20,8],[40,120,.2,18,7],[-250,-150,.3,22,9]];
+export const CLIFFS=[[-80,-120,1.5,20,9],[53,-133,-0.3,20,8],[-185,20,2,20,8],[205,-40,-0.7,20,9],[-20,150,-0.4,18,7],[120,200,0.5,20,8]];
 const TREE_HP=100;const rockHp=sc=>Math.round(130+50*sc);
-export const ROADS=[[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[0,7],[2,5],[1,6],[3,7],[4,7],[0,8],[8,3],[8,7],[2,9],[9,12],[12,4],[0,12],[0,10],[10,1],[6,11],[11,3],[5,1],
- [2,13],[13,14],[14,4],[14,12],[16,8],[16,7],[17,3],[17,11],[15,10],[18,5],[19,5],[19,1],[13,18],[7,16]];
+// Districts (v2 layout). Size tier comes from r: large 50+, medium 30-49, small under 30.
+// Positions are spaced so districts never overlap; the test harness checks this.
 export const POIS=[
  {n:'Downtown Dunk',x:0,z:0,r:58,type:'city'},
- {n:'Pleasant Pickle',x:-150,z:95,r:44,type:'suburb'},
- {n:'Salty Shores',x:150,z:115,r:42,type:'town'},
+ {n:'Stack Street',x:-120,z:95,r:40,type:'apartments'},
+ {n:'Salty Shores Hotel',x:150,z:115,r:34,type:'hotel'},
  {n:'Lonely Lodge',x:-125,z:-150,r:36,type:'cabins'},
- {n:'Retail Rodeo',x:135,z:-140,r:44,type:'warehouse'},
+ {n:'Retail Rodeo',x:135,z:-140,r:44,type:'mall'},
  {n:'Misty Mill',x:15,z:190,r:34,type:'town'},
  {n:'Radar Ridge',x:-215,z:-25,r:32,type:'base'},
  {n:'Frosty Fort',x:30,z:-218,r:36,type:'fort'},
  {n:"Mc Dongal's",x:-30,z:-168,r:27,type:'diner'},
  {n:'Sunny Sands',x:195,z:20,r:32,type:'resort'},
  {n:"Farmer's Folly",x:-100,z:5,r:30,type:'farm'},
- {n:'Tomato Town',x:-190,z:-100,r:28,type:'town'},
+ {n:'Tomato Town',x:-190,z:-100,r:28,type:'suburb'},
  {n:'Dusty Depot',x:170,z:-62,r:26,type:'town'},
- // Season 1 additions
  {n:'Sandy Cove',x:250,z:150,r:34,type:'resort'},
  {n:'Pier Point',x:260,z:-120,r:30,type:'town'},
  {n:'Harbor Heights',x:-270,z:60,r:32,type:'warehouse'},
- {n:'Gas and Go',x:70,z:-250,r:28,type:'town'},
+ {n:'Gas and Go',x:100,z:-235,r:28,type:'gas'},
  {n:'Sawmill Creek',x:-220,z:-170,r:30,type:'farm'},
  {n:'Sunset Cabins',x:90,z:235,r:34,type:'cabins'},
  {n:'Quarry Rock',x:-60,z:240,r:32,type:'warehouse'},
+ {n:'Skyline Point',x:110,z:-10,r:30,type:'tower'},
+ {n:'Pleasant Pickle',x:-200,z:130,r:28,type:'suburb'},
+ {n:'Fuel Stop 9',x:-35,z:-95,r:22,type:'gas'},
+ {n:'Brick Row',x:60,z:-95,r:30,type:'town'},
 ];
+// Roads are generated from the layout: a minimum spanning tree (every district reachable) plus each
+// district's two nearest neighbours (so the network has loops, not just a tree).
+function roadGraph(){
+ const n=POIS.length,E=new Map();
+ const d=(a,b)=>Math.hypot(POIS[a].x-POIS[b].x,POIS[a].z-POIS[b].z);
+ const add=(a,b)=>{if(a===b)return;const lo=Math.min(a,b),hi=Math.max(a,b);const k=lo*1000+hi;if(!E.has(k))E.set(k,[lo,hi])};
+ const used=new Set([0]);
+ while(used.size<n){let best=null,bd=1e9;for(const a of used)for(let b=0;b<n;b++){if(used.has(b))continue;const dd=d(a,b);if(dd<bd){bd=dd;best=[a,b]}}used.add(best[1]);add(best[0],best[1])}
+ for(let a=0;a<n;a++){const near=[...Array(n).keys()].filter(b=>b!==a).sort((x,y)=>d(a,x)-d(a,y)).slice(0,2);for(const b of near)if(d(a,b)<170)add(a,b)}
+ return [...E.values()];
+}
+export const ROADS=roadGraph();
 function hash(ix,iz){let h=Math.imul(ix,374761393)^Math.imul(iz,668265263);h=Math.imul(h^(h>>>13),1274126177);h^=h>>>16;return (h>>>0)/4294967295}
 function vnoise(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);const a=hash(ix,iz),b=hash(ix+1,iz),c=hash(ix,iz+1),d=hash(ix+1,iz+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
 function fbm(x,z){return vnoise(x,z)*.5+vnoise(x*2.1+7,z*2.1+3)*.25+vnoise(x*4.3+1,z*4.3+9)*.125+vnoise(x*8.7,z*8.7)*.0625}
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+// terrain features: [x, z, height, radius]. Negative height = a dip.
+const TERRAIN=[[-75,-95,38,38],[-215,-25,18,34],[80,30,14,45],[270,-200,26,50],[-250,210,22,45],[20,-330,16,60],[150,-200,20,40],[-120,200,18,40],[230,200,16,40],[95,-62,-13,19],[-62,150,-11,15],[190,-40,9,22]];
 function rawH(x,z){
  const r=Math.hypot(x,z),ang=Math.atan2(z,x);
  const edge=ISL*(.8+.22*vnoise(Math.cos(ang)*1.7+10,Math.sin(ang)*1.7+10)+.08*vnoise(ang*4+50,3));
  const L=clamp((edge-r)/60,-1,1);
  let h;
- if(L>0){const s=sstep(0,1,L);h=s*(3+fbm(x*.011,z*.011)*22);
-  h+=38*Math.exp(-(((x+75)**2+(z+95)**2)/(2*38*38)))*s;
-  h+=18*Math.exp(-(((x+215)**2+(z+25)**2)/(2*34*34)))*s;
-  h+=14*Math.exp(-(((x-80)**2+(z-30)**2)/(2*45*45)))*s;
-  h+=26*Math.exp(-(((x-270)**2+(z+200)**2)/(2*50*50)))*s;h+=22*Math.exp(-(((x+250)**2+(z-210)**2)/(2*45*45)))*s;h+=16*Math.exp(-(((x-20)**2+(z+330)**2)/(2*60*60)))*s;
-  h-=13*Math.exp(-(((x-95)**2+(z+62)**2)/(2*19*19)))*s;h-=11*Math.exp(-(((x+62)**2+(z-150)**2)/(2*15*15)))*s;h+=9*Math.exp(-(((x-190)**2+(z+40)**2)/(2*22*22)))*s;
-  for(const[cx,cz,a,L,S]of CLIFFS){const dx=x-cx,dz=z-cz,ca=Math.cos(a),sa=Math.sin(a);const t=dx*ca+dz*sa,n=-dx*sa+dz*ca;h+=S*sstep(-1.2,1.2,n)*(1-sstep(L-4,L,Math.abs(t)))*s}}
+ if(L>0){const s=sstep(0,1,L);h=s*(3+fbm(x*.011,z*.011)*15);   // v2: calmer ground than before
+  for(const[cx,cz,A,R]of TERRAIN)h+=A*Math.exp(-((x-cx)**2+(z-cz)**2)/(2*R*R))*s;
+  for(const[cx,cz,a,L2,S]of CLIFFS){const dx=x-cx,dz=z-cz,ca=Math.cos(a),sa=Math.sin(a);const t=dx*ca+dz*sa,n=-dx*sa+dz*ca;h+=S*sstep(-1.2,1.2,n)*(1-sstep(L2-4,L2,Math.abs(t)))*s}}
  else h=L*14;
  return h;
 }
@@ -73,7 +86,7 @@ export function query(x,z,r,out){out.length=0;stamp++;const x0=Math.floor((x-r)/
 // Destructible parts: every box added while `partMat` is set (building walls, roofs, props, boulders) gets hp.
 // Thin ground slabs (floors, paving) are shorter than .2 m and are never destructible.
 export const wparts=[];let partMat=null;
-const poiMat=t=>(t==='city'||t==='fort'||t==='diner')?'stone':(t==='base'||t==='warehouse')?'metal':'wood';
+const poiMat=t=>(t==='city'||t==='fort'||t==='diner'||t==='apartments'||t==='tower'||t==='hotel'||t==='mall')?'stone':(t==='base'||t==='warehouse')?'metal':'wood';
 export let boxInst=null; // instanced mesh of all visible static boxes, so a destroyed box can be hidden
 function addBox(x0,y0,z0,x1,y1,z1,color,vis=true){
  const b={x0,y0,z0,x1,y1,z1,c:color,circ:false};
@@ -111,6 +124,58 @@ function makeBuilding(rng,cx,cz,w,d,h,doorSide,opts={}){
  return {x:cx,z:cz,w,d,y0,h,door:dd};
 }
 export const buildings=[];
+// ---- building kit v2: multi-storey stacks with a stair core, and the rest of the new districts
+function sideWins(c,len,skipDoor){const out=[];const n=Math.max(1,Math.floor((len-2.5)/3.2));for(let i=0;i<n;i++){const o=-((n-1)*3.2)/2+i*3.2;if(skipDoor&&Math.abs(o)<2.2)continue;out.push({s:c+o-.8,e:c+o+.8,y0:1,y1:2.4})}return out}
+// A multi-storey block. Every floor has windows on all four sides; the ground floor has the door.
+// A stair core sits in the corner next to the west wall: two flights go up through a hole in every floor,
+// alternating columns and direction, so each floor can be climbed. Upper floors get loot and sometimes a chest.
+function makeStack(rng,cx,cz,w,d,floors,doorSide,opts={}){
+ const y0=H(cx,cz),FH=opts.fh||3.4,F=floors;
+ const wc=opts.color||PAL.wall[Math.floor(rng()*PAL.wall.length)],rc=opts.roof||PAL.roof[Math.floor(rng()*PAL.roof.length)];
+ const x0=cx-w/2,x1=cx+w/2,z0=cz-d/2,z1=cz+d/2,th=.4;
+ const S=k=>y0+k*FH+.08;                                   // walking surface of floor k
+ const RUN=4,hx0=x0+1,hx1=x0+4.2,hz0=z0+1,hz1=hz0+RUN;    // stair hole
+ const dc={n:cx,s:cx,e:cz,w:cz};
+ for(let k=0;k<F;k++){
+  const sides={n:[],s:[],e:[],w:[]};
+  for(const sd of['n','s','e','w']){const len=(sd==='n'||sd==='s')?w:d;const c=dc[sd];const door=k===0&&sd===doorSide;
+   if(door)sides[sd].push({s:c-.95,e:c+.95,y0:0,y1:2.5});
+   sides[sd].push(...sideWins(c,len,door))}
+  wallX(x0,x1,z0,S(k),FH-.08,sides.n,wc,th);wallX(x0,x1,z1,S(k),FH-.08,sides.s,wc,th);
+  wallZ(z0,z1,x0,S(k),FH-.08,sides.w,wc,th);wallZ(z0,z1,x1,S(k),FH-.08,sides.e,wc,th);
+ }
+ addBox(x0,y0,z0,x1,y0+.08,z1,'#7b7468',true);           // ground floor
+ for(let k=1;k<F;k++){const yb=S(k)-.08,yt=S(k);          // upper floors: slabs around the stair hole
+  addBox(x0,yb,z0,hx0,yt,z1,'#9a9184');addBox(hx1,yb,z0,x1,yt,z1,'#9a9184');
+  addBox(hx0,yb,z0,hx1,yt,hz0,'#9a9184');addBox(hx0,yb,hz1,hx1,yt,z1,'#9a9184')}
+ const rise=FH/8,run=RUN/8;                                // flights: 8 steps each, climbing the core
+ for(let k=1;k<F;k++){const base=S(k-1);const odd=k%2===1;
+  const cols=odd?[hx0+.05,hx0+1.55]:[hx0+1.65,hx1-.05];
+  for(let i=0;i<8;i++){const top=base+(i+1)*rise;let za,zb;
+   if(odd){za=hz0+i*run;zb=hz0+(i+1)*run}else{za=hz1-(i+1)*run;zb=hz1-i*run}
+   addBox(cols[0],top-.5,za,cols[1],top,zb,'#b5ab9b')}}
+ const top=y0+F*FH;addBox(x0-.3,top,z0-.3,x1+.3,top+.35,z1+.3,rc);
+ const dd={n:[cx,z0-2.5],s:[cx,z1+2.5],w:[x0-2.5,cz],e:[x1+2.5,cz]}[doorSide];
+ const q=opts.q||1;
+ const spots=Math.max(2,Math.floor(w*d/45));
+ for(let i=0;i<spots;i++)lootSpots.push({x:lerp(x0+1.2,x1-1.2,rng()),z:lerp(z0+1.2,z1-1.2,rng()),y:y0+.1,door:dd,inside:true,chest:false,q});
+ if(rng()<(opts.chest??.6))lootSpots.push({x:lerp(hx1+1,x1-1.5,rng()),z:rng()<.5?z0+1.1:z1-1.1,y:y0+.1,door:dd,inside:true,chest:true,q});
+ for(let k=1;k<F;k++){
+  for(let i=0;i<(opts.upperLoot??1);i++)lootSpots.push({x:lerp(hx1+.9,x1-.9,rng()),z:lerp(z0+1,z1-1,rng()),y:S(k)+.1,door:dd,inside:true,chest:false,q});
+  if(rng()<(opts.upperChest??.45))lootSpots.push({x:lerp(hx1+1,x1-1,rng()),z:rng()<.5?z0+1.1:z1-1.1,y:S(k)+.1,door:dd,inside:true,chest:true,q});
+ }
+ const b={x:cx,z:cz,w,d,y0,h:F*FH,door:dd,kind:opts.kind||'apartments',floors:F,top};
+ buildings.push(b);return b;
+}
+function gasStation(rng,x,z){
+ const yy=H(x,z);
+ addBox(x-8,yy+4.6,z-6,x+8,yy+4.9,z+6,'#f5f5f5');
+ for(const[px,pz]of[[-7,-5],[7,-5],[-7,5],[7,5]])addBox(px+x-.35,yy,z+pz-.35,px+x+.35,yy+4.6,z+pz+.35,'#8aa3b8');
+ for(const pz of[-2,2]){addBox(x-3,yy,z+pz-.5,x-2,yy+1.6,z+pz+.5,'#d33');addBox(x+2,yy,z+pz-.5,x+3,yy+1.6,z+pz+.5,'#d33')}
+ buildings.push(makeBuilding(rng,x-14,z,10,8,3.6,'e',{color:'#f0e6d2',q:1.8,props:2,chest:.9}));
+ standSign('FUEL & GO',x,z-10,0,12,2.4,'#e74c3c','#fff');
+ lootSpots.push({x:x+4,z:z+8,y:yy+.2,inside:false,chest:false,q:1.4});
+}
 function genPOI(rng,p,idx){partMat=poiMat(p.type);try{genPOI_(rng,p,idx)}finally{partMat=null}}
 function genPOI_(rng,p,idx){
  const S={city:21,suburb:26,town:24,cabins:28,warehouse:32,base:30,fort:40}[p.type]||24;
@@ -156,18 +221,57 @@ function genPOI_(rng,p,idx){
   for(let i=0;i<6;i++)addBox(p.x-4+i*2.4,yy,p.z-16,p.x-2.6+i*2.4,yy+1.3,p.z-14.6,'#d9b84a');
   standSign("FARMER'S FOLLY",p.x+2,p.z+16,0,10,2.2,'#7a4a2a','#ffe9b0');
   return}
+ // ---- v2 districts
+ if(p.type==='city'){
+  const a=makeStack(rng,p.x-14,p.z-14,14,14,12,'s',{kind:'tower',fh:3.4,upperLoot:2,upperChest:.6,q:1.5});
+  makeStack(rng,p.x+16,p.z+8,14,14,9,'w',{kind:'tower',fh:3.4,upperLoot:2,q:1.5});
+  addBox(p.x-15,a.top,p.z-15,p.x-13,a.top+9,p.z-13,'#c9c0b0');addBox(p.x-14.5,a.top+9,p.z-14.5,p.x-13.5,a.top+12,p.z-13.5,'#7a3b2e');
+  makeStack(rng,p.x-18,p.z+16,14,12,6,'n',{kind:'apartments',q:1.3,fh:3.2});
+  makeStack(rng,p.x+20,p.z-22,14,12,6,'s',{kind:'apartments',q:1.3,fh:3.2});
+  makeStack(rng,p.x-38,p.z-10,12,12,5,'e',{kind:'apartments',q:1.2,fh:3.2});
+  makeStack(rng,p.x+40,p.z+18,12,12,5,'w',{kind:'apartments',q:1.2,fh:3.2});
+  buildings.push(makeBuilding(rng,p.x-6,p.z+22,9,8,3.6,'n',{q:1.4,props:1,chest:.7}));
+  buildings.push(makeBuilding(rng,p.x+6,p.z-38,10,8,3.6,'s',{color:'#ffd27a',q:1.4,props:2}));
+  buildings.push(makeBuilding(rng,p.x+36,p.z-6,9,8,3.6,'w',{q:1.4,props:1}));
+  standSign('DOWNTOWN DUNK',p.x,p.z-5,0,12,2.4,'#2c3e50','#fff');
+  return}
+ if(p.type==='apartments'){
+  for(const[dx,dz,dir]of[[-15,-14,'e'],[15,-14,'w'],[-15,13,'e'],[15,13,'w']])makeStack(rng,p.x+dx,p.z+dz,14,11,4+Math.floor(rng()*3),dir,{kind:'apartments',q:1.3,fh:3.2,upperChest:.5});
+  const yy=H(p.x,p.z);
+  addBox(p.x-2.5,yy,p.z+1,p.x+2.5,yy+.3,p.z+3,'#ffd23d');addBox(p.x-2.5,yy+.3,p.z+2.8,p.x+2.5,yy+1.4,p.z+3,'#ff6b6b');  // slide and climbing frame
+  addBox(p.x-6,yy,p.z-2,p.x-4.5,yy+2.4,p.z-.5,'#8aa3b8');addBox(p.x+4.5,yy,p.z-2,p.x+6,yy+2.4,p.z-.5,'#8aa3b8');addBox(p.x-6,yy+2.2,p.z-2,p.x+6,yy+2.5,p.z-.5,'#8aa3b8');   // swings
+  standSign('STACK STREET',p.x,p.z-6,0,10,2.2,'#3498db','#fff');
+  return}
+ if(p.type==='tower'){
+  const r=makeStack(rng,p.x,p.z,14,14,14,'s',{kind:'tower',fh:3.4,upperLoot:2,upperChest:.6,q:1.6});
+  addBox(p.x-.9,r.top,p.z-.9,p.x+.9,r.top+7,p.z+.9,'#c9c0b0');
+  const yy=H(p.x,p.z);
+  for(const[bx,bz]of[[-10,-10],[10,-10]])addBox(p.x+bx-1.4,yy,p.z+bz+9,p.x+bx+1.4,yy+.6,p.z+bz+10,'#8b6b3e');   // plaza benches
+  return}
+ if(p.type==='hotel'){
+  makeStack(rng,p.x-4,p.z,16,14,6,'w',{kind:'hotel',fh:3.5,color:'#f3e9d2',q:1.8,upperLoot:2,upperChest:.5});
+  const yy=H(p.x,p.z);
+  addBox(p.x+6,yy,p.z-5,p.x+13,yy+.12,p.z+5,'#4fc3f7');
+  standSign('GRAND VISTA',p.x-4,p.z+10,0,12,2.4,'#7b3fbf','#fff');
+  return}
+ if(p.type==='mall'){
+  makeStack(rng,p.x,p.z,40,22,2,'s',{kind:'mall',fh:4.6,color:'#e8e0d0',q:1.7,upperLoot:3,upperChest:.8,chest:.9});
+  const yy=H(p.x,p.z);
+  for(let i=0;i<7;i++){const bx=p.x-15+i*5;addBox(bx-.1,yy,p.z+15,bx+.1,yy+.05,p.z+24,'#f2f2f2')}   // car park bays
+  standSign('RETAIL RODEO',p.x,p.z+27,0,16,2.6,'#e67e22','#fff');
+  return}
+ if(p.type==='gas'){gasStation(rng,p.x,p.z);return}
  const n=p.type==='cabins'?2:3;
+ const SP={suburb:26,town:24,cabins:28,warehouse:32,base:30}[p.type]||24;
  for(let gx=-n;gx<=n;gx++)for(let gz=-n;gz<=n;gz++){
-  const bx=p.x+gx*S+(rng()-.5)*S*.25,bz=p.z+gz*S+(rng()-.5)*S*.25;
-  if(Math.hypot(bx-p.x,bz-p.z)>p.r*.88)continue;if(gx===0&&gz===0&&(p.type==='city'||rng()<.5))continue;if(rng()<.12)continue;
+  const bx=p.x+gx*SP+(rng()-.5)*SP*.25,bz=p.z+gz*SP+(rng()-.5)*SP*.25;
+  if(Math.hypot(bx-p.x,bz-p.z)>p.r*.88)continue;if(gx===0&&gz===0&&rng()<.5)continue;if(rng()<.12)continue;
   let w,d,h,o={};
-  if(p.type==='city'){w=11+rng()*7;d=11+rng()*6;h=rng()<.4?9:4.2;o={q:1.5,props:1};}
-  else if(p.type==='warehouse'){w=18+rng()*6;d=12+rng()*5;h=5.5;o={q:1.3,props:3};}
-  else if(p.type==='city'){const yy=H(p.x,p.z);addBox(p.x-3.2,yy,p.z-3.2,p.x+3.2,yy+23,p.z+3.2,'#c9c0b0');addBox(p.x-3.8,yy+23,p.z-3.8,p.x+3.8,yy+24,p.z+3.8,'#8a7a66');addBox(p.x-2.4,yy+24,p.z-2.4,p.x+2.4,yy+26,p.z+2.4,'#7a3b2e');addBox(p.x-1,yy+26,p.z-1,p.x+1,yy+28,p.z+1,'#7a3b2e');landmarks.push({k:'clock',x:p.x,y:yy+19,z:p.z,h:3.2});lootSpots.push({x:p.x+4.5,z:p.z+4.5,y:yy+.1,inside:false,chest:true,q:2});}
- if(p.type==='base'){w=12+rng()*6;d=10+rng()*5;h=4.2;o={q:1.4,color:'#9aa6a0',props:2};}
-  else if(p.type==='cabins'){w=8+rng()*3;d=7+rng()*3;h=3.4;o={q:1.1,color:'#9b7653'};}
-  else if(p.type==='suburb'){w=9+rng()*3;d=8+rng()*3;h=3.5;o={q:1};}
-  else {w=9+rng()*4;d=8+rng()*4;h=3.6+(rng()<.2?3:0);o={q:1.1};}
+  if(p.type==='warehouse'){w=18+rng()*6;d=12+rng()*5;h=5.5;o={q:1.3,props:3}}
+  else if(p.type==='base'){w=12+rng()*6;d=10+rng()*5;h=4.2;o={q:1.4,color:'#9aa6a0',props:2}}
+  else if(p.type==='cabins'){w=8+rng()*3;d=7+rng()*3;h=3.4;o={q:1.1,color:'#9b7653'}}
+  else if(p.type==='suburb'){w=9+rng()*3;d=8+rng()*3;h=3.5;o={q:1}}
+  else {w=10+rng()*4;d=8+rng()*3;h=3.6+(rng()<.3?3:0);o={q:1.1}}
   buildings.push(makeBuilding(rng,bx,bz,w,d,h,dirTo(bx,bz),o));
  }
  if(p.type==='base'){const yy=H(p.x,p.z);addBox(p.x-3,yy,p.z-3,p.x+3,yy+16,p.z+3,'#c0c4c8');addBox(p.x-6,yy+16,p.z-.5,p.x+6,yy+17,p.z+.5,'#e04a4a')}
@@ -203,7 +307,7 @@ export function buildMap(){
  for(let i=0;i<160;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.9;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.9){bad=true;break}if(bad)continue;
   const sc=1+rng()*2.2;const c={x,z,r:1.1*sc,y0:h-1,y1:h+1.3*sc,rock:true,sc,rot:rng()*6,pk:'rock',mat:'rock',hp:rockHp(sc),maxHp:rockHp(sc),idx:rockList.length};rockList.push(c);insertCircle(c);circles.push(c)}
  // outdoor loot spots
- for(const p of POIS){for(let i=0;i<10;i++){const a=rng()*6.283,r=Math.sqrt(rng())*p.r*.9;lootSpots.push({x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:false,q:.7})}}
+ for(const p of POIS){const cnt=p.r>=50?16:p.r>=30?12:8;for(let i=0;i<cnt;i++){const a=rng()*6.283,r=Math.sqrt(rng())*p.r*.9;lootSpots.push({x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:false,q:.7})}}
  for(let i=0;i<70;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.85;const x=Math.cos(a)*r,z=Math.sin(a)*r;if(H(x,z)<2.4)continue;lootSpots.push({x,z,y:0,inside:false,chest:false,q:.5})}
  for(const s of lootSpots)if(!s.inside)s.y=H(s.x,s.z)+.1;
  fixLootSpots();

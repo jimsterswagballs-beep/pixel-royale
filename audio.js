@@ -1,5 +1,7 @@
 // proximity profiles: ref = distance where a sound is at half strength, max = silent beyond this (metres),
 // lp / lpD = how fast distant sounds lose their highs
+import NOCTURNE from './nocturne-op9-no2.mp3';
+import GYM1 from './gymnopedie-1.mp3';
 const GUN={ref:9,max:170,lp:15000,lpD:20};
 const PROX={
  ar:GUN,smg:GUN,sg:GUN,pi:GUN,fun:GUN,laser:GUN,launch:GUN,
@@ -17,7 +19,7 @@ export class Audio{
   const len=this.ctx.sampleRate;this.noiseBuf=this.ctx.createBuffer(1,len,this.ctx.sampleRate);const d=this.noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;this.apply();this.startMusic()}catch(e){this.ctx=null}}
  apply(){if(!this.ctx)return;this.master.gain.value=this.vol.master;this.sfxG.gain.value=this.vol.sfx;this.musG.gain.value=this.vol.music*.35}
  setVol(m,s,mu){this.vol={master:m/100,sfx:s/100,music:mu/100};this.apply()}
- resume(){if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume()}
+ resume(){if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();this.resumeMusic()}
  noise(dur,f0,f1,g,type='lowpass',dest,delay=0){const c=this.ctx,s=c.createBufferSource();s.buffer=this.noiseBuf;const f=c.createBiquadFilter();f.type=type;f.frequency.setValueAtTime(f0,c.currentTime+delay);f.frequency.exponentialRampToValueAtTime(Math.max(30,f1),c.currentTime+delay+dur);const ga=c.createGain();ga.gain.setValueAtTime(g,c.currentTime+delay);ga.gain.exponentialRampToValueAtTime(.001,c.currentTime+delay+dur);s.connect(f);f.connect(ga);ga.connect(dest);s.start(c.currentTime+delay,Math.random()*.5,dur+.05)}
  tone(freq,dur,g,type='sine',dest,f1,delay=0){const c=this.ctx,o=c.createOscillator();o.type=type;o.frequency.setValueAtTime(freq,c.currentTime+delay);if(f1)o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),c.currentTime+delay+dur);const ga=c.createGain();ga.gain.setValueAtTime(g,c.currentTime+delay);ga.gain.exponentialRampToValueAtTime(.001,c.currentTime+delay+dur);o.connect(ga);ga.connect(dest);o.start(c.currentTime+delay);o.stop(c.currentTime+delay+dur+.05)}
  // play a sound; pos optional {x,y,z}. Positional sounds fade with distance from the listener,
@@ -116,8 +118,19 @@ export class Audio{
    const src=this.ctx.createBufferSource();src.buffer=buf;src.connect(dest);src.start();return src;
   }catch(e){return null}
  }
- startMusic(){if(this.musicOn||!this.ctx)return;this.musicOn=true;const scale=[0,3,5,7,10,12,15,12,10,7,5,3];const bass=[0,0,5,7];
-  setInterval(()=>{if(!this.ctx||this.ctx.state!=='running')return;const s=this.step++;const base=this.mode==='game'?110:130.8;
-   const note=base*Math.pow(2,scale[(s*(this.mode==='game'?5:1))%scale.length]/12);this.tone(note*2,.28,.22,'triangle',this.musG);
-   if(s%4===0)this.tone(base/2*Math.pow(2,bass[(s>>2)%4]/12),.9,.35,'sine',this.musG);if(this.mode==='game'&&s%2===0)this.noise(.05,6000,3000,.05,'highpass',this.musG)},230)}
+ startMusic(){if(this.musicOn||!this.ctx)return;this.musicOn=true;
+  this.musicTracks=[NOCTURNE,GYM1];
+  const el=this.musicEl=document.createElement("audio");el.preload="auto";
+  this.musicSrc=this.ctx.createMediaElementSource(el);this.musicSrc.connect(this.musG);
+  this.musicOrder=[];this.musicIdx=-1;
+  el.addEventListener("ended",()=>this.nextTrack());
+  this.nextTrack()}
+ nextTrack(){if(this.musicIdx<0||this.musicIdx>=this.musicOrder.length-1){
+   const prev=this.musicOrder[this.musicOrder.length-1];
+   this.musicOrder=this.musicTracks.map((_,i)=>i).sort(()=>Math.random()-.5);
+   if(this.musicOrder[0]===prev&&this.musicOrder.length>1)this.musicOrder.push(this.musicOrder.shift());
+   this.musicIdx=0}else this.musicIdx++;
+  const el=this.musicEl;el.src=this.musicTracks[this.musicOrder[this.musicIdx]];
+  el.play().catch(()=>{})}
+ resumeMusic(){if(this.musicEl&&this.musicEl.paused)this.musicEl.play().catch(()=>{})}
 }

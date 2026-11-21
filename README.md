@@ -1,3 +1,11 @@
+# Pixel Royale: v23 map
+
+- New layout: 24 districts with spaced positions and size tiers (large, medium, small). Roads are generated from the layout, so they stay connected as districts move.
+- New districts: Downtown Dunk (towers and apartment blocks), Stack Street (apartments), Skyline Point (tower), Salty Shores Hotel, Retail Rodeo (mall), Fuel Stop 9 and Gas and Go (gas stations), Brick Row and Pleasant Pickle.
+- New buildings: multi-storey apartments, towers, hotels and malls, all with a stair core that every floor connects to. Upper floors have loot and sometimes chests.
+- Terrain is calmer, with hills and dips in one list. Cliffs were moved clear of districts.
+- Loot: outdoor loot now scales with district size. Bots prefer the new districts by persona.
+
 # Pixel Royale: v22 update
 
 - Interact (E by default) gets in and out of cars. Loot on the ground still comes first when you stand on it. The separate "Enter / Exit Car" key is gone; swap seat is still its own key.

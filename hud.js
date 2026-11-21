@@ -239,7 +239,7 @@ export class HUD{
   if(!g.teamMode)return null;
   let best=null,bd=1e9;
   for(const c of g.cards.values()){if(c.team!==me.team||c.carrier>=0)continue;const d=Math.hypot(c.x-me.pos.x,c.z-me.pos.z);if(d<bd){bd=d;best=c}}
-  return best?{x:best.x,y:best.y+1.2,z:best.z,label:'Reboot card',cls:'card'}:null;
+  return best?{x:best.x,y:best.y+1.2,z:best.z,label:'Reboot card',cls:'rcard'}:null;
  }
  // teammates (visible through walls and across the map) and the waypoint, as markers at the screen edge when off screen
  drawWorldMarks(g,me){

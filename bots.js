@@ -30,11 +30,11 @@ const PERSONAS={
 // Quirks layer on top so two bots with the same personality still play differently.
 const QUIRKS={medic:3,paranoid:3,jumpy:3,twitchy:3,hoarder:2,wild:2,bold:2,patient:2};
 const DROP_W={ // POI type weights for choosing where to land
- rusher:{city:3,fort:2.5,base:2,warehouse:2,town:1,suburb:1,cabins:.4},
- looter:{suburb:2,town:2,city:1.5,warehouse:1.5,cabins:1,base:1,fort:1},
- camper:{cabins:3,base:2,suburb:1,town:1,fort:1,city:.3,warehouse:.8},
- sniper:{cabins:2,base:3,fort:1.5,suburb:1,town:1,city:.4,warehouse:1},
- survivor:{cabins:3,suburb:1.5,town:1,base:1,fort:.6,city:.2,warehouse:.6}};
+ rusher:{tower:2,mall:2,apartments:1.5,hotel:1,gas:.8,city:3,fort:2.5,base:2,warehouse:2,town:1,suburb:1,cabins:.4},
+ looter:{tower:1.5,mall:1.5,apartments:1.2,hotel:1,gas:.8,suburb:2,town:2,city:1.5,warehouse:1.5,cabins:1,base:1,fort:1},
+ camper:{hotel:1.5,apartments:1,gas:1,mall:.6,tower:.5,cabins:3,base:2,suburb:1,town:1,fort:1,city:.3,warehouse:.8},
+ sniper:{tower:1.5,hotel:1,apartments:.8,mall:.6,gas:.6,cabins:2,base:3,fort:1.5,suburb:1,town:1,city:.4,warehouse:1},
+ survivor:{gas:1.5,hotel:.8,apartments:.6,mall:.3,tower:.2,cabins:3,suburb:1.5,town:1,base:1,fort:.6,city:.2,warehouse:.6}};
 const rr=(a,b)=>a+Math.random()*(b-a);
 const jit=(v,k=.15)=>v*(1+(Math.random()*2-1)*k);
 function pickKey(obj){let t=0;for(const k in obj)t+=obj[k];let r=Math.random()*t;for(const k in obj){r-=obj[k];if(r<=0)return k}return Object.keys(obj)[0]}
