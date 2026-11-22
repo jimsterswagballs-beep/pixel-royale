@@ -269,7 +269,7 @@ export class Game{
    case'bolt':this.onBolt(ev);break;
    case'storm':this.hud.announce(ev.m);au.play('storm');break;
    case'sd':{this.hud.announce('Supply drop incoming!','#ffd23d');au.play('drop');this.supplies.push({id:ev.id,x:ev.x,z:ev.z,t0:this.t,y0:ev.y0,landed:false});this.hud.markSupply(this.supplies);break}
-   case'bp':case'bh':case'bx':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
+   case'bp':case'bh':case'bx':case'bcol':case'mats':case'hv':case'dec':case'ph':case'px':case'gain':this.onBuildEvent(ev);break;
    case'ntf':if(this.me&&(ev.tm===undefined||ev.tm===this.me.team))this.hud.toast(ev.t,ev.c);break;
    case'rb':if(ev.v===this.myId)this.onMeRebooted(ev);break;
    case'end':this.onEnd(ev);break;

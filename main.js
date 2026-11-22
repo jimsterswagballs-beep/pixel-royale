@@ -222,10 +222,23 @@ buildTitle(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.11</div><h3>Five-Left Finale</h3><ul>
+     <li><b>5 people left</b>: when five players are still alive, a red "5 PEOPLE LEFT" flashes across the top of the screen and fades away.</li>
+     <li>The screen slowly gains a red tint, and the background music is replaced by the finale song until the next match.</li>
+     <li><b>Fire</b>: fires light up one after another across the island and keep burning until the match ends.</li>
+     <li>The screen reacts to the beat of the song, with a red flash, a small camera kick and extra sparks from nearby fires.</li>
+    </section>
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.10</div><h3>Map, Bots &amp; Scenery</h3><ul>
+     <li><b>Roads rebuilt</b>: roads meet at real junctions, curve smoothly, never cross each other, and stay clear of lakes and steep hills.</li>
+     <li>Districts are spaced out, and buildings no longer overlap or sit on roads. Buildings stand on a plinth, so none float on a slope.</li>
+     <li><b>Bots and windows</b>: bots can no longer slip through window sills while jumping or recovering from a jam.</li>
+     <li><b>Scenery</b>: street lamps along the roads, grass and wildflower tufts in open ground, and a flock of birds overhead.</li>
+     <li><b>Collapsing buildings</b>: each building is held up by support pillars. Destroy all of them and the building tips over and comes down as rubble. Anyone underneath takes crush damage.</li>
+    </section>
     <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.9</div><h3>Mobile Support</h3><ul>
      <li><b>Mobile support</b>: pick PC or Mobile when you first open the game. Mobile has a joystick on the left (push to the edge to sprint), drag on the right to look, and buttons for every action.</li>
      <li>Tap a hotbar slot to pick it. Change your platform any time in Settings &gt; Controls.</li>
-     <li><b>Collapsing buildings</b>: destroy half of a building's supports and it falls. Anyone underneath takes crush damage.</li>
+     <li><b>Collapsing buildings</b>: destroy all of a building's supports and it falls. Anyone underneath takes crush damage.</li>
      <li>Bots that jam at the same spot twice give up that loot and roam somewhere else.</li>
     </section>
     <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.8</div><h3>Revive &amp; Reboot Screens</h3><ul>

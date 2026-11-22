@@ -11,6 +11,7 @@ import * as W from './world.js';
 import * as NAV from './botnav.js';
 import {MATS,PIECES,PIECE_KEYS,MAT_KEYS,PART_RES,emptyMats} from './materials.js';
 import {boxCrack,circCrack,removeCrack,clearCracks,stageFor} from './cracks.js';
+import {clamp} from './data.js';
 
 const GRID=4,WALL_H=3,FLOOR_T=.35,REACH=16,MAX_DEBRIS=420,COLLAPSE_R=10;
 const boxMats=new Map();
@@ -120,7 +121,75 @@ export const structMethods={
   if(T.pk==='piece')this.emit({k:'bx',id:T.id,big});
   else if(T.pk==='box')this.emit({k:'px',t:'w',i:T.wi,big});
   else this.emit({k:'px',t:T.pk,i:T.idx,big});
+  if(T.sup)this.bldSupportLost(T);
   this.collapseAround(T,depth+1)},
+ // ---- collapsing buildings. The host decides when a building falls (every support gone) and who is hurt. Every
+ // player then sees the same fall: the building's walls are hinged on a pivot at its far edge and tip over in 1.6 s.
+ // It settles as rubble and its visual copy is removed after 25 s.
+ // a support pillar was destroyed (host): when every pillar of its building is gone, the building comes down
+ bldSupportLost(T){
+  const bl=W.BLD[T.bid];if(!bl||bl.collapsed||bl.collapsing||!T.sup||this.role==='client')return;
+  if(bl.supports.some(q=>!q.dead))return;
+  const a=Math.random()*6.283;
+  this.emit({k:'bcol',b:bl.id,dx:Math.cos(a),dz:Math.sin(a)});
+ },
+ // every machine: start the fall (the host and the guests all get this event)
+ bldBegin(bl,dx,dz){
+  if(bl.collapsing||bl.collapsed)return;
+  bl.collapsing=true;bl.fallT=0;bl.hurtDone=false;
+  const l=Math.hypot(dx,dz)||1;bl.dir=[dx/l,dz/l];
+  // pivot: the base edge on the far side from the fall direction, so the building tips over toward dir
+  const cx=(bl.x0+bl.x1)/2,cz=(bl.z0+bl.z1)/2;
+  const half=Math.abs(bl.dir[0])*(bl.x1-bl.x0)/2+Math.abs(bl.dir[1])*(bl.z1-bl.z0)/2;
+  bl.pivot=[cx-bl.dir[0]*half,bl.y0,cz-bl.dir[1]*half];
+  // rotating the up vector about (dz, 0, -dx) by a positive angle tips it toward dir
+  bl.axis=new THREE.Vector3(bl.dir[1],0,-bl.dir[0]);
+  // the collision boxes go at once, so players and bots are not stuck inside a falling wall
+  for(const q of bl.parts){if(!q.gone)W.removeSolid(q);W.hideBox(q)}
+  NAV.invalidateRect(bl.x0-2,bl.z0-2,bl.x1+2,bl.z1+2);
+  // a visual copy of every part that still stands, hinged on the pivot
+  const g=new THREE.Group();g.position.set(bl.pivot[0],bl.pivot[1],bl.pivot[2]);
+  for(const q of bl.parts){if(q.dead)continue;
+   const m=new THREE.Mesh(new THREE.BoxGeometry(q.x1-q.x0,q.y1-q.y0,q.z1-q.z0),boxMat(q.c));
+   m.position.set((q.x0+q.x1)/2-bl.pivot[0],(q.y0+q.y1)/2-bl.pivot[1],(q.z0+q.z1)/2-bl.pivot[2]);
+   m.castShadow=m.receiveShadow=true;g.add(m)}
+  this.dynamic.add(g);bl.mesh=g;
+ },
+ // per frame, every machine: tip the visual copy, crush whoever is underneath (host), settle as rubble
+ bldUpdate(dt){
+  for(const bl of W.BLD){
+   if(bl.collapsing&&!bl.collapsed){
+    bl.fallT+=dt;const k=Math.min(1,bl.fallT/1.6);
+    if(bl.mesh)bl.mesh.quaternion.setFromAxisAngle(bl.axis,Math.PI/2*k*k);
+    if(this.role!=='client'&&!bl.hurtDone&&k>.75){bl.hurtDone=true;this.bldCrush(bl)}
+    if(k>=1)this.bldSettle(bl);
+   }else if(bl.collapsed&&bl.mesh){
+    bl.restT=(bl.restT??25)-dt;
+    if(bl.restT<=0)this.bldClearMesh(bl);
+   }
+  }
+ },
+ // host: everyone inside the footprint takes heavy damage and is pushed clear of the fall
+ bldCrush(bl){
+  const cx=(bl.x0+bl.x1)/2,cz=(bl.z0+bl.z1)/2;
+  for(const e of this.list){if(!e.alive||e.drop==='bus')continue;
+   if(e.pos.x>bl.x0-.5&&e.pos.x<bl.x1+.5&&e.pos.z>bl.z0-.5&&e.pos.z<bl.z1+.5){
+    const dmg=clamp(90*(1-Math.hypot(e.pos.x-cx,e.pos.z-cz)/Math.max(4,bl.x1-bl.x0))+30,30,120);
+    this.damage(e,dmg,null,-25,false,[e.pos.x,e.pos.y+1,e.pos.z]);
+    this.emit({k:'st',i:e.id,s:'kb',vx:bl.dir[0]*8,vy:4,vz:bl.dir[1]*8},e.id)}}
+ },
+ // the building has landed: it is gone for collision (already removed), and rubble and dust fly out
+ bldSettle(bl){
+  bl.collapsed=true;bl.collapsing=false;bl.restT=25;
+  const cx=(bl.x0+bl.x1)/2,cz=(bl.z0+bl.z1)/2;
+  this.structDebris(cx,bl.y0+1.5,cz,'#b8ae9c',36,.9);
+  this.fx.dust(cx,bl.y0+2,cz,24,6,'#9a9184');
+  this.audio.play('expl',new THREE.Vector3(cx,bl.y0,cz),1);
+ },
+ bldClearMesh(bl){
+  if(!bl.mesh)return;
+  this.dynamic.remove(bl.mesh);bl.mesh.traverse(o=>{if(o.geometry)o.geometry.dispose()});bl.mesh=null;
+ },
  collapseAround(T,depth){
   if(depth>10)return;
   let cx,cz,R;
@@ -247,6 +316,7 @@ export const structMethods={
     break}
    case'gain':{if(ev.i===this.myId){const m=MATS[ev.m];this.hud.toast('+'+ev.n+' '+m.n,m.c)}break}
    case'mats':{const t=this.ents.get(ev.i);if(t)t.mats=ev.m;break}
+   case'bcol':{const bl=W.BLD[ev.b];if(bl)this.bldBegin(bl,ev.dx,ev.dz);break}
    case'hv':{this.fx.burst(ev.x,ev.y,ev.z,5,3,ev.c,.3,8);break}
   }
  },
@@ -291,6 +361,7 @@ export const structMethods={
   for(const s of this.debris){this.dynamic.remove(s.m);s.m.geometry.dispose()}this.debris.length=0;
   if(this.ghost){this.dynamic.remove(this.ghost);this.ghost=null}
   clearCracks();
+  for(const bl of W.BLD)this.bldClearMesh(bl);
   W.restoreDecor();NAV.resetAll();
   this.building=false;
   if(this._dom){this._dom.build.style.display='none'}

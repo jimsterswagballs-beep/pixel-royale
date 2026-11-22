@@ -1,3 +1,23 @@
+# Pixel Royale: v29 five-left finale
+
+- **Five left**: when five players are still alive (counting bots), "5 PEOPLE LEFT" flashes in red across the top of the screen and fades away.
+- **Red tint**: the screen then slowly gains a red tint over about 20 seconds.
+- **Finale song**: the background music is replaced with the finale song and loops until the next match. The music returns to the normal playlist when the match resets.
+- **Fire**: 28 fires ignite one after another across the island and burn for the rest of the match. Fires only draw when they are within about 240 m of you.
+- **Beat reaction**: the song's bass is tracked. On each beat the screen gives a small camera kick and a red flash, the tint pulses, and the fires near you throw extra sparks.
+
+Known limits: the finale was checked with Node tests (beat detection on a synthetic 120 BPM track, fire placement), not in a browser. The song is bundled into the HTML file, so the file is about 7 MB larger.
+
+# Pixel Royale: v28 map, bots and scenery
+
+- **Roads**: the road network is rebuilt. Roads join at real junctions, curve smoothly, never cross each other, and stay out of districts, lakes and steep slopes. Districts were spread apart so their roads fit.
+- **Buildings**: buildings sit on dry land, off the roads, and never overlap. Each building stands on a plinth so it never floats on a slope.
+- **Collapsing buildings**: every building is held up by support pillars. Destroy all of them and the building tips over in 1.6 s, leaves rubble, and clears from the map after 25 s. Anyone inside the footprint takes crush damage (host decides; everyone sees the same fall).
+- **Bots and windows**: bots could slip sideways through window sills while airborne (during jumps or stuck recovery). Collision now measures steps from the ground under the body, so sills and low walls block airborne bodies too. Doorways still work.
+- **Scenery**: street lamps along the roads, grass and wildflower tufts in open ground, and a flock of birds overhead.
+
+Known limits: the map, bot and collapse changes were checked with Node tests, not in a browser. Bot stair-climbing is not reworked yet.
+
 # Pixel Royale: v27 mobile support
 
 - Platform choice: on first open you pick PC or Mobile, with a picture of each. The device your browser looks like is marked "Suggested". Your choice is remembered, and you can switch in Settings > Controls.

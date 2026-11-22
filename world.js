@@ -6,51 +6,50 @@ export const ISL=380,HALF=520,WATER=0;
 export const CLIFFS=[];
 const TREE_HP=100;const rockHp=sc=>Math.round(130+50*sc);
 
-// Districts (v23). Size tier comes from r: large 50+, medium 30-49, small under 30.
+// Districts (v28: spaced out by a relaxation pass so every district has room for its own ring road). Size tier comes from r: large 50+, medium 30-49, small under 30.
 // Every district has a clear pad (flattened ground) and keeps off the lake and the sea.
 export const POIS=[
- {n:'Downtown Dunk',x:0,z:0,r:58,type:'city'},
- {n:'Stack Street',x:-125,z:95,r:40,type:'apartments'},
- {n:'Salty Shores Hotel',x:165,z:110,r:34,type:'hotel'},
- {n:'Lonely Lodge',x:-130,z:-150,r:36,type:'cabins'},
- {n:'Retail Rodeo',x:150,z:-150,r:44,type:'mall'},
- {n:'Misty Mill',x:20,z:205,r:34,type:'town'},
- {n:'Radar Ridge',x:-225,z:-30,r:32,type:'base'},
- {n:'Frosty Fort',x:30,z:-240,r:36,type:'fort'},
- {n:"Mc Dongal's",x:-45,z:-200,r:27,type:'diner'},
- {n:'Sunny Sands',x:200,z:20,r:32,type:'resort'},
- {n:"Farmer's Folly",x:-110,z:10,r:30,type:'farm'},
- {n:'Tomato Town',x:-200,z:-100,r:28,type:'suburb'},
- {n:'Dusty Depot',x:190,z:-65,r:26,type:'town'},
- {n:'Sandy Cove',x:250,z:160,r:34,type:'resort'},
- {n:'Pier Point',x:255,z:-110,r:30,type:'town'},
- {n:'Harbor Heights',x:-280,z:60,r:32,type:'warehouse'},
- {n:'Gas and Go',x:105,z:-235,r:28,type:'gas'},
- {n:'Sawmill Creek',x:-225,z:-175,r:30,type:'farm'},
- {n:'Sunset Cabins',x:100,z:250,r:34,type:'cabins'},
- {n:'Quarry Rock',x:-70,z:250,r:32,type:'warehouse'},
- {n:'Skyline Point',x:115,z:-15,r:30,type:'tower'},
- {n:'Pleasant Pickle',x:-210,z:140,r:28,type:'suburb'},
- {n:'Fuel Stop 9',x:-40,z:-95,r:22,type:'gas'},
- {n:'Brick Row',x:65,z:-95,r:30,type:'town'},
- // new in v23
- {n:'Thunder Dome',x:-60,z:160,r:38,type:'stadium'},
- {n:'Lakeside Docks',x:-5,z:95,r:24,type:'lake'},
- {n:'Old Keep',x:-120,z:-60,r:24,type:'ruins'},
- {n:'Camp Pinecone',x:70,z:-180,r:22,type:'camp'},
+ {n:'Downtown Dunk',x:-3,z:-13,r:58,type:'city'},
+ {n:'Stack Street',x:-146,z:82,r:40,type:'apartments'},
+ {n:'Salty Shores Hotel',x:166,z:112,r:34,type:'hotel'},
+ {n:'Lonely Lodge',x:-137,z:-165,r:36,type:'cabins'},
+ {n:'Retail Rodeo',x:165,z:-158,r:44,type:'mall'},
+ {n:'Misty Mill',x:35,z:201,r:34,type:'town'},
+ {n:'Radar Ridge',x:-229,z:-16,r:32,type:'base'},
+ {n:'Frosty Fort',x:20,z:-263,r:36,type:'fort'},
+ {n:"Mc Dongal's",x:-52,z:-198,r:27,type:'diner'},
+ {n:'Sunny Sands',x:207,z:26,r:32,type:'resort'},
+ {n:"Farmer's Folly",x:-120,z:-12,r:30,type:'farm'},
+ {n:'Tomato Town',x:-200,z:-99,r:28,type:'suburb'},
+ {n:'Dusty Depot',x:191,z:-59,r:26,type:'town'},
+ {n:'Sandy Cove',x:248,z:155,r:34,type:'resort'},
+ {n:'Pier Point',x:262,z:-109,r:30,type:'town'},
+ {n:'Harbor Heights',x:-282,z:63,r:32,type:'warehouse'},
+ {n:'Gas and Go',x:117,z:-251,r:28,type:'gas'},
+ {n:'Sawmill Creek',x:-230,z:-188,r:30,type:'farm'},
+ {n:'Sunset Cabins',x:106,z:266,r:34,type:'cabins'},
+ {n:'Quarry Rock',x:-65,z:279,r:32,type:'warehouse'},
+ {n:'Skyline Point',x:117,z:-15,r:30,type:'tower'},
+ {n:'Pleasant Pickle',x:-218,z:147,r:28,type:'suburb'},
+ {n:'Fuel Stop 9',x:-3,z:-138,r:22,type:'gas'},
+ {n:'Brick Row',x:73,z:-102,r:30,type:'town'},
+ {n:'Thunder Dome',x:-72,z:171,r:38,type:'stadium'},
+ {n:'Lakeside Docks',x:-10,z:96,r:24,type:'lake'},
+ {n:'Old Keep',x:-278,z:-121,r:24,type:'ruins'},
+ {n:'Camp Pinecone',x:68,z:-183,r:22,type:'camp'},
 ];
 
 // Lakes: a bowl that the sea plane fills. `bed` is the depth at the centre (below 0 is under water).
 export const LAKES=[{n:'Lake Muffin',x:75,z:85,r:30,bed:-3.5}];
 
 // Hills and ridges: [x, z, height, radius]. Negative height would be a dip.
-const TERRAIN=[
- [-85,-105,46,34],   // Mount Muffin
+export const TERRAIN=[
+ [-72,-112,44,28],   // Mount Muffin
  [-150,190,26,34],   // Radio Hill
- [150,170,22,42],    // south-east ridge (windfarm)
+ [175,215,22,42],    // south-east ridge (windfarm)
  [-20,-290,20,40],   // north ridge behind the fort
  [290,-40,18,30],    // coastal headland
- [-260,-120,18,36],  // western hills
+ [-250,-15,15,40],   // western hills under Radar Ridge
 ];
 
 const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
@@ -58,7 +57,7 @@ function hash(ix,iz){let h=Math.imul(ix,374761393)^Math.imul(iz,668265263);h=Mat
 function vnoise(x,z){const ix=Math.floor(x),iz=Math.floor(z),fx=x-ix,fz=z-iz;const u=fx*fx*(3-2*fx),v=fz*fz*(3-2*fz);const a=hash(ix,iz),b=hash(ix+1,iz),c=hash(ix,iz+1),d=hash(ix+1,iz+1);return a+(b-a)*u+(c-a)*v+(a-b-c+d)*u*v}
 function fbm(x,z){return vnoise(x,z)*.5+vnoise(x*2.1+7,z*2.1+3)*.25+vnoise(x*4.3+1,z*4.3+9)*.125+vnoise(x*8.7,z*8.7)*.0625}
 
-function rawH(x,z){
+export function rawH(x,z){
  const r=Math.hypot(x,z),ang=Math.atan2(z,x);
  const edge=ISL*(.8+.22*vnoise(Math.cos(ang)*1.7+10,Math.sin(ang)*1.7+10)+.08*vnoise(ang*4+50,3));
  const L=clamp((edge-r)/60,-1,1);
@@ -73,95 +72,190 @@ function rawH(x,z){
  }else h=L*14;
  return h;
 }
-const poiY=POIS.map(p=>clamp(rawH(p.x,p.z),3,30));
+const poiY=POIS.map(p=>{let s=0,n=0;for(let a=0;a<6.283;a+=.785)for(let r=0;r<=p.r*.9;r+=p.r*.3){s+=rawH(p.x+Math.cos(a)*r,p.z+Math.sin(a)*r);n++}return clamp(s/n,3.4,28)});
 export function H(x,z){
  let h=rawH(x,z);
- for(let i=0;i<POIS.length;i++){const p=POIS[i];const dx=x-p.x,dz=z-p.z;if(dx>p.r*1.3||dx<-p.r*1.3||dz>p.r*1.3||dz<-p.r*1.3)continue;
-  const d=Math.hypot(dx,dz);const w=sstep(p.r*1.25,p.r*.85,d);if(w>0)h=lerp(h,poiY[i],w);}
+ for(let i=0;i<POIS.length;i++){const p=POIS[i];const dx=x-p.x,dz=z-p.z;if(dx>p.r*1.75||dx<-p.r*1.75||dz>p.r*1.75||dz<-p.r*1.75)continue;
+  const d=Math.hypot(dx,dz);const w=sstep(p.r*1.7,p.r*.92,d);if(w>0)h=lerp(h,poiY[i],w);}
  for(const L of LAKES){const d=Math.hypot(x-L.x,z-L.z);const w=sstep(L.r*1.7,L.r*.95,d);if(w>0){const t=Math.min(1,d/L.r);h=lerp(h,L.bed+4.6*t*t,w)}}
  return h;
 }
 export function slope(x,z){const e=1.2;return [(H(x+e,z)-H(x-e,z))/(2*e),(H(x,z+e)-H(x,z-e))/(2*e)]}
 export function poiAt(x,z){for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*1.1)return p;return null}
 
-// ---- road network: a minimum spanning tree (every district reachable) plus each district's two nearest
-// neighbours (loops). Each road is routed with A* over a height grid, so it avoids the lake and the sea and
-// keeps to gentle slopes, then smoothed into a polyline.
-function roadGraph(){
- const n=POIS.length,E=new Map();
- const d=(a,b)=>Math.hypot(POIS[a].x-POIS[b].x,POIS[a].z-POIS[b].z);
- const add=(a,b)=>{if(a===b)return;const lo=Math.min(a,b),hi=Math.max(a,b);const k=lo*1000+hi;if(!E.has(k))E.set(k,[lo,hi])};
- const used=new Set([0]);
- while(used.size<n){let best=null,bd=1e9;for(const a of used)for(let b=0;b<n;b++){if(used.has(b))continue;const dd=d(a,b);if(dd<bd){bd=dd;best=[a,b]}}used.add(best[1]);add(best[0],best[1])}
- for(let a=0;a<n;a++){const near=[...Array(n).keys()].filter(b=>b!==a).sort((x,y)=>d(a,x)-d(a,y)).slice(0,2);for(const b of near)if(d(a,b)<185)add(a,b)}
- return [...E.values()];
-}
+// ---- road network (v28) ------------------------------------------------------------------------------------
+// Roads are routed with A* over a 6 m height grid and end at a gate on the edge of each district (never in the
+// middle of its buildings). Later roads prefer to follow earlier ones, so they merge into real junctions instead
+// of running side by side. Each stretch between two junctions is smoothed into a curve. The network is built once,
+// at the start of buildMap(), before any building is placed, so buildings and scenery are placed around the roads.
+export const ROADS=[];            // [a,b,k]: node ids (see ROAD_NODES) and the index of the stretch
+export const ROAD_NODES=[];       // {id,x,z,deg,gate}: gates (district edge) and junctions
 const GS=6,GMIN=-ISL-40,GN=Math.ceil((2*ISL+80)/GS);
 const GH=new Float32Array(GN*GN);
 for(let j=0;j<GN;j++)for(let i=0;i<GN;i++)GH[j*GN+i]=H(GMIN+i*GS,GMIN+j*GS);
-const ROAD_OK=h=>h>=.8;    // roads stay on dry land
-
+const POI_EXT={stadium:12,fort:6,mall:4};
+const keepOut=p=>p.r*1.06+(POI_EXT[p.type]||0);   // roads never enter this circle
+export const ringR=p=>keepOut(p)+4.5;               // the ring road around a district
+const RINGS=false;                                   // true: a full ring road around every district
 function heapOps(){
  const hk=[],hv=[];
  const push=(k,v)=>{hk.push(k);hv.push(v);let i=hk.length-1;while(i>0){const p=(i-1)>>1;if(hk[p]<=hk[i])break;[hk[p],hk[i]]=[hk[i],hk[p]];[hv[p],hv[i]]=[hv[i],hv[p]];i=p}};
  const pop=()=>{const v=hv[0];const lk=hk.pop(),lv=hv.pop();if(hk.length){hk[0]=lk;hv[0]=lv;let i=0;for(;;){const l=2*i+1,r=l+1;let m=i;if(l<hk.length&&hk[l]<hk[m])m=l;if(r<hk.length&&hk[r]<hk[m])m=r;if(m===i)break;[hk[m],hk[i]]=[hk[i],hk[m]];[hv[m],hv[i]]=[hv[i],hv[m]];i=m}}return v};
  return {push,pop,size:()=>hk.length};
 }
-function astar(sx,sy,gx,gy){
- const N=GN*GN,g=new Float32Array(N).fill(Infinity),prev=new Int32Array(N).fill(-1),done=new Uint8Array(N);
- const s=sy*GN+sx,t=gy*GN+gx;const hp=heapOps();
- const hh=i=>{const x=i%GN,y=(i-x)/GN;const dx=Math.abs(x-gx),dy=Math.abs(y-gy);return GS*(Math.max(dx,dy)+(Math.SQRT2-1)*Math.min(dx,dy))};
- g[s]=0;hp.push(hh(s),s);
- const D=[[1,0,1],[-1,0,1],[0,1,1],[0,-1,1],[1,1,Math.SQRT2],[1,-1,Math.SQRT2],[-1,1,Math.SQRT2],[-1,-1,Math.SQRT2]];
- while(hp.size()){const c=hp.pop();if(done[c])continue;done[c]=1;if(c===t)break;
-  const cx=c%GN,cy=(c-cx)/GN,hc=GH[c];
-  for(const[dx,dy,L0]of D){const nx=cx+dx,ny=cy+dy;if(nx<0||ny<0||nx>=GN||ny>=GN)continue;const n=ny*GN+nx;if(done[n])continue;
-   const hn=GH[n];if(n!==t&&!ROAD_OK(hn))continue;
-   const len=L0*GS,slope=Math.abs(hn-hc)/len;
-   const cost=len*(1+40*Math.max(0,slope-.04))+(hn>30?8:0);
-   const ng=g[c]+cost;if(ng<g[n]){g[n]=ng;prev[n]=c;hp.push(ng+hh(n),n)}}}
- if(s!==t&&prev[t]<0)return null;
- const out=[];for(let c=t;c!==-1;c=prev[c]){out.push(c);if(c===s)break}
- return out.reverse().map(c=>{const x=c%GN,y=(c-x)/GN;return{x:GMIN+x*GS,z:GMIN+y*GS}});
+const cellX=i=>GMIN+(i%GN)*GS,cellZ=i=>GMIN+Math.floor(i/GN)*GS;
+const cellOfXZ=(x,z)=>Math.round((z-GMIN)/GS)*GN+Math.round((x-GMIN)/GS);
+function roadGraph(){   // candidate links: a minimum spanning tree plus each district's two nearest neighbours, shortest first
+ const n=POIS.length,E=new Map();
+ const d=(a,b)=>Math.hypot(POIS[a].x-POIS[b].x,POIS[a].z-POIS[b].z);
+ const add=(a,b,mst)=>{if(a===b)return;const lo=Math.min(a,b),hi=Math.max(a,b);const k=lo*1000+hi;if(!E.has(k))E.set(k,{a:lo,b:hi,mst,len:d(lo,hi)})};
+ const used=new Set([0]);
+ while(used.size<n){let best=null,bd=1e9;for(const a of used)for(let b=0;b<n;b++){if(used.has(b))continue;const dd=d(a,b);if(dd<bd){bd=dd;best=[a,b]}}used.add(best[1]);add(best[0],best[1],true)}
+ for(let a=0;a<n;a++){const near=[...Array(n).keys()].filter(b=>b!==a).sort((x,y)=>d(a,x)-d(a,y)).slice(0,2);for(const b of near)if(d(a,b)<170)add(a,b,false)}
+ return [...E.values()].sort((p,q)=>(q.mst-p.mst)||(p.len-q.len));
 }
-function smoothPts(P,passes){for(let k=0;k<passes;k++){const Q=P.map(p=>({...p}));for(let i=1;i<P.length-1;i++)Q[i]={x:(P[i-1].x+2*P[i].x+P[i+1].x)/4,z:(P[i-1].z+2*P[i].z+P[i+1].z)/4};P=Q}return P}
-const PATH=new Map();   // 'a_b' -> {pts, cum, len}
-export const ROADS=roadGraph().filter(([a,b])=>{
- const A=POIS[a],B=POIS[b];
- const cells=astar(Math.round((A.x-GMIN)/GS),Math.round((A.z-GMIN)/GS),Math.round((B.x-GMIN)/GS),Math.round((B.z-GMIN)/GS));
- let pts=cells?smoothPts(cells,8):[{x:A.x,z:A.z},{x:B.x,z:B.z}];
- pts[0]={x:A.x,z:A.z};pts[pts.length-1]={x:B.x,z:B.z};
- const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].z-pts[i-1].z));
- PATH.set(a+'_'+b,{pts,cum,len:cum[cum.length-1]});
- return true;
-});
-
-// point on road a->b at t (0..1): arc length along the routed polyline, with the unit direction of travel
-export function roadPoint(a,b,t){
- let P=PATH.get(a+'_'+b),rev=false;if(!P){P=PATH.get(b+'_'+a);rev=!!P;}
- if(!P){const A=POIS[a],B=POIS[b];return{x:A.x+(B.x-A.x)*t,z:A.z+(B.z-A.z)*t,dx:B.x-A.x,dz:B.z-A.z}}
- if(rev)t=1-t;
- const s=clamp(t,0,1)*P.len;let i=1;while(i<P.cum.length-1&&P.cum[i]<s)i++;
- const p0=P.pts[i-1],p1=P.pts[i],seg=(P.cum[i]-P.cum[i-1])||1;const f=clamp((s-P.cum[i-1])/seg,0,1);
+function buildRoadNetwork(){
+ ROADS.length=0;ROAD_NODES.length=0;PATH.clear();RD.fill(1e9);
+ const N=GN*GN,BLK=new Uint8Array(N),PEN=new Float32Array(N),RC=new Uint8Array(N);   // RC: 1 road cell, 2 beside a road
+ for(let c=0;c<N;c++){
+  const x=cellX(c),z=cellZ(c),h=GH[c],i=c%GN,j=(c/GN)|0;
+  if(h<1.9){BLK[c]=1;continue}
+  if(i>0&&j>0&&i<GN-1&&j<GN-1){const s=Math.max(Math.abs(GH[c+1]-h),Math.abs(GH[c-1]-h),Math.abs(GH[c+GN]-h),Math.abs(GH[c-GN]-h))/GS;if(s>.4){BLK[c]=1;continue}}
+  let blocked=false;
+  for(const L of LAKES)if(Math.hypot(x-L.x,z-L.z)<L.r*1.45+6){blocked=true;break}
+  if(!blocked)for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<keepOut(p)){blocked=true;break}if(d<keepOut(p)*1.3)PEN[c]=Math.max(PEN[c],(1.3-d/keepOut(p))*3)}
+  if(blocked){BLK[c]=1;continue}
+  if(h<3.4)PEN[c]+=1.2;if(h>32)PEN[c]+=2;
+ }
+ void 0;
+ const D8=[[1,0],[-1,0],[0,1],[0,-1],[1,1],[1,-1],[-1,1],[-1,-1]],DK=[[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]];
+ const sweep=(dx,dy)=>{ // cells a move passes through besides its ends
+  if(Math.abs(dx)===1&&Math.abs(dy)===1)return[[dx,0],[0,dy]];
+  if(Math.abs(dx)===2)return[[dx/2,0],[dx/2,dy]];return[[0,dy/2],[dx,dy/2]]};
+ function route(s,t){
+  const g=new Float32Array(N).fill(Infinity),prev=new Int32Array(N).fill(-1),done=new Uint8Array(N);const hp=heapOps();
+  const tx=t%GN,ty=(t/GN)|0;
+  const hh=i=>{const x=i%GN,y=(i/GN)|0;const dx=Math.abs(x-tx),dy=Math.abs(y-ty);return GS*(Math.max(dx,dy)+(Math.SQRT2-1)*Math.min(dx,dy))*.7};
+  g[s]=0;hp.push(hh(s),s);
+  while(hp.size()){const c=hp.pop();if(done[c])continue;done[c]=1;if(c===t)break;
+   const cx=c%GN,cy=(c/GN)|0,hc=GH[c];
+   for(const mv of D8.concat(DK)){const nx=cx+mv[0],ny=cy+mv[1];if(nx<0||ny<0||nx>=GN||ny>=GN)continue;const n=ny*GN+nx;if(done[n])continue;
+    if(BLK[n]&&n!==t)continue;
+    const sw=(mv[0]!==0&&mv[1]!==0)?sweep(mv[0],mv[1]):null;let okm=true;
+    if(sw){let allRoad=true;for(const[ox,oy]of sw){const q=(cy+oy)*GN+cx+ox;if(BLK[q]){okm=false;break}if(RC[q]!==1)allRoad=false}
+     if(okm&&RC[c]!==1&&RC[n]!==1){for(const[ox,oy]of sw)if(RC[(cy+oy)*GN+cx+ox]===1){okm=false;break}}   // never cut across another road's cell without joining it
+     if(okm&&Math.abs(mv[0])===1&&Math.abs(mv[1])===1&&allRoad&&!(RC[c]===1&&RC[n]===1))okm=false}
+    if(!okm)continue;
+    const len=Math.hypot(mv[0],mv[1])*GS,hn=GH[n],sl=Math.abs(hn-hc)/len;
+    let cost=len*(1+36*Math.max(0,sl-.05))+PEN[n]*len*.5;
+    cost*=RC[n]===1?.3:RC[n]===2?3:1;
+    // a little extra for turning keeps the road from zig-zagging
+    if(prev[c]>=0){const px=c%GN-prev[c]%GN,py=((c/GN)|0)-((prev[c]/GN)|0);const dot=(px*mv[0]+py*mv[1])/(Math.hypot(px,py)*Math.hypot(mv[0],mv[1]));if(dot<.9)cost+=GS*(dot<.5?1.2:.35)}
+    const ng=g[c]+cost;if(ng<g[n]){g[n]=ng;prev[n]=c;hp.push(ng+hh(n),n)}}}
+  if(s!==t&&prev[t]<0)return null;
+  const out=[];for(let c=t;c!==-1;c=prev[c]){out.push(c);if(c===s)break}return out.reverse();
+ }
+ function markPath(P){
+  for(let k=0;k<P.length;k++){const c=P[k];RC[c]=1;
+   if(k>0){const a=P[k-1],ax=a%GN,ay=(a/GN)|0,cx=c%GN,cy=(c/GN)|0;const dx=cx-ax,dy=cy-ay;
+    if(Math.abs(dx)+Math.abs(dy)>2||(Math.abs(dx)===2||Math.abs(dy)===2)){ // knight move: mark the cell nearest the line
+     const mx=Math.abs(dx)===2?ax+dx/2:ax+(Math.abs(dx)?dx:0),my=Math.abs(dy)===2?ay+dy/2:ay+(Math.abs(dy)?dy:0);RC[my*GN+mx]=1}}}
+  for(const c of P){const cx=c%GN,cy=(c/GN)|0;for(let oy=-1;oy<=1;oy++)for(let ox=-1;ox<=1;ox++){const q=(cy+oy)*GN+cx+ox;if(q>=0&&q<N&&RC[q]===0)RC[q]=2}}
+ }
+ // every district gets a ring road just outside its keep-out circle; links then join the rings, so the roads wrap around
+ // the districts instead of running through them. Where a ring would cross water, a steep slope or another district it is left open.
+ const owner=new Int16Array(N).fill(-1);
+ for(let c=0;c<N;c++){if(!BLK[c])continue;const x=cellX(c),z=cellZ(c);for(let k=0;k<POIS.length;k++)if(Math.hypot(x-POIS[k].x,z-POIS[k].z)<keepOut(POIS[k])){owner[c]=k;break}}
+ // Links are routed from a gate on one district's edge to a gate on the next one. Where a district has two or more gates,
+ // a short arc of road along its edge joins them, so a road that comes in on one side carries on round the district's edge
+ // and leaves on the other side, like a bypass, instead of ending in a field.
+ const ringSeq=POIS.map(()=>[]);const gateIdx=POIS.map(()=>[]);const paths=[];
+ POIS.forEach((p,pi)=>{
+  const R=ringR(p),steps=Math.max(24,Math.ceil(2*Math.PI*R/2.4));const seq=ringSeq[pi];
+  for(let k=0;k<steps;k++){const a=k/steps*6.2832;const c=cellOfXZ(p.x+Math.cos(a)*R,p.z+Math.sin(a)*R);
+   const ok=c>=0&&c<N&&(!BLK[c]||owner[c]===pi||(owner[c]<0&&GH[c]>=1.9));
+   if(!ok){if(seq.length&&seq[seq.length-1]!==-1)seq.push(-1);continue}
+   if(seq.length&&seq[seq.length-1]===c)continue;
+   if(seq.length&&seq[seq.length-1]>=0){const q=seq[seq.length-1];if(Math.abs(q%GN-c%GN)>1||Math.abs(((q/GN)|0)-((c/GN)|0))>1)seq.push(-1)}
+   seq.push(c);BLK[c]=0}
+ });
+ const gateAt=(pi,tx,tz)=>{ // index in the ring of the cell nearest to (tx,tz); reuses a gate that is already close
+  const seq=ringSeq[pi];let best=-1,bd=1e9;
+  for(let k=0;k<seq.length;k++){const c=seq[k];if(c<0)continue;const d=(cellX(c)-tx)**2+(cellZ(c)-tz)**2;if(d<bd){bd=d;best=k}}
+  if(best<0)return -1;
+  for(const g of gateIdx[pi]){const c1=seq[g],c2=seq[best];if(Math.hypot(cellX(c1)-cellX(c2),cellZ(c1)-cellZ(c2))<20)return g}
+  gateIdx[pi].push(best);return best};
+ for(const e of roadGraph()){
+  const A=POIS[e.a],B=POIS[e.b];
+  const gi=gateAt(e.a,B.x,B.z),gj=gateAt(e.b,A.x,A.z);if(gi<0||gj<0){if(globalThis.__dbg)console.log('no gate',A.n,B.n,gi,gj);continue}
+  const s=ringSeq[e.a][gi],t=ringSeq[e.b][gj];if(s===t)continue;
+  const P=route(s,t);if(!P||P.length<2){if(globalThis.__dbg)console.log('no route',A.n,B.n,e.mst);continue}
+  if(!e.mst&&P.every(c=>RC[c]===1))continue;   // it would only follow roads that are already there
+  markPath(P);paths.push(P);if(globalThis.__dbg)console.log('link',A.n,B.n,P.length);
+ }
+ POIS.forEach((p,pi)=>{
+  const seq=ringSeq[pi],G=gateIdx[pi].slice();if(G.length<2)return;const n=seq.length;
+  const ang=g=>Math.atan2(cellZ(seq[g])-p.z,cellX(seq[g])-p.x);
+  G.sort((x,y)=>ang(x)-ang(y));
+  const pairs=[];
+  if(G.length===2)pairs.push([G[0],G[1]]);
+  else{let gap=-1,gk=0;for(let k=0;k<G.length;k++){const a0=ang(G[k]),a1=ang(G[(k+1)%G.length])+(k===G.length-1?6.2832:0);if(a1-a0>gap){gap=a1-a0;gk=k}}
+   for(let k=0;k<G.length;k++)if(k!==gk)pairs.push([G[k],G[(k+1)%G.length]])}
+  for(const[g0,g1]of pairs){
+   const walk=dir=>{const out=[seq[g0]];let k=g0;while(k!==g1){k=(k+dir+n)%n;if(seq[k]<0)return null;out.push(seq[k]);if(out.length>n)return null}return out};
+   const f=walk(1),b=walk(-1);let arc=f&&b?(f.length<=b.length?f:b):(f||b);
+   if(arc&&arc.length>1){markPath(arc);paths.push(arc)}}
+ });
+ // ---- cell graph -> junctions and stretches
+ const adj=new Map();const link=(a,b)=>{if(a===b)return;if(!adj.has(a))adj.set(a,new Set());if(!adj.has(b))adj.set(b,new Set());adj.get(a).add(b);adj.get(b).add(a)};
+ for(const P of paths)for(let k=1;k<P.length;k++)link(P[k-1],P[k]);
+ const isNode=c=>adj.get(c).size!==2;
+ const nodeId=new Map();const nodeOf=c=>{let id=nodeId.get(c);if(id===undefined){id=ROAD_NODES.length;nodeId.set(c,id);ROAD_NODES.push({id,x:cellX(c),z:cellZ(c),deg:adj.get(c).size,gate:false})}return id};
+ const seen=new Set();const ek=(a,b)=>a<b?a*N+b:b*N+a;
+ const chains=[];
+ for(const [c0,nb] of adj){if(!isNode(c0))continue;
+  for(const n0 of nb){if(seen.has(ek(c0,n0)))continue;
+   const cells=[c0];let prevC=c0,cur=n0;seen.add(ek(c0,n0));
+   while(true){cells.push(cur);if(isNode(cur))break;let nx=-1;for(const q of adj.get(cur))if(q!==prevC){nx=q;break}if(nx<0)break;seen.add(ek(cur,nx));prevC=cur;cur=nx}
+   chains.push(cells)}}
+ const resample=(pts,step)=>{const out=[pts[0]];let acc=0;for(let i=1;i<pts.length;i++){let a=pts[i-1],b=pts[i];let L=Math.hypot(b.x-a.x,b.z-a.z);let t=0;while(L-t>=step-acc){t+=step-acc;acc=0;out.push({x:a.x+(b.x-a.x)*t/L,z:a.z+(b.z-a.z)*t/L})}acc+=L-t}
+  const last=pts[pts.length-1],lo=out[out.length-1];if(Math.hypot(last.x-lo.x,last.z-lo.z)>.5)out.push({x:last.x,z:last.z});else out[out.length-1]={x:last.x,z:last.z};return out};
+ const smooth=(P,passes)=>{for(let k=0;k<passes;k++){const Q=P.map(p=>({...p}));for(let i=1;i<P.length-1;i++)Q[i]={x:(P[i-1].x+2*P[i].x+P[i+1].x)/4,z:(P[i-1].z+2*P[i].z+P[i+1].z)/4};P=Q}return P};
+ chains.forEach((cells,k)=>{
+  let pts=cells.map(c=>({x:cellX(c),z:cellZ(c)}));
+  pts=resample(pts,GS*.8);pts=smooth(pts,12);pts=resample(pts,2.4);
+  const a=nodeOf(cells[0]),b=nodeOf(cells[cells.length-1]);
+  const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+Math.hypot(pts[i].x-pts[i-1].x,pts[i].z-pts[i-1].z));
+  const idx=ROADS.length;ROADS.push([a,b,idx]);PATH.set(idx,{pts,cum,len:cum[cum.length-1],a,b});
+ });
+ // distance field to the nearest road, 2 m cells, out to 24 m
+ const mark=(x,z)=>{const ci=Math.round((x-RMIN)/RSTEP),cj=Math.round((z-RMIN)/RSTEP),R=12;
+  for(let j=cj-R;j<=cj+R;j++)for(let i=ci-R;i<=ci+R;i++){if(i<0||j<0||i>=RN||j>=RN)continue;const cx=RMIN+i*RSTEP,cz=RMIN+j*RSTEP,d=Math.hypot(cx-x,cz-z);const q=j*RN+i;if(d<RD[q])RD[q]=d}};
+ for(const P of PATH.values())for(let i=1;i<P.pts.length;i++){const a=P.pts[i-1],b=P.pts[i];const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)));for(let k=0;k<=n;k++)mark(a.x+(b.x-a.x)*k/n,a.z+(b.z-a.z)*k/n)}
+}
+const PATH=new Map();   // stretch index -> {pts, cum, len, a, b}
+const RSTEP=2,RMIN=-ISL-40,RN=Math.ceil((2*ISL+80)/RSTEP);
+const RD=new Float32Array(RN*RN).fill(1e9);
+// point on stretch i of the network at t (0..1): arc length along the smoothed polyline, with the unit direction of travel
+export function roadPointAt(i,t){
+ const P=PATH.get(i);if(!P)return{x:0,z:0,dx:0,dz:1};
+ const s=clamp(t,0,1)*P.len;let k=1;while(k<P.cum.length-1&&P.cum[k]<s)k++;
+ const p0=P.pts[k-1],p1=P.pts[k],seg=(P.cum[k]-P.cum[k-1])||1;const f=clamp((s-P.cum[k-1])/seg,0,1);
  const dx=p1.x-p0.x,dz=p1.z-p0.z,l=Math.hypot(dx,dz)||1;
  return{x:p0.x+dx*f,z:p0.z+dz*f,dx:dx/l,dz:dz/l};
 }
-// distance to the nearest road centre line, from a 2 m field built once from the routed paths
-const RSTEP=2,RMIN=-ISL-40,RN=Math.ceil((2*ISL+80)/RSTEP);
-const RD=new Float32Array(RN*RN).fill(1e9);
-{
- const mark=(x,z)=>{const ci=Math.round((x-RMIN)/RSTEP),cj=Math.round((z-RMIN)/RSTEP),R=4;
-  for(let j=cj-R;j<=cj+R;j++)for(let i=ci-R;i<=ci+R;i++){if(i<0||j<0||i>=RN||j>=RN)continue;
-   const cx=RMIN+i*RSTEP,cz=RMIN+j*RSTEP,d=Math.hypot(cx-x,cz-z);const k=j*RN+i;if(d<RD[k])RD[k]=d}};
- for(const P of PATH.values())for(let i=1;i<P.pts.length;i++){const a=P.pts[i-1],b=P.pts[i];const n=Math.max(1,Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)));
-  for(let k=0;k<=n;k++)mark(a.x+(b.x-a.x)*k/n,a.z+(b.z-a.z)*k/n)}
-}
+export function roadPoint(a,b,t){for(const r of ROADS){if(r[0]===a&&r[1]===b)return roadPointAt(r[2],t);if(r[0]===b&&r[1]===a){const p=roadPointAt(r[2],1-t);return{x:p.x,z:p.z,dx:-p.dx,dz:-p.dz}}}return{x:0,z:0,dx:0,dz:1}}
 export function roadDist(x,z){
  const fx=(x-RMIN)/RSTEP-.5,fz=(z-RMIN)/RSTEP-.5;
  if(fx<0||fz<0||fx>=RN-1||fz>=RN-1)return 1e9;
  const i=Math.floor(fx),j=Math.floor(fz),u=fx-i,v=fz-j;
  const a=RD[j*RN+i],b=RD[j*RN+i+1],c=RD[(j+1)*RN+i],d=RD[(j+1)*RN+i+1];
  return (a+(b-a)*u)*(1-v)+(c+(d-c)*u)*v;
+}
+// unit vector from (x, z) towards the nearest road (null if none within 26 m)
+export function roadToward(x,z){
+ const d0=roadDist(x,z);if(d0>26)return null;
+ const gx=roadDist(x+2,z)-roadDist(x-2,z),gz=roadDist(x,z+2)-roadDist(x,z-2);const l=Math.hypot(gx,gz);if(l<.01)return null;return[-gx/l,-gz/l,d0];
 }
 // the car park bays (x, z, yaw) that cars spawn in; filled by the district builders
 export const parking=[];
@@ -192,7 +286,27 @@ function wallZ(z0,z1,x,y0,H_,openings,color,th=.4){
  for(const o of openings){if(o.s>cur)addBox(x-th/2,y0,cur,x+th/2,y0+H_,o.s,color);if(o.y0>0)addBox(x-th/2,y0,o.s,x+th/2,y0+o.y0,o.e,color);if(o.y1<H_)addBox(x-th/2,y0+o.y1,o.s,x+th/2,y0+H_,o.e,color);cur=o.e}
  if(cur<z1)addBox(x-th/2,y0,cur,x+th/2,y0+H_,z1,color)}
 const PAL={wall:['#e8d9b8','#d9c7a0','#cfd8dc','#e6b8a2','#b8c9a8','#d8c0d0','#c9b79c','#aebfd0'],roof:['#8a4b3a','#5b6b7a','#7a5b3a','#4f5f4f','#6a4a5a'],conc:['#9aa0a6','#8b9096','#a7adb3']};
+// ---- collapsible buildings (v28): every house, block and tower is held up by support pillars. Break all of them and
+// the whole building comes down. BLD[id] = {id, parts:[every box of the building], supports:[the pillars], ...}
+export const BLD=[];
+const SUP_HP={wood:110,stone:200,metal:300};
+function addFixed(x0,y0,z0,x1,y1,z1,c){const pm=partMat;partMat=null;try{return addBox(x0,y0,z0,x1,y1,z1,c)}finally{partMat=pm}}
+function registerBuilding(b,p0,x0,z0,x1,z1,y0,top,wallColor){
+ // a plinth down to the lowest corner so a house on a slope never floats
+ let mn=1e9;for(const[sx,sz]of[[x0,z0],[x1,z0],[x0,z1],[x1,z1],[(x0+x1)/2,(z0+z1)/2]])mn=Math.min(mn,H(sx,sz));
+ if(y0-mn>.05)addFixed(x0-.05,mn-.5,z0-.05,x1+.05,y0+.02,z1+.05,'#6e6a62');
+ const dark=partMat==='wood'?'#5a3d22':partMat==='metal'?'#4d5560':'#6c6f74';
+ const pts=[[x0,z0],[x1,z0],[x0,z1],[x1,z1]];
+ for(const f of[1/3,2/3]){if(x1-x0>16)pts.push([x0+(x1-x0)*f,z0],[x0+(x1-x0)*f,z1]);if(z1-z0>16)pts.push([x0,z0+(z1-z0)*f],[x1,z0+(z1-z0)*f])}
+ b.supports=[];
+ for(const[px,pz]of pts){const q=addBox(px-.55,y0,pz-.55,px+.55,top,pz+.55,dark);
+  if(q.hp!==undefined){q.hp=q.maxHp=SUP_HP[q.mat]||150}q.sup=true;q.bid=BLD.length;b.supports.push(q)}
+ b.id=BLD.length;b.parts=boxes.slice(p0);b.collapsed=false;b.supLeft=b.supports.length;b.top=top;
+ b.x0=x0;b.x1=x1;b.z0=z0;b.z1=z1;
+ for(const q of b.parts)q.bid=b.id;
+ BLD.push(b);return b}
 function makeBuilding(rng,cx,cz,w,d,h,doorSide,opts={}){
+ const p0=boxes.length;
  const y0=H(cx,cz),wc=opts.color||PAL.wall[Math.floor(rng()*PAL.wall.length)],rc=PAL.roof[Math.floor(rng()*PAL.roof.length)];
  const x0=cx-w/2,x1=cx+w/2,z0=cz-d/2,z1=cz+d/2,th=.4;
  const door=(len,c)=>({s:c-.95,e:c+.95,y0:0,y1:2.7});
@@ -212,7 +326,7 @@ function makeBuilding(rng,cx,cz,w,d,h,doorSide,opts={}){
  const spots=Math.max(1,Math.floor(w*d/55)+Math.floor(rng()*2));
  for(let i=0;i<spots;i++){lootSpots.push({x:lerp(x0+1.2,x1-1.2,rng()),z:lerp(z0+1.2,z1-1.2,rng()),y:y0+.1,door:dd,inside:true,chest:false,q:opts.q||1})}
  if(rng()<(opts.chest??.65)){const bx=lerp(x0+1.5,x1-1.5,rng());const bz=rng()<.5?z0+1.1:z1-1.1;lootSpots.push({x:bx,z:bz,y:y0+.1,door:dd,inside:true,chest:true,q:opts.q||1})}
- return {x:cx,z:cz,w,d,y0,h,door:dd};
+ return registerBuilding({x:cx,z:cz,w,d,y0,h,door:dd},p0,x0,z0,x1,z1,y0,y0+h+.35);
 }
 export const buildings=[];
 // ---- building kit v2: multi-storey stacks with a stair core, and the rest of the new districts
@@ -221,6 +335,7 @@ function sideWins(c,len,skipDoor){const out=[];const n=Math.max(1,Math.floor((le
 // A stair core sits in the corner next to the west wall: two flights go up through a hole in every floor,
 // alternating columns and direction, so each floor can be climbed. Upper floors get loot and sometimes a chest.
 function makeStack(rng,cx,cz,w,d,floors,doorSide,opts={}){
+ const p0=boxes.length;
  const y0=H(cx,cz),FH=opts.fh||3.4,F=floors;
  const wc=opts.color||PAL.wall[Math.floor(rng()*PAL.wall.length)],rc=opts.roof||PAL.roof[Math.floor(rng()*PAL.roof.length)];
  const x0=cx-w/2,x1=cx+w/2,z0=cz-d/2,z1=cz+d/2,th=.4;
@@ -256,7 +371,7 @@ function makeStack(rng,cx,cz,w,d,floors,doorSide,opts={}){
   if(rng()<(opts.upperChest??.45))lootSpots.push({x:lerp(hx1+1,x1-1,rng()),z:rng()<.5?z0+1.1:z1-1.1,y:S(k)+.1,door:dd,inside:true,chest:true,q});
  }
  const b={x:cx,z:cz,w,d,y0,h:F*FH,door:dd,kind:opts.kind||'apartments',floors:F,top};
- buildings.push(b);return b;
+ registerBuilding(b,p0,x0,z0,x1,z1,y0,top+.35);buildings.push(b);return b;
 }
 function gasStation(rng,x,z){
  const yy=H(x,z);
@@ -267,6 +382,15 @@ function gasStation(rng,x,z){
  standSign('FUEL & GO',x,z-10,0,12,2.4,'#e74c3c','#fff');
  lootSpots.push({x:x+4,z:z+8,y:yy+.2,inside:false,chest:false,q:1.4});
 }
+// a building site is free when it is dry, off the roads (with room for a door and a pavement) and clear of other buildings
+function siteFree(x,z,w,d,margin){
+ for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1],[0,-1],[0,1],[-1,0],[1,0]])if(roadDist(x+sx*(w/2+.3),z+sz*(d/2+.3))<5.5+margin*.25)return false;   // pavement and a door's worth of room
+ for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1],[0,0]])if(H(x+sx*w/2,z+sz*d/2)<2.2)return false;
+ for(const L of LAKES)if(Math.hypot(x-L.x,z-L.z)<L.r*1.45+Math.max(w,d)/2)return false;
+ for(const q of buildings)if(Math.abs(x-q.x)<(w+q.w)/2+margin&&Math.abs(z-q.z)<(d+q.d)/2+margin)return false;
+ return true}
+// which wall a door should go in: the one facing the nearest road when there is one close by, else `fallback`
+function faceRoad(x,z,fallback){const t=roadToward(x,z);if(!t||t[2]>24)return fallback;return Math.abs(t[0])>Math.abs(t[1])?(t[0]>0?'e':'w'):(t[1]>0?'s':'n')}
 function genPOI(rng,p,idx){partMat=poiMat(p.type);try{genPOI_(rng,p,idx)}finally{partMat=null}}
 function genPOI_(rng,p,idx){
  const S={city:21,suburb:26,town:24,cabins:28,warehouse:32,base:30,fort:40}[p.type]||24;
@@ -278,7 +402,7 @@ function genPOI_(rng,p,idx){
   const gz=[{s:p.z-3,e:p.z+3,y0:0,y1:4.5}];wallZ(p.z-R,p.z+R,p.x-R,yy,wh,gz,PAL.conc[1],th);wallZ(p.z-R,p.z+R,p.x+R,yy,wh,gz,PAL.conc[1],th);
   for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]])addBox(p.x+sx*R-4,yy,p.z+sz*R-4,p.x+sx*R+4,yy+11,p.z+sz*R+4,'#7e858c');
   buildings.push(makeBuilding(rng,p.x,p.z,16,14,5,'s',{color:'#cfd8dc',props:3,chest:1,q:1.6,}));
-  buildings.push(makeBuilding(rng,p.x-12,p.z+10,8,8,3.6,'e',{q:1.2}));buildings.push(makeBuilding(rng,p.x+12,p.z-10,8,8,3.6,'w',{q:1.2}));
+  buildings.push(makeBuilding(rng,p.x-15,p.z+15,8,8,3.6,'e',{q:1.2}));buildings.push(makeBuilding(rng,p.x+15,p.z-15,8,8,3.6,'w',{q:1.2}));
   return}
 
  const yy0=H(p.x,p.z);
@@ -292,7 +416,7 @@ function genPOI_(rng,p,idx){
   addBox(p.x+11,yy+3.4,p.z-6,p.x+17,yy+3.7,p.z+7,'#c0392b');for(const[px,pz]of[[11.2,-5.8],[16.6,-5.8],[11.2,6.6],[16.6,6.6]])addBox(p.x+px-.2,yy,p.z+pz-.2,p.x+px+.2,yy+3.4,p.z+pz+.2,'#888');
   addBox(p.x-19.4,yy,p.z+8.6,p.x-18.6,yy+13,p.z+9.4,'#9aa0a6');landmarks.push({k:'burger',x:p.x-19,y:yy+15.2,z:p.z+9});
   for(let i=0;i<3;i++){const tx=p.x-8+i*5;addBox(tx-.7,yy,p.z-9.4,tx+.7,yy+.9,p.z-8.2,'#d33');addBox(tx-.5,yy+.9,p.z-9.2,tx+.5,yy+1.05,p.z-8.4,'#fff')}
-  buildings.push(makeBuilding(rng,p.x-15,p.z-9,8,7,3.4,'e',{q:1.4}));
+  buildings.push(makeBuilding(rng,p.x-19,p.z-11,8,7,3.4,'e',{q:1.4}));
   for(let i=0;i<5;i++)lootSpots.push({x:p.x-14+i*7,z:p.z+19.5,y:yy+.2,inside:false,chest:false,q:1.6});
   return}
  if(p.type==='resort'){
@@ -322,7 +446,7 @@ function genPOI_(rng,p,idx){
   makeStack(rng,p.x+20,p.z-22,14,12,6,'s',{kind:'apartments',q:1.3,fh:3.2});
   makeStack(rng,p.x-38,p.z-10,12,12,5,'e',{kind:'apartments',q:1.2,fh:3.2});
   makeStack(rng,p.x+40,p.z+18,12,12,5,'w',{kind:'apartments',q:1.2,fh:3.2});
-  buildings.push(makeBuilding(rng,p.x-6,p.z+22,9,8,3.6,'n',{q:1.4,props:1,chest:.7}));
+  buildings.push(makeBuilding(rng,p.x-1,p.z+24,9,8,3.6,'n',{q:1.4,props:1,chest:.7}));
   buildings.push(makeBuilding(rng,p.x+6,p.z-38,10,8,3.6,'s',{color:'#ffd27a',q:1.4,props:2}));
   buildings.push(makeBuilding(rng,p.x+36,p.z-6,9,8,3.6,'w',{q:1.4,props:1}));
   standSign('DOWNTOWN DUNK',p.x,p.z-5,0,12,2.4,'#2c3e50','#fff');
@@ -358,18 +482,21 @@ function genPOI_(rng,p,idx){
  if(p.type==='camp'){camp(rng,p);return}
  if(p.type==='lake'){lakeside(rng,p);return}
  if(p.type==='town')church(rng,p);
- const n=p.type==='cabins'?2:3;
- const SP={suburb:26,town:24,cabins:28,warehouse:32,base:30}[p.type]||24;
- for(let gx=-n;gx<=n;gx++)for(let gz=-n;gz<=n;gz++){
-  const bx=p.x+gx*SP+(rng()-.5)*SP*.25,bz=p.z+gz*SP+(rng()-.5)*SP*.25;
-  if(Math.hypot(bx-p.x,bz-p.z)>p.r*.88)continue;if(gx===0&&gz===0&&rng()<.5)continue;if(rng()<.12)continue;
+ const target={suburb:9,town:9,cabins:7,warehouse:5,base:6}[p.type]||7;
+ let placed=0;
+ for(let t=0;t<400&&placed<target;t++){
+  const a=rng()*6.283,rad=Math.sqrt(rng())*p.r*.84;
+  const bx=p.x+Math.cos(a)*rad,bz=p.z+Math.sin(a)*rad;
   let w,d,h,o={};
   if(p.type==='warehouse'){w=18+rng()*6;d=12+rng()*5;h=5.5;o={q:1.3,props:3}}
   else if(p.type==='base'){w=12+rng()*6;d=10+rng()*5;h=4.2;o={q:1.4,color:'#9aa6a0',props:2}}
   else if(p.type==='cabins'){w=8+rng()*3;d=7+rng()*3;h=3.4;o={q:1.1,color:'#9b7653'}}
   else if(p.type==='suburb'){w=9+rng()*3;d=8+rng()*3;h=3.5;o={q:1}}
   else {w=10+rng()*4;d=8+rng()*3;h=3.6+(rng()<.3?3:0);o={q:1.1}}
-  buildings.push(makeBuilding(rng,bx,bz,w,d,h,dirTo(bx,bz),o));
+  if(!siteFree(bx,bz,w,d,5))continue;
+  // a tower in the middle of a base keeps its own spot clear
+  if(p.type==='base'&&Math.hypot(bx-p.x,bz-p.z)<w/2+d/2+3)continue;
+  buildings.push(makeBuilding(rng,bx,bz,w,d,h,faceRoad(bx,bz,dirTo(bx,bz)),o));placed++;
  }
  if(p.type==='base'){const yy=H(p.x,p.z);addBox(p.x-3,yy,p.z-3,p.x+3,yy+16,p.z+3,'#c0c4c8');addBox(p.x-6,yy+16,p.z-.5,p.x+6,yy+17,p.z+.5,'#e04a4a')}
 }
@@ -495,11 +622,11 @@ function buildLandmarks(rng){
  // lighthouse on the coast
  {let lx=0,lz=0;const a=1.9;for(let r=340;r>120;r-=3){const x=Math.cos(a)*r,z=Math.sin(a)*r;if(H(x,z)>3.4){lx=x;lz=z;break}}const yy=H(lx,lz);addCyl(lx,lz,2.6,yy,yy+24);landmarks.push({k:'lighthouse',x:lx,y:yy,z:lz});lootSpots.push({x:lx+3.5,z:lz,y:yy+.1,inside:false,chest:true,q:1.8})}
  // Mount Muffin summit flag
- {const s=findPeak(-85,-105,50);landmarks.push({k:'flag',x:s.x,y:s.y,z:s.z});standSign('MOUNT MUFFIN',s.x+3,s.z+3,0.6,8,1.8,'#6a5acd','#fff');lootSpots.push({x:s.x-2,z:s.z+1.5,y:s.y+.1,inside:false,chest:true,q:2.4});lootSpots.push({x:s.x+1,z:s.z-2,y:s.y+.1,inside:false,chest:false,q:2})}
+ {const s=findPeak(-72,-112,40);landmarks.push({k:'flag',x:s.x,y:s.y,z:s.z});standSign('MOUNT MUFFIN',s.x+3,s.z+3,0.6,8,1.8,'#6a5acd','#fff');lootSpots.push({x:s.x-2,z:s.z+1.5,y:s.y+.1,inside:false,chest:true,q:2.4});lootSpots.push({x:s.x+1,z:s.z-2,y:s.y+.1,inside:false,chest:false,q:2})}
  // Radio Hill: a lattice tower on the highest ground of the south-west hills
  {const s=findPeak(-150,190,40);latticeTower(s.x,s.z,s.y,30);lootSpots.push({x:s.x+4,z:s.z+4,y:s.y+.1,inside:false,chest:true,q:2})}
  // windfarm on the south-east ridge
- for(const[x0,z0]of[[140,150],[160,172],[126,180]]){const s=findSpot(x0,z0,40,2,34);if(s){turbine(s.x,s.z,s.y);lootSpots.push({x:s.x+3,z:s.z,y:s.y+.1,inside:false,chest:true,q:1.4})}}
+ for(const[x0,z0]of[[160,205],[185,225],[150,235]]){const s=findSpot(x0,z0,40,2,34);if(s){turbine(s.x,s.z,s.y);lootSpots.push({x:s.x+3,z:s.z,y:s.y+.1,inside:false,chest:true,q:1.4})}}
  // water tower beside Dusty Depot
  {const s=findSpot(195,-45,20,2,20);if(s){watertower(s.x,s.z,s.y);lootSpots.push({x:s.x+4,z:s.z+3,y:s.y+.1,inside:false,chest:true,q:1.3})}}
  // shipwreck on the beach near Pier Point
@@ -514,6 +641,7 @@ function buildLandmarks(rng){
 
 export function buildMap(){
  if(built)return;built=true;const rng=mulberry32(1337);
+ buildRoadNetwork();
  POIS.forEach((p,i)=>genPOI(rng,p,i));
  // rubble piles around each district (not in forts)
  POIS.forEach(p=>{if(p.type==='fort')return; for(let i=0;i<10;i++){const a=rng()*6.283,r=p.r*(.25+rng()*.7);const cx=p.x+Math.cos(a)*r,cz=p.z+Math.sin(a)*r;if(buildings.some(b=>Math.abs(cx-b.x)<b.w/2+2.5&&Math.abs(cz-b.z)<b.d/2+2.5))continue;const y=H(cx,cz);const sz=1.1+rng()*.9;const col=['#9b6a3a','#7a8a9a','#c0463a','#4a8a5a'][Math.floor(rng()*4)];partMat='stone';addBox(cx-sz/2,y,cz-sz/2,cx+sz/2,y+sz,cz+sz/2,col);if(rng()<.4)addBox(cx-sz/3,y+sz,cz-sz/3,cx+sz/3,y+sz*1.6,cz+sz/3,col);partMat=null}});
@@ -613,21 +741,26 @@ export function groundAt(x,z,feet,r,step=.65){let g=H(x,z);query(x,z,r+1,_b);
  for(let i=0;i<_b.length;i++){const b=_b[i];if(b.circ!==false)continue;if(x+r>b.x0&&x-r<b.x1&&z+r>b.z0&&z-r<b.z1&&b.y1<=feet+step&&b.y1>g)g=b.y1}return g}
 export function ceilingAt(x,z,head,r){query(x,z,r+1,_b);let c=Infinity;for(let i=0;i<_b.length;i++){const b=_b[i];if(b.circ!==false)continue;if(x+r>b.x0&&x-r<b.x1&&z+r>b.z0&&z-r<b.z1&&b.y0>=head-.3&&b.y0<c)c=b.y0}return c}
 // does cylinder at (x,y,z) radius r height h collide horizontally?
-export function blocked(x,y,z,r,h,step=.65){query(x,z,r+1,_b);
+// the surface a body at (x, y, z) stands on: terrain, or the top of a solid it is resting on (own buffer, safe inside blocked())
+const _sb=[];
+function supportUnder(x,z,y,r){let g=H(x,z);query(x,z,r+1,_sb);
+ for(let i=0;i<_sb.length;i++){const b=_sb[i];if(b.circ!==false)continue;if(x+r>b.x0&&x-r<b.x1&&z+r>b.z0&&z-r<b.z1&&b.y1<=y+.05&&b.y1>g)g=b.y1}return g}
+// v28: a box is only a step to climb if its top is within `step` of the ground under the body, not of its feet. A body
+// that is airborne (jumping, falling, stuck recovery) can no longer slide sideways through a window sill or a low wall.
+export function blocked(x,y,z,r,h,step=.65){query(x,z,r+1,_b);let sup=null;
  for(let i=0;i<_b.length;i++){const b=_b[i];
-  if(b.circ===false){if(x+r>b.x0&&x-r<b.x1&&z+r>b.z0&&z-r<b.z1&&y<b.y1-step&&y+h>b.y0)return true}
+  if(b.circ===false){if(x+r>b.x0&&x-r<b.x1&&z+r>b.z0&&z-r<b.z1&&y+h>b.y0&&y<b.y1-.02){if(y<b.y1-step)return true;if(sup===null)sup=supportUnder(x,z,y,r);if(b.y1>sup+step)return true}}
   else{const dx=x-b.x,dz=z-b.z,rr=b.r+r;if(dx*dx+dz*dz<rr*rr&&y<b.y1&&y+h>b.y0)return true}}return false}
 export function pushOutCircles(e,r,h){query(e.pos.x,e.pos.z,r+3,_b);for(let i=0;i<_b.length;i++){const b=_b[i];if(b.circ===false)continue;const dx=e.pos.x-b.x,dz=e.pos.z-b.z,rr=b.r+r,d2=dx*dx+dz*dz;if(d2<rr*rr&&e.pos.y<b.y1&&e.pos.y+h>b.y0){const d=Math.sqrt(d2)||.001;e.pos.x=b.x+dx/d*rr;e.pos.z=b.z+dz/d*rr}}}
 // ---------------- meshes
 // ---- roads: real road surfaces that follow the hills (asphalt, edge lines, a dashed centre line and kerbs)
-function roadSamples(a,b,step){
- const A=POIS[a],B=POIS[b];const len=Math.hypot(B.x-A.x,B.z-A.z);
- const n=Math.max(2,Math.ceil(len/step));const out=[];
- for(let i=0;i<=n;i++){
-  const t=i/n,p=roadPoint(a,b,t),e=.004;
-  const q1=roadPoint(a,b,Math.max(0,t-e)),q2=roadPoint(a,b,Math.min(1,t+e));
+function roadSamples(i,step){
+ const P=PATH.get(i);const n=Math.max(2,Math.ceil(P.len/step));const out=[];
+ for(let k=0;k<=n;k++){
+  const t=k/n,p=roadPointAt(i,t),e=.006;
+  const q1=roadPointAt(i,Math.max(0,t-e)),q2=roadPointAt(i,Math.min(1,t+e));
   let tx=q2.x-q1.x,tz=q2.z-q1.z;const l=Math.hypot(tx,tz)||1;tx/=l;tz/=l;
-  out.push({x:p.x,z:p.z,nx:-tz,nz:tx,s:t*len});
+  out.push({x:p.x,z:p.z,nx:-tz,nz:tx,s:t*P.len});
  }
  return out;
 }
@@ -635,24 +768,33 @@ function roadSamples(a,b,step){
 function roadBand(arr,S,lo,hi,lift,onlyIf){
  const put=(x,z)=>[x,H(x,z)+lift,z];
  for(let i=0;i<S.length-1;i++){
-  const A=S[i],B=S[i+1];if(onlyIf&&!onlyIf(A))continue;
+  const A=S[i],B=S[i+1];if(onlyIf&&!(onlyIf(A)&&onlyIf(B)))continue;
   const v=[put(A.x+A.nx*hi,A.z+A.nz*hi),put(A.x+A.nx*lo,A.z+A.nz*lo),put(B.x+B.nx*lo,B.z+B.nz*lo),put(B.x+B.nx*hi,B.z+B.nz*hi)];
   if(v.some(q=>q[1]-lift<.6))continue;      // not on land (water or the very edge of the beach)
   for(const k of[0,1,2,0,2,3])arr.push(v[k][0],v[k][1],v[k][2]);
  }
 }
+// a round patch of road: fills the corners where roads meet and rounds off the end of a road at a district gate
+function roadDisc(arr,x,z,r,lift){
+ const n=16;for(let k=0;k<n;k++){const a0=k/n*6.2832,a1=(k+1)/n*6.2832;
+  for(const[px,pz]of[[x,z],[x+Math.cos(a0)*r,z+Math.sin(a0)*r],[x+Math.cos(a1)*r,z+Math.sin(a1)*r]])arr.push(px,H(px,pz)+lift,pz)}
+}
 function buildRoads(){
  const grp=new THREE.Group();
  const bands={asph:[],edge:[],dash:[],kerb:[]};
- for(const[a,b]of ROADS){
-  const S=roadSamples(a,b,1.2);
-  roadBand(bands.asph,S,-3.4,3.4,.12);                 // the road surface
-  roadBand(bands.edge,S,3.05,3.3,.14);                 // white edge lines
-  roadBand(bands.edge,S,-3.3,-3.05,.14);
-  roadBand(bands.dash,S,-.14,.14,.15,A=>A.s%7.2<3.6);   // dashed centre line
-  roadBand(bands.kerb,S,3.4,4.0,.2);                   // kerbs on both sides
-  roadBand(bands.kerb,S,-4.0,-3.4,.2);
+ const juncs=ROAD_NODES.filter(n=>n.deg>=3),ends=ROAD_NODES;
+ const nearJ=(x,z,r)=>{for(const j of juncs)if((x-j.x)**2+(z-j.z)**2<r*r)return true;return false};
+ const nearN=(x,z,r)=>{for(const j of ends)if((x-j.x)**2+(z-j.z)**2<r*r)return true;return false};
+ for(const[a,b,idx]of ROADS){
+  const S=roadSamples(idx,1.2);
+  roadBand(bands.asph,S,-3.4,3.4,.12);                              // the road surface
+  roadBand(bands.edge,S,3.05,3.3,.14,A=>!nearJ(A.x,A.z,6.8));        // white edge lines (not across a junction)
+  roadBand(bands.edge,S,-3.3,-3.05,.14,A=>!nearJ(A.x,A.z,6.8));
+  roadBand(bands.dash,S,-.14,.14,.15,A=>A.s%7.2<3.6&&!nearN(A.x,A.z,6.5));   // dashed centre line
+  roadBand(bands.kerb,S,3.4,4.0,.2,A=>!nearJ(A.x,A.z,6.4));           // kerbs on both sides
+  roadBand(bands.kerb,S,-4.0,-3.4,.2,A=>!nearJ(A.x,A.z,6.4));
  }
+ for(const n of ROAD_NODES)roadDisc(bands.asph,n.x,n.z,n.deg>=3?5.6:3.5,.12);
  const mats={asph:'#4a4d54',edge:'#eef0f2',dash:'#f2c94c',kerb:'#c9bd9c'};
  for(const k in bands){
   if(!bands[k].length)continue;
@@ -675,7 +817,8 @@ export function buildMeshes(scene,quality={}){
   else if(sl>.75||h>26)c.set('#8b8579').lerp(new THREE.Color('#6f6a60'),n);
   else{const pn=vnoise(x*.035+9,z*.035+4);c.set('#6fc04a').lerp(new THREE.Color('#4a9a38'),n*1.3).lerp(new THREE.Color('#9ad45a'),clamp(.5-n,0,.5)).lerp(new THREE.Color('#3f8a42'),clamp((pn-.5)*2,0,.7)).lerp(new THREE.Color('#b8d860'),clamp((.35-pn)*2,0,.5))}
   if(h>1.8&&h<34){const rd=roadDist(x,z);if(rd<4.2)c.lerp(new THREE.Color(rd<2.6?'#4b4e55':'#c4b89a'),clamp((4.2-rd)/1.2,0,1)*.95)}
-  for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<p.r*.92&&h>1.8){c.lerp(new THREE.Color(p.type==='suburb'?'#7bb85a':'#9a9a96'),sstep(p.r*.92,p.r*.5,d)*.75)}}
+  for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<ringR(p)-3&&h>1.8){c.lerp(new THREE.Color(p.type==='suburb'?'#7bb85a':'#9a9a96'),sstep(ringR(p)-3,p.r*.5,d)*.75)}}
+  for(const nd of ROAD_NODES){if(!nd.gate)continue;const d=Math.hypot(x-nd.x,z-nd.z);if(d<11&&h>1.8)c.lerp(new THREE.Color('#9a9a96'),sstep(11,5,d)*.8)}
   col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b}
  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();
  const terrain=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));terrain.receiveShadow=true;g.add(terrain);
@@ -704,6 +847,16 @@ export function buildMeshes(scene,quality={}){
  return {group:g,water,terrain};
 }
 export {treeList,rockList};
+// v28 scenery: street lamps every ~42 m along each road (on the verge, never in the carriageway), and grass tufts in open ground
+export function lampSpots(){
+ const out=[];
+ for(const [a,b,idx] of ROADS){const P=PATH.get(idx);if(!P)continue;
+  for(let s=14;s<P.len-10;s+=42){const t=s/P.len;const p=roadPointAt(idx,t);const side=((idx*7)%2?1:-1);
+   const x=p.x-p.dz*5.2*side,z=p.z+p.dx*5.2*side;
+   if(H(x,z)<2.2||roadDist(x,z)>7)continue;
+   if(buildings.some(q=>Math.abs(x-q.x)<q.w/2+1.5&&Math.abs(z-q.z)<q.d/2+1.5))continue;
+   out.push({x,z,y:H(x,z)})}}
+ return out}
 export function addDecor(scene){
  const rng=mulberry32(77),pts=[];
  for(let i=0;i<1400;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.92;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.2||h>30)continue;if(roadDist(x,z)<4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.8){bad=true;break}if(bad)continue;pts.push([x,h,z,.6+rng()*.9,rng()])}
@@ -729,6 +882,28 @@ export function addDecor(scene){
   if(l.k==='tank'){g.add(mk(CY,'#e9edf1',0,10+l.h/2,0,l.r*2,l.h,l.r*2));g.add(mk(SP,'#e9edf1',0,10+l.h,0,l.r*2,l.r*.9,l.r*2));for(const[sx,sz]of[[-1,-1],[1,-1],[-1,1],[1,1]])g.add(mk(BX,'#8e96a0',sx*l.r*.7,5,sz*l.r*.7,.5,10,.5));scene.add(g);continue}
   if(l.k==='flag'){g.add(mk(CY,'#cfcfcf',0,5,0,.25,10,.25));const cl=mk(BX,'#ff3d6a',1.4,9,0,2.8,1.8,.08);g.add(cl);scene.add(g);anim.push(t=>{cl.rotation.y=Math.sin(t*3)*.25;cl.scale.x=2.8+Math.sin(t*5)*.15});continue}
  }
+  // ---- v28 scenery: street lamps, grass tufts and a flock of birds
+  {const lamps=lampSpots();const pole=new THREE.CylinderGeometry(.09,.12,4.6,7),head=new THREE.BoxGeometry(.5,.22,.5);
+   const pm=new THREE.InstancedMesh(pole,new THREE.MeshLambertMaterial({color:'#3f4650'}),Math.max(1,lamps.length));
+   const hm=new THREE.InstancedMesh(head,new THREE.MeshLambertMaterial({color:'#fff3c0',emissive:'#ffcc66',emissiveIntensity:.9}),Math.max(1,lamps.length));
+   lamps.forEach((l,i)=>{m4.compose(ps.set(l.x,l.y+2.3,l.z),q.identity(),sc.set(1,1,1));pm.setMatrixAt(i,m4);m4.compose(ps.set(l.x,l.y+4.7,l.z),q.identity(),sc.set(1,1,1));hm.setMatrixAt(i,m4)});
+   pm.count=lamps.length;hm.count=lamps.length;pm.castShadow=true;scene.add(pm);scene.add(hm);}
+  {const gp=[];const gr=mulberry32(91);
+   for(let i=0;i<2400;i++){const a=gr()*6.283,r=Math.sqrt(gr())*ISL*.9;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);
+    if(h<2.4||h>22||roadDist(x,z)<5||POIS.some(p=>Math.hypot(x-p.x,z-p.z)<p.r*1.05))continue;
+    if(LAKES.some(L=>Math.hypot(x-L.x,z-L.z)<L.r+4))continue;gp.push([x,h,z,.35+gr()*.4])}
+   const tuft=new THREE.ConeGeometry(.18,.7,4);tuft.translate(0,.35,0);
+   const gm=new THREE.InstancedMesh(tuft,new THREE.MeshLambertMaterial({color:0xffffff}),Math.max(1,gp.length));
+   gp.forEach((g,i)=>{m4.compose(ps.set(g[0],g[1],g[2]),q.identity(),sc.set(g[3],g[3],g[3]));gm.setMatrixAt(i,m4);gm.setColorAt(i,c.set(gr()<.2?'#d9c24a':gr()<.15?'#e87ab0':'#5fae45'))});
+   gm.count=gp.length;gm.instanceColor.needsUpdate=true;gm.instanceMatrix.needsUpdate=true;scene.add(gm);}
+  {const flock=[];const br=mulberry32(33);
+   const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,-1.2,.25,.2,0,0,.5,0,0,0,0,0,.5,1.2,.25,.2],3));bg.computeVertexNormals();
+   const flockM=new THREE.InstancedMesh(bg,new THREE.MeshLambertMaterial({color:'#2a2a33',side:THREE.DoubleSide}),14);
+   for(let i=0;i<14;i++)flock.push({cx:br()*600-300,cz:br()*600-300,r:60+br()*120,sp:.05+br()*.05,ph:br()*6.283,y:70+br()*40});
+   scene.add(flockM);
+   anim.push(t=>{for(let i=0;i<flock.length;i++){const f=flock[i];const a=f.ph+t*f.sp;const x=f.cx+Math.cos(a)*f.r,z=f.cz+Math.sin(a)*f.r;
+    const yaw=-a+Math.PI/2;const flap=Math.sin(t*6+i)*.25;
+    q.setFromEuler(new THREE.Euler(0,yaw,0));m4.compose(ps.set(x,f.y+Math.sin(t*.7+i)*2,z),q,sc.set(2.2,1+flap,2.2));flockM.setMatrixAt(i,m4)}flockM.instanceMatrix.needsUpdate=true})}
  return {update(t){for(const a of anim)a(t)}}
 }
 
@@ -754,4 +929,5 @@ export function restoreDecor(){
  for(const kind of['tree','rock'])for(const d of decorInst[kind]){d.m.instanceMatrix.array.set(d.orig);d.m.instanceMatrix.needsUpdate=true}
  for(const c of[...treeList,...rockList]){c.gone=false;c.dead=false;c.hp=c.maxHp}
  for(const b of wparts){if(b.gone){b.gone=false;boxes.push(b)}b.dead=false;b.hp=b.maxHp}
+ for(const bl of BLD){for(const q of bl.parts){if(q.gone){q.gone=false;boxes.push(q)}}bl.collapsed=false;bl.collapsing=false;bl.fallT=0;bl.hurtDone=false;bl.restT=undefined;bl.supLeft=bl.supports.length}
  if(boxInst){boxInst.im.instanceMatrix.array.set(boxInst.orig);boxInst.im.instanceMatrix.needsUpdate=true}}
