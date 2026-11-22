@@ -4,7 +4,7 @@ import {abilityIcon} from './icons.js';
 import * as W from './world.js';
 import {wstat,IMG} from './shared.js';
 import {MATS,MAT_KEYS} from './materials.js';
-import {REVIVE_T,REVIVE_RANGE,KNOCK_T,CARD_T,VAN_T,VAN_READY,VAN_ACTIVE} from './knock.js';
+import {REVIVE_T,REVIVE_RANGE,KNOCK_HP,CARD_T,VAN_T,VAN_READY,VAN_ACTIVE} from './knock.js';
 
 // one glyph per weapon type and per ability, used in the loadout and ability cards
 const WICON={melee:'⛏',ar:'🔫',smg:'🔫',sg:'💥',sn:'🎯',pi:'🔫',ex:'🚀'};
@@ -12,6 +12,8 @@ const ABIL_ICON={'Ground Slam':'💥','Overdrive Aura':'⚡','Energy Dodge':'�
 const $=id=>document.getElementById(id);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
 export const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// colour of a reboot van on the map: ready, in use, or cooling down
+const vanCol=s=>s===VAN_READY?'#4dfcff':s===VAN_ACTIVE?'#6dff7a':'#7a7f8c';
 export class HUD{
  constructor(app){this.app=app;this.root=$('hud');this.scope=false;this.toastT=0;this.build();this.mapImg=null;this.dmgNums=[];this.lastSlotKey='';this.matLast={};this.matEls=null;
   this.scale=1;this.fit();window.addEventListener('resize',()=>this.fit());}
@@ -170,6 +172,25 @@ export class HUD{
   // scoreboard
   const bd=this.q('#board');if(I.down('score')){bd.style.display='block';if(!this.bt||performance.now()-this.bt>300){this.bt=performance.now();const l=g.list.slice().sort((a,b)=>b.kills-a.kills||(b.alive-a.alive));bd.innerHTML='<h3>Players</h3>'+l.slice(0,16).map(e=>`<div class="${e.alive?'':'dead'}"><span>${e.name}${e.bot?' 🤖':''}</span><b>${e.kills}</b></div>`).join('')}}else bd.style.display='none';
  }
+ // driving: a panel for the car you are in (speed, car health, the controls)
+ carHud(g,me,B){
+  const box=this.q('#carhud');
+  const c=me.car>=0&&g.cars?g.cars.get(me.car):null;
+  if(!c||!me.alive){box.style.display='none';box.dataset.k='';return}
+  const drv=c.seats[0]===me.id;
+  const kph=Math.round(Math.abs(c.v)*3.6),hpPct=clamp(c.hp/c.maxHp*100,0,100);
+  const ctl=drv?`<kbd>${keyLabel(B.fwd)}</kbd><kbd>${keyLabel(B.back)}</kbd> drive / reverse · <kbd>${keyLabel(B.left)}</kbd><kbd>${keyLabel(B.right)}</kbd> steer · <kbd>${keyLabel(B.jump)}</kbd> brake · <kbd>${keyLabel(B.interact)}</kbd> get out`:`Passenger · <kbd>${keyLabel(B.interact)}</kbd> get out`;
+  const html=`<div>${kph} km/h${c.burn?' · <span class="onfire">ON FIRE</span>':''}</div><div class="cbar"><i style="width:${hpPct}%"></i></div><div style="font-size:12px;font-weight:600;margin-top:5px">${ctl}</div>`;
+  if(box.dataset.k!==html){box.dataset.k=html;box.innerHTML=html}
+  box.style.display='block';
+ }
+ // Chaos Rising: the countdown to the next chaos event
+ chaosHud(g){
+  const el=this.q('#chaoslbl');
+  const on=g.gm==='chaos'&&!g.over;
+  el.style.display=on?'block':'none';
+  if(on){const t=`CHAOS RISING · next event in ${Math.max(0,Math.ceil(g.chaosT||0))}s`;if(el.textContent!==t)el.textContent=t}
+ }
  updateTeam(g,me){
   const box=this.q('#team');const now=performance.now();if(this.teamT&&now-this.teamT<200)return;this.teamT=now;
   const mates=g.list.filter(o=>o!==me&&o.team===me.team);
@@ -179,7 +200,7 @@ export class HUD{
    const card=[...g.cards.values()].find(c=>c.owner===o.id);
    let st;
    if(!o.alive)st=card?`<span class="card">REBOOT CARD ${card.carrier>=0?'· '+esc((g.ents.get(card.carrier)||{}).name||'carried'):'· on the ground'}</span>`:'<span class="ko">OUT</span>';
-   else if(o.knocked)st=`<span class="kn">KNOCKED · ${Math.ceil(o.kT)}s · ${d}m</span><i class="rv"><u style="width:${Math.min(100,o.reviveT/REVIVE_T*100)}%"></u></i>`;
+   else if(o.knocked)st=`<span class="kn">KNOCKED · ${Math.ceil(o.hp)} HP · ${d}m</span><i class="rv"><u style="width:${Math.min(100,o.reviveT/REVIVE_T*100)}%"></u></i>`;
    else st=`<i><u style="width:${clamp(o.hp/o.maxHp*100,0,100)}%"></u></i><span>${Math.ceil(o.hp)} HP · ${d}m</span>`;
    return `<div class="tm${o.alive?'':' out'}${o.knocked?' kn':''}"><b>${esc(o.name)}</b>${st}</div>`}).join('');
   if(box.dataset.k!==rows){box.dataset.k=rows;box.innerHTML=`<div class="tt">Team</div>${rows}`}
@@ -221,11 +242,11 @@ export class HUD{
  // the downed panel: bleed-out timer, the revive if a teammate is doing one, and what to do
  renderDowned(g,me){
   const box=this.q('#rbwait');box.className='rbs dn';box.style.display='flex';
-  const left=Math.ceil(Math.max(0,me.kT));const keyI=keyLabel(this.app.input.binds.interact);
+  const left=Math.ceil(Math.max(0,me.hp));const keyI=keyLabel(this.app.input.binds.interact);
   const reviving=me.reviveT>0;
-  const msg=reviving?'<b>A teammate is reviving you. Stay still.</b>':`Crawl to cover. A standing teammate can revive you if they stay within ${REVIVE_RANGE} m and hold <kbd>${keyI}</kbd>.`;
-  const html=`<div class="rbs-head"><span class="rbs-tag dn">Downed</span><span class="rbs-time"><b>${left}</b>s to bleed out</span></div>`+
-   `<div class="rbs-bleed dn"><i style="width:${clamp(me.kT/KNOCK_T,0,1)*100}%"></i></div>`+
+  const msg=reviving?'<b>A teammate is reviving you. Stay still.</b>':`Crawl to cover. Enemy shots take this down faster. A standing teammate can revive you if they stay within ${REVIVE_RANGE} m and hold <kbd>${keyI}</kbd>.`;
+  const html=`<div class="rbs-head"><span class="rbs-tag dn">Downed</span><span class="rbs-time"><b>${left}</b> HP left</span></div>`+
+   `<div class="rbs-bleed dn"><i style="width:${clamp(me.hp/KNOCK_HP,0,1)*100}%"></i></div>`+
    (reviving?`<div class="rbs-revbar"><i style="width:${Math.min(100,me.reviveT/REVIVE_T*100)}%"></i></div>`:'')+
    `<div class="rbs-msg">${msg}</div>`+
    `<div class="rbs-mates">${this.mateChips(g,me)}</div>`;
@@ -272,6 +293,11 @@ export class HUD{
   const box=this.q('#wmarks');if(!box||!g.camera)return;const cam=g.camera;const W0=innerWidth/this.scale,H0=innerHeight/this.scale;
   const items=[];
   if(g.teamMode)for(const o of g.list){if(o===me||o.team!==me.team||!o.alive)continue;items.push({key:'m'+o.id,cls:'mate'+(o.knocked?' kn':''),x:o.pos.x,y:o.pos.y+2.3,z:o.pos.z,name:o.name+(o.knocked?' · knocked':''),d:o.pos})}
+  if(g.teamMode){
+   for(const v of g.vans.values())items.push({key:'v'+v.id,cls:'vanm '+(v.state===VAN_READY?'ready':v.state===VAN_ACTIVE?'active':'cool'),x:v.x,y:v.y+4,z:v.z,name:'Reboot van',d:v});
+   for(const cd of g.cards.values()){if(cd.team!==me.team)continue;const car=cd.carrier>=0?g.ents.get(cd.carrier):null;const px=car?car.pos.x:cd.x,py=car?car.pos.y:cd.y,pz=car?car.pos.z:cd.z;const ow=g.ents.get(cd.owner);
+    items.push({key:'c'+cd.id,cls:'cardm',x:px,y:py+2.2,z:pz,name:'Reboot card'+(ow?' · '+ow.name:''),d:{x:px,z:pz}})}
+  }
   const wp=this.waypointTarget(g,me);if(wp)items.push({key:'wp',cls:'wp '+wp.cls,x:wp.x,y:wp.y,z:wp.z,name:wp.label,d:wp});
   this.wmEls=this.wmEls||new Map();const used=new Set();
   for(const it of items){
@@ -297,7 +323,7 @@ export class HUD{
  drawMinimap(g,tgt,big){
   const cv=big||this.mm,x=cv.getContext('2d'),S=cv.width;x.clearRect(0,0,S,S);if(!this.mapImg)return;
   const st=g.storm,z=g.nextZone(),wp=this.waypointTarget(g,g.me);
-  const teammates=g.teamMode?g.list.filter(o=>o!==g.me&&o.alive&&o.team===g.me.team&&!o.drop):[];
+  const teammates=g.teamMode?g.list.filter(o=>o!==g.me&&o.alive&&o.team===g.me.team):[];
   if(!big){
    const view=230,k=S/view;const rot=g.settings.mapRotate;
    // map->canvas transform for the minimap (player at the centre)
@@ -319,8 +345,12 @@ export class HUD{
    const rim=S/2-14;
    const mark=(px,pz,col,shape)=>{let[a,c]=T(px,pz);let dx=a-S/2,dy=c-S/2;const d=Math.hypot(dx,dy);const out=d>rim;if(out){dx=dx/d*rim;dy=dy/d*rim;a=S/2+dx;c=S/2+dy}
     x.fillStyle=col;x.strokeStyle='#021';x.lineWidth=2;x.beginPath();
-    if(shape==='diamond'){x.moveTo(a,c-9);x.lineTo(a+7,c);x.lineTo(a,c+9);x.lineTo(a-7,c)}else x.arc(a,c,6,0,6.283);
+    if(shape==='diamond'){x.moveTo(a,c-9);x.lineTo(a+7,c);x.lineTo(a,c+9);x.lineTo(a-7,c)}else if(shape==='square'){x.rect(a-6,c-6,12,12)}else x.arc(a,c,6,0,6.283);
     x.closePath();x.fill();x.stroke()};
+   if(g.teamMode){
+    for(const v of g.vans.values())mark(v.x,v.z,vanCol(v.state),'square');
+    for(const cd of g.cards.values()){if(cd.team!==g.me.team)continue;const car=cd.carrier>=0?g.ents.get(cd.carrier):null;mark(car?car.pos.x:cd.x,car?car.pos.z:cd.z,'#eafcff','square')}
+   }
    for(const o of teammates)mark(o.pos.x,o.pos.z,o.knocked?'#ff6b6b':'#4dff8a','dot');
    if(wp)mark(wp.x,wp.z,'#ffd23d','diamond');
    x.restore();
@@ -340,8 +370,16 @@ export class HUD{
   for(const p of W.POIS){const[a,b]=P(p.x,p.z);x.strokeText(p.n,a,b);x.fillText(p.n,a,b)}
   const b=g.bus;const[s0,s1]=P(b.sx,b.sz),[e0,e1]=P(b.sx+b.dx*b.len,b.sz+b.dz*b.len);
   x.strokeStyle='#ffd23d';x.setLineDash([10,8]);x.lineWidth=3;x.beginPath();x.moveTo(s0,s1);x.lineTo(e0,e1);x.stroke();x.setLineDash([]);
-  const[bp0,bp1]=P(b.pos.x,b.pos.z);if(g.busMesh.visible){x.fillStyle='#ffd23d';x.beginPath();x.arc(bp0,bp1,9,0,6.283);x.fill()}
+  const[bp0,bp1]=P(b.pos.x,b.pos.z);if(g.busMesh&&g.busMesh.visible){x.fillStyle='#ffd23d';x.beginPath();x.arc(bp0,bp1,9,0,6.283);x.fill()}
   for(const s of g.supplies){const[a,c]=P(s.x,s.z);x.fillStyle='#ff5a5a';x.fillRect(a-7,c-7,14,14)}
+  if(g.teamMode){
+   x.font='800 14px Segoe UI,Arial,sans-serif';x.textAlign='center';x.lineWidth=4;x.strokeStyle='rgba(0,0,0,.8)';
+   for(const v of g.vans.values()){const[a,c]=P(v.x,v.z),col=vanCol(v.state);x.fillStyle=col;x.strokeStyle='#021';x.lineWidth=2;x.fillRect(a-8,c-8,16,16);x.strokeRect(a-8,c-8,16,16);
+    x.strokeStyle='rgba(0,0,0,.8)';x.lineWidth=4;x.strokeText('Van',a,c-13);x.fillStyle=col;x.fillText('Van',a,c-13)}
+   for(const cd of g.cards.values()){if(cd.team!==g.me.team)continue;const car=cd.carrier>=0?g.ents.get(cd.carrier):null;const[a,c]=P(car?car.pos.x:cd.x,car?car.pos.z:cd.z);
+    x.fillStyle='#eafcff';x.strokeStyle='#021';x.lineWidth=2;x.fillRect(a-6,c-8,12,16);x.strokeRect(a-6,c-8,12,16);
+    x.strokeStyle='rgba(0,0,0,.8)';x.lineWidth=4;x.strokeText('Card',a,c-13);x.fillStyle='#eafcff';x.fillText('Card',a,c-13)}
+  }
   if(wp){const[a,c]=P(wp.x,wp.z);x.fillStyle='#ffd23d';x.strokeStyle='#000';x.lineWidth=3;x.beginPath();x.moveTo(a,c-16);x.lineTo(a+10,c);x.lineTo(a,c+16);x.lineTo(a-10,c);x.closePath();x.fill();x.stroke();
     x.font='800 15px Segoe UI,Arial,sans-serif';x.strokeText(wp.label,a,c-22);x.fillStyle='#ffd23d';x.fillText(wp.label,a,c-22);x.fillStyle='#ffffff'}
   for(const o of teammates){const[a,c]=P(o.pos.x,o.pos.z);x.fillStyle=o.knocked?'#ff6b6b':'#4dff8a';x.strokeStyle='#021';x.lineWidth=2;x.beginPath();x.arc(a,c,8,0,6.283);x.fill();x.stroke();

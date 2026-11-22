@@ -858,3 +858,12 @@ body.mobile.tp #touchUI{display:block}
 #tzSheet .tb{width:58px;height:58px}
 #tzRot{display:none;position:fixed;inset:0;z-index:40;align-items:center;justify-content:center;background:rgba(4,8,22,.94);color:#eef6ff;font:800 18px 'Segoe UI',Arial,sans-serif;text-align:center;padding:24px}
 @media (orientation:portrait){body.mobile.tp #tzRot{display:flex}}
+
+/* reboot vans and reboot cards on the world markers (team modes) */
+.wmark.vanm i{transform:none;border-radius:3px;width:12px;height:12px}
+.wmark.vanm.ready i{background:#4dfcff;box-shadow:0 0 10px rgba(77,252,255,.7)}
+.wmark.vanm.active i{background:#6dff7a;box-shadow:0 0 12px rgba(109,255,122,.8)}
+.wmark.vanm.cool i{background:#7a7f8c;box-shadow:none}
+.wmark.vanm b{color:#dffcff}
+.wmark.cardm i{transform:none;width:9px;height:12px;border-radius:2px;background:#fff;border-color:#0b3a52;box-shadow:0 0 10px rgba(127,233,255,.8)}
+.wmark.cardm b{color:#e6fbff}

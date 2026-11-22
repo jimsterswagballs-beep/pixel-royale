@@ -6,7 +6,8 @@ import {WEAPONS,mulberry32} from './data.js';
 import * as W from './world.js';
 
 export const KNOCK_BIT=524288;           // flag bit in packFlags/unpackFlags
-export const KNOCK_T=30;                 // seconds a knocked player has before they are eliminated
+export const KNOCK_HP=100;               // knocked players have this much health to lose before they are finished off
+export const KNOCK_DRAIN=2.5;            // health a knocked player bleeds away per second (enemy shots take more)
 export const REVIVE_T=4;                 // seconds a teammate must hold interact to revive
 export const REVIVE_HP=30;               // health a revived player comes back with
 export const REVIVE_RANGE=2.6;
@@ -58,7 +59,7 @@ export const knockMethods={
  // ------------------------------------------------------------------ knocked
  canKnock(t){return !!this.teamMode&&t.alive&&!t.knocked&&!t.drop},
  knockEnt(t,by,wid){
-  t.knocked=true;t.hp=0;t.kT=KNOCK_T;t.reviver=-1;t.reviveT=0;t.use=null;t.aiming=false;t.holdI=false;
+  t.knocked=true;t.hp=KNOCK_HP;t.kT=KNOCK_HP;t.reviver=-1;t.reviveT=0;t.use=null;t.aiming=false;t.holdI=false;
   t.knockBy=by?by.id:-1;t.knockWid=wid;
   this.emit({k:'ntf',tm:t.team,c:'#ff8a8a',t:`${t.name} is knocked!`});
  },
@@ -86,8 +87,9 @@ export const knockMethods={
  tickKnock(dt){
   for(const k of this.list){
    if(!k.alive||!k.knocked)continue;
-   k.kT-=dt;
-   if(k.kT<=0){this.killEnt(k,k.knockBy>=0?this.ents.get(k.knockBy):null,k.knockWid,false);continue}
+   // bleeding out: the knock health slowly goes down; enemy shots take it down faster (see damage)
+   k.hp-=KNOCK_DRAIN*dt;k.kT=k.hp;
+   if(k.hp<=0){k.hp=0;this.killEnt(k,k.knockBy>=0?this.ents.get(k.knockBy):null,k.knockWid,false);continue}
    const r=this.nearestReviver(k);
    if(!r){k.reviver=-1;k.reviveT=0;continue}
    if(r.id!==k.reviver){k.reviver=r.id;k.reviveT=0}
