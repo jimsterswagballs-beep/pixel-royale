@@ -426,7 +426,7 @@ buildTitle(){
   const inParty=!!(this.lobby&&this.net&&this.net.peer);
   if(inParty&&!this.net.isHost&&this.playing&&!this.hud.finished)this.net.toHost({t:'quit'}); // mid-match quit: host hands our character to a bot
   this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();this.input.locked=false;
-  this.game.running=false;this.hud.hide();for(const id of ['elim','victory'])$(id).style.display='none';$('pause').classList.remove('show');$('bigmap').style.display='none';
+  this.game.running=false;this.game.finaleReset();this.hud.hide();for(const id of ['elim','victory'])$(id).style.display='none';$('pause').classList.remove('show');$('bigmap').style.display='none';
   if(inParty){
    if(this.net.isHost)this.net.broadcast({t:'toLobby'});
    if(this.lobbyOnMsg)this.net.onMsg=this.lobbyOnMsg;
