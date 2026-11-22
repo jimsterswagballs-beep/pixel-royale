@@ -11,9 +11,10 @@ import {H,LAKES,ISL} from './world.js';
 import {mulberry32,clamp} from './data.js';
 
 export const FIN_COUNT=5;          // the finale starts when this many players are still alive
-const FIRE_N=28;                   // fire spots across the island
-const FIRE_RANGE=240;              // fires only burn (and cost particles) within this distance of the camera
-const TINT_TIME=20;                // seconds for the red tint to reach full strength
+const FIRE_N=72;                   // fire spots across the island
+const FIRE_RANGE=320;              // fires only burn (and cost particles) within this distance of the camera
+const TINT_DELAY=10;               // seconds before the red tint starts to fade in
+const TINT_TIME=10;                // seconds the red tint takes to fade in to full strength
 
 // Beat detector: the bass level is compared with a slow average. A beat is a clear jump above that average,
 // with a short cooldown so one kick never counts twice. Pure function so it can be tested without a browser.
@@ -34,15 +35,15 @@ export function fireSpots(){
   const a=r()*6.283,d=Math.sqrt(r())*ISL*.85,x=Math.cos(a)*d,z=Math.sin(a)*d,h=H(x,z);
   if(h<2.6)continue;
   if(LAKES.some(L=>Math.hypot(x-L.x,z-L.z)<L.r+5))continue;
-  out.push({x,y:h,z,ign:out.length*.35,acc:0});
+  out.push({x,y:h,z,ign:out.length*.14,acc:0});
  }
  return out;
 }
 
 const CSS=`
 #finTint,#finBeat{position:fixed;inset:0;pointer-events:none;opacity:0;z-index:1}
-#finTint{background:radial-gradient(ellipse at center,rgba(255,30,30,.08) 30%,rgba(170,0,0,.8) 100%)}
-#finBeat{background:radial-gradient(ellipse at center,rgba(255,70,70,.2) 20%,rgba(255,0,0,.6) 100%)}
+#finTint{background:radial-gradient(ellipse at center,rgba(255,0,0,.14) 20%,rgba(200,0,0,.95) 100%)}
+#finBeat{background:radial-gradient(ellipse at center,rgba(255,40,40,.3) 15%,rgba(255,0,0,.85) 100%)}
 #finAnn{position:fixed;left:0;right:0;top:22%;text-align:center;pointer-events:none;opacity:0;z-index:3;
  font:900 min(9vw,72px) Impact,"Arial Black",sans-serif;color:#ff2a2a;letter-spacing:4px;text-transform:uppercase;
  text-shadow:0 0 18px rgba(255,0,0,.9),0 4px 0 #3a0000}
@@ -96,35 +97,35 @@ export const finaleMethods={
   if(!F.on)return;
   F.t+=dt;
   const d=this.finDom;
-  const k=Math.min(1,F.t/TINT_TIME);
+  const k=clamp((F.t-TINT_DELAY)/TINT_TIME,0,1);   // the tint waits, then fades in
   const b=beatStep(F.beat,this.finaleBass(),dt);
   if(b.hit){                                                 // on each beat: a camera kick and a brief red flash
-   this.view.shake=Math.min(1,this.view.shake+.12*b.strength);
+   this.view.shake=Math.min(1,this.view.shake+.22*b.strength);
    this.finaleBeatSparks(b.strength);
   }
-  d.tint.style.opacity=clamp(k*(.55+.3*b.pulse),0,1).toFixed(3);
-  d.beat.style.opacity=(b.pulse*b.pulse*.55*(.35+.65*k)).toFixed(3);
+  d.tint.style.opacity=clamp(k*(.7+.3*b.pulse),0,1).toFixed(3);
+  d.beat.style.opacity=(b.pulse*b.pulse*.8*(.35+.65*k)).toFixed(3);
   // fires ignite one after another, then burn
   const cam=this.camera.position;
   for(const f of this.finFires){
    if(F.t<f.ign)continue;
    const dist=Math.hypot(f.x-cam.x,f.z-cam.z);if(dist>FIRE_RANGE)continue;
    const fade=Math.min(1,(F.t-f.ign)/3);
-   f.acc+=dt*(14+38*b.pulse)*fade*(1-.5*dist/FIRE_RANGE);
+   f.acc+=dt*(34+90*b.pulse)*fade*(1-.4*dist/FIRE_RANGE);
    while(f.acc>=1){f.acc-=1;this.finaleSpark(f)}
   }
  },
  finaleSpark(f){
   const r=Math.random,cols=['#ff5a14','#ff8a1f','#ffc23d','#ffe27a'];
-  this.fx.emit(f.x+(r()-.5)*1.4,f.y+.2+r()*.3,f.z+(r()-.5)*1.4,(r()-.5)*.8,2.4+r()*2.6,(r()-.5)*.8,cols[(r()*4)|0],.55+r()*.5,-2.2,.55+r()*.5,-.55,1.2,1);
-  if(r()<.22)this.fx.puff(f.x,f.y+1.5,f.z,(r()-.5)*.6,1.8,(r()-.5)*.6,'#3a3430',1.8+r()*1.2,.9,1.6,.35,0,1);
+  this.fx.emit(f.x+(r()-.5)*1.8,f.y+.2+r()*.4,f.z+(r()-.5)*1.8,(r()-.5)*1.2,3.2+r()*4.2,(r()-.5)*1.2,cols[(r()*4)|0],.7+r()*.7,-2.2,1+r()*1.1,-.7,1.2,1);
+  if(r()<.4)this.fx.puff(f.x,f.y+1.5,f.z,(r()-.5)*.8,2.2,(r()-.5)*.8,'#3a3430',2.5+r()*2,.9,2,.35,0,1);
  },
  // on a beat, the fires near the player throw extra sparks
  finaleBeatSparks(strength){
   const cam=this.camera.position;
   for(const f of this.finFires){
-   if(this.finState.t<f.ign||Math.hypot(f.x-cam.x,f.z-cam.z)>150||Math.random()>.5)continue;
-   for(let i=0;i<Math.round(2+3*strength);i++)this.finaleSpark(f);
+   if(this.finState.t<f.ign||Math.hypot(f.x-cam.x,f.z-cam.z)>200||Math.random()>.7)continue;
+   for(let i=0;i<Math.round(4+6*strength);i++)this.finaleSpark(f);
   }
  },
  // match start (cleanup): the finale ends, the tint and fires go, and the normal music comes back

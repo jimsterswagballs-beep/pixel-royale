@@ -371,6 +371,8 @@ export class Game{
    cam.position.set(cx,Math.max(cyy,W.H(cx,cz)+.5),cz);cam.lookAt(tgt.rpos.x,tgt.rpos.y+1.2,tgt.rpos.z);
    if(this.over&&this.winnerId===tgt.id){const a=this.t*.5;cam.position.set(tgt.rpos.x+Math.sin(a)*5,tgt.rpos.y+2,tgt.rpos.z+Math.cos(a)*5);cam.lookAt(tgt.rpos.x,tgt.rpos.y+1.1,tgt.rpos.z)}
    cam.fov=lerp(cam.fov,s.fov,.1);cam.rotation.z=0}
+  // finale: the camera bounces on every beat (the pulse is set by the beat detector in finale.js)
+  if(this.finState&&this.finState.on)cam.position.y+=this.finState.beat.pulse*.16;
   cam.updateProjectionMatrix();
   this.sky.position.copy(cam.position);updateSun(this,cam);
   this.audio.listener={x:cam.position.x,y:cam.position.y,z:cam.position.z,yaw:fpv?this.me.yaw:(this.specYaw||0)};

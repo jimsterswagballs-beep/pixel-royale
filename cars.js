@@ -16,6 +16,9 @@ export const CAR_RESPAWN_T=7;     // seconds between new cars appearing
 const ENTER_T=.5, EXIT_T=.6;      // seconds to climb in / step out
 const ENTER_RANGE=3.4;            // how close you must be to a door to get in
 const ENTER_MAX_SPEED=5;          // m/s: no jumping into a moving car
+const GRAV=24;                    // m/s^2: a car that drives off a drop falls at this rate
+const LAND_SAFE=9;                // m/s: landing slower than this does no damage
+const LAND_DMG=5;                 // damage per m/s of landing speed above LAND_SAFE
 const SEATS=[[-.5,.45],[.5,.45],[-.5,-1],[.5,-1]];   // [right, forward] offsets from the car centre (seat 0 is the driver)
 export const SEAT_NAMES=['driver seat','front passenger','back left','back right'];
 const GLASS='#2b3a4a',TYRE='#1b1b1f',TRIM='#2a2d33';
@@ -337,14 +340,33 @@ export const carMethods={
   c.lat-=c.lat*Math.min(1,g*dt);
   c.lat=clamp(c.lat,-spec.vmax*.6,spec.vmax*.6);
   const [fx,fz]=fwd(c.yaw),[rx,rz]=right(c.yaw);
-  const nx=c.x+(fx*v+rx*c.lat)*dt,nz=c.z+(fz*v+rz*c.lat)*dt,ny=W.H(nx,nz);
-  const [gx,gz]=W.slope(nx,nz);
-  const hit=ny<-.3||Math.hypot(gx,gz)>1.2||W.blocked(nx,ny+.2,nz,1.3,1.3,.6);
+  const nx=c.x+(fx*v+rx*c.lat)*dt,nz=c.z+(fz*v+rz*c.lat)*dt;
+  const gnd=W.H(nx,nz),dist=Math.hypot(nx-c.x,nz-c.z),drop=c.y-gnd;
+  const [gx,gz]=W.slope(nx,nz),steep=Math.hypot(gx,gz)>1.2;
+  // the car sits on the ground unless it has left it: a drop the wheels cannot follow (a cliff edge, or a drop
+  // steeper than the slope limit) sends it over the edge, and it falls under gravity until it lands
+  let air=!!c.air,vy=c.vy||0,ny=gnd,impact=0,splash=false;
+  if(!air&&drop>.6&&(steep||drop>1.2*dist)&&gnd>-.3){air=true;vy=0}
+  if(air){
+    vy-=GRAV*dt;ny=c.y+vy*dt;
+    if(ny<=gnd){                       // touched down
+      impact=-vy;ny=gnd;air=false;vy=0;
+      if(gnd<-.3)splash=true;          // landed in the lake
+    }
+  }
+  // walls and water stop a car on the ground (steep uphill, or the lake); buildings stop it in the air too
+  const hit=(!air&&(gnd<-.3||(steep&&gnd>c.y)))||W.blocked(nx,ny+.2,nz,1.3,1.3,.6);
   const speed=Math.hypot(v,c.lat);
   if(hit&&speed>2.5){
    c.hp-=speed*2.4;v=-v*.2;c.lat*=.2;this.emit({k:'ex',x:c.x,y:c.y+.8,z:c.z,r:1.2,c:'#cfd6de'});
   }else if(hit){v=0;c.lat=0}
-  else{c.x=nx;c.z=nz;c.y=ny}
+  else{c.x=nx;c.z=nz}
+  if(hit&&!air)ny=c.y;                 // a grounded car that is stopped keeps its height
+  c.y=ny;c.air=air;c.vy=vy;
+  if(splash){c.hp=0;this.emit({k:'ex',x:c.x,y:-.2,z:c.z,r:2.5,c:'#9fd6ff'})}
+  else if(impact>LAND_SAFE){
+   c.hp-=(impact-LAND_SAFE)*LAND_DMG;this.emit({k:'ex',x:c.x,y:c.y+.8,z:c.z,r:1.4,c:'#cfd6de'});
+  }
   c.v=v;
   c.group.position.set(c.x,c.y,c.z);
   // run over people on foot, push people on foot out of a parked car

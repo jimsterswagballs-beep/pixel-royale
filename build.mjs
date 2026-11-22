@@ -10,17 +10,17 @@ await esbuild.build({
   format: 'iife',
   platform: 'browser',
   loader: { '.png': 'file', '.mp3': 'file', '.mp4': 'file' },
-  outdir: '.',
+  outdir: 'dist',
   entryNames: '_game',
-  assetNames: 'assets/[name]',
+  assetNames: '[name]',
   write: true,
   target: 'es2020',
   logLevel: 'warning'
 });
-const js = fs.readFileSync('_game.js', 'utf8').replace(/<\/script>/g, '<\\/script>');
-fs.unlinkSync('_game.js');
+const js = fs.readFileSync('dist/_game.js', 'utf8').replace(/<\/script>/g, '<\\/script>');
+fs.unlinkSync('dist/_game.js');
 const css = fs.readFileSync('style.css', 'utf8');
 let html = fs.readFileSync('template.html', 'utf8');
 html = html.replace('/*CSS*/', () => css).replace('/*JS*/', () => js);
-fs.writeFileSync('index.html', html);
-console.log('Built index.html (' + (html.length / 1024 / 1024).toFixed(2) + ' MB) + assets/ (' + fs.readdirSync('assets').length + ' files)');
+fs.writeFileSync('dist/index.html', html);
+console.log('Built index.html (' + (html.length / 1024 / 1024).toFixed(2) + ' MB), assets next to it');
