@@ -15,6 +15,7 @@ import {structMethods} from './structures.js';
 import {carMethods} from './cars.js';
 import {chaosMethods} from './chaos.js';
 import {weatherMethods,makeWeatherSky} from './weather.js';
+import {finaleMethods} from './finale.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 
@@ -76,6 +77,7 @@ export class Game{
   for(const t of this.traps.values())if(t.mesh)this.dynamic.remove(t.mesh);
   for(const p of this.pvis.values())this.dynamic.remove(p.mesh);
   this.clearStructures();
+  this.finaleReset();
   if(this.busMesh){this.dynamic.remove(this.busMesh);this.busMesh=null}
   if(this.stormMesh){this.dynamic.remove(this.stormMesh);this.stormMesh=null}
   if(this.vmModel){this.vmScene.remove(this.vmModel);this.vmModel=null}
@@ -308,7 +310,8 @@ export class Game{
   this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);this.updateChaosVis(dt);
   this.updateLootVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
   this.fx.update(dt);
-  this.structUpdateUI(dt);
+  this.finaleUpdate(dt);
+  this.structUpdateUI(dt);this.bldUpdate(dt);
   this.netTick(dt);
  }
  updateBus(dt){
@@ -394,4 +397,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods);
+Object.assign(Game.prototype,finaleMethods,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods);

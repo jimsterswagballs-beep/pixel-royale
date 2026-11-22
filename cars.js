@@ -168,8 +168,8 @@ export const carMethods={
    if(W.parking.length&&rng()<.7){
     const b=W.parking[Math.floor(rng()*W.parking.length)];x=b.x;z=b.z;yaw=b.yaw+(rng()<.5?0:Math.PI);onLot=true;
    }else{
-    const [a,b]=W.ROADS[Math.floor(rng()*W.ROADS.length)];const t=.1+rng()*.8;
-    const p=W.roadPoint(a,b,t);if(W.poiAt(p.x,p.z))continue;
+    const r=W.ROADS[Math.floor(rng()*W.ROADS.length)];const t=.1+rng()*.8;
+    const p=W.roadPointAt(r[2],t);if(W.poiAt(p.x,p.z))continue;
     x=p.x;z=p.z;const dir=rng()<.5?1:-1;yaw=Math.atan2(-p.dx*dir,-p.dz*dir);
    }
    if(W.H(x,z)<2.2)continue;

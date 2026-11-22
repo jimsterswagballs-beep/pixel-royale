@@ -54,31 +54,10 @@ export class HUD{
   const me=g.me;this.abilEls=[];const ab=this.q('#abil');ab.innerHTML='';
   me.cdef.ab.forEach((a,i)=>{const d=el('div','abil',`<div class="kk"></div><div class="ico">${a.ic?'<img alt="" src="'+abilityIcon(a)+'">':(ABIL_ICON[a.n]||['①','②','③'][i]||'✦')}</div><div class="nx"></div><div class="an">${a.n}</div><div class="cdo"></div><div class="cdt"></div>`);ab.appendChild(d);this.abilEls.push(d)});
   this.slotsKey='';this.announce('Battle Bus is launching – press SPACE to jump!','#ffd23d');this.board=false;
-  this.resetFinal();this.finished=false;this.pendingElim=null;this.elimShown=false;$('elim').style.display='none';$('victory').style.display='none';
+  this.finished=false;this.pendingElim=null;this.elimShown=false;$('elim').style.display='none';$('victory').style.display='none';
  }
- hide(){this.root.style.display='none';this.clearStormFx();this.resetFinal()}
+ hide(){this.root.style.display='none';this.clearStormFx()}
  // drop last match's storm warnings: the purple storm vignette and the centre-screen storm banner
- // final five: once per match, a flashing red announcement, a slow red tint, and the final-five track
- finalEls(){
-  if(!this.q('#finalAnn')){const a=document.createElement('div');a.id='finalAnn';this.root.appendChild(a);const t=document.createElement('div');t.id='redtint';this.root.appendChild(t)}
-  return [this.q('#finalAnn'),this.q('#redtint')];
- }
- resetFinal(){
-  const [a,t]=this.finalEls();a.classList.remove('show');a.textContent='';t.style.opacity=0;
-  this.finalDone=false;this.finalT=-1;this.app.audio.stopFinalMusic();
- }
- updateFinal(g,dt){
-  const n=g.aliveCount();
-  if(!this.finalDone&&n<=5&&n>=2){
-    this.finalDone=true;this.finalT=0;const [a]=this.finalEls();
-    a.textContent=n+' People Left';a.classList.remove('show');void a.offsetWidth;a.classList.add('show');
-    this.app.audio.startFinalMusic();
-  }
-  if(this.finalT>=0){
-    this.finalT+=dt;const [,t]=this.finalEls();
-    t.style.opacity=clamp((this.finalT-3)/30,0,1)*.8;   // tint starts after the flash and reaches 80% over ~30 s
-  }
- }
  clearStormFx(){this.q('#vig').classList.remove('storm');const a=this.q('#announce');a.classList.remove('show');a.textContent=''}
  toast(m,c){const t=el('div','toast',m);if(c)t.style.color=c;const box=this.q('#toasts');box.appendChild(t);while(box.children.length>3)box.removeChild(box.firstChild);setTimeout(()=>t.remove(),2200)}
  announce(m,c='#fff'){const a=this.q('#announce');a.textContent=m;a.style.color=c;a.classList.remove('show');void a.offsetWidth;a.classList.add('show')}
@@ -178,7 +157,6 @@ export class HUD{
   this.q('#scope').style.display=this.scope?'block':'none';
   // vignette storm
   const inS=g.insideStorm(tgt.pos.x,tgt.pos.z);this.q('#vig').classList.toggle('storm',!inS);
-  this.updateFinal(g,dt);
   this.carHud(g,me,B);
   this.chaosHud(g);
   // bus hint
