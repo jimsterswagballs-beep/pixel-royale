@@ -867,3 +867,9 @@ body.mobile.tp #touchUI{display:block}
 .wmark.vanm b{color:#dffcff}
 .wmark.cardm i{transform:none;width:9px;height:12px;border-radius:2px;background:#fff;border-color:#0b3a52;box-shadow:0 0 10px rgba(127,233,255,.8)}
 .wmark.cardm b{color:#e6fbff}
+
+/* structure health bar (appears after you hit a structure) and the critical hit popup */
+.strbar{position:absolute;width:76px;height:10px;margin:-5px 0 0 -38px;background:rgba(10,12,18,.72);border:2px solid #0b0d12;border-radius:6px;overflow:hidden;pointer-events:none;box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.strbar i{display:block;height:100%;width:100%;background:linear-gradient(#b6ff8a,#4fc23f)}
+.crit{position:absolute;left:50%;top:41%;transform:translate(-50%,-50%);font:900 24px/1 'Segoe UI',Arial,sans-serif;letter-spacing:.14em;color:#ffd23d;text-shadow:0 0 10px rgba(255,160,0,.8),0 2px 0 #3a1a00,0 -2px 0 #3a1a00,2px 0 0 #3a1a00,-2px 0 0 #3a1a00;pointer-events:none;animation:critpop .8s ease-out forwards}
+@keyframes critpop{0%{transform:translate(-50%,-50%) scale(1.8);opacity:0}15%{opacity:1;transform:translate(-50%,-50%) scale(1.05)}70%{opacity:1}100%{transform:translate(-50%,-80%) scale(.95);opacity:0}}

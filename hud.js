@@ -13,6 +13,8 @@ const $=id=>document.getElementById(id);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
 export const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 // colour of a reboot van on the map: ready, in use, or cooling down
+// you are carrying a reboot card (the reboot vans only show then)
+const holdsCard=g=>!!g.cards&&[...g.cards.values()].some(c=>c.carrier===g.me.id);
 const vanCol=s=>s===VAN_READY?'#4dfcff':s===VAN_ACTIVE?'#6dff7a':'#7a7f8c';
 export class HUD{
  constructor(app){this.app=app;this.root=$('hud');this.scope=false;this.toastT=0;this.build();this.mapImg=null;this.dmgNums=[];this.lastSlotKey='';this.matLast={};this.matEls=null;
@@ -80,6 +82,7 @@ export class HUD{
   if(self){const o=document.createElement('em');o.className='own';o.textContent='own goal';d.appendChild(o)}
   else d.appendChild(who(k.victim.name,k.victim.col,k.victim.me));
   kf.appendChild(d);while(kf.children.length>6)kf.removeChild(kf.firstChild);setTimeout(()=>d.remove(),6000)}
+ critPop(){const n=el('div','crit','CRITICAL');this.root.appendChild(n);setTimeout(()=>n.remove(),800)}
  hitmarker(kill,head,sh){const h=this.q('#hitm');h.className=(kill?'kill ':'')+(head?'head ':'')+(sh?'sh ':'');void h.offsetWidth;h.className+='show'}
  healNumber(pos,a){const n=el('div','dn hl','+'+Math.round(a));this.q('#dmgnums').appendChild(n);this.dmgNums.push({n,p:pos.clone(),t:0,dx:(Math.random()-.5)*40});setTimeout(()=>{n.remove();this.dmgNums=this.dmgNums.filter(x=>x.n!==n)},900)}
  dmgNumber(pos,d,head,g){const n=el('div','dn'+(head?' hd':''),d);this.q('#dmgnums').appendChild(n);this.dmgNums.push({n,p:pos.clone(),t:0,dx:(Math.random()-.5)*40});setTimeout(()=>{n.remove();this.dmgNums=this.dmgNums.filter(x=>x.n!==n)},900)}
@@ -168,9 +171,26 @@ export class HUD{
   const cam=g.camera;for(const d of this.dmgNums){d.t+=dt;const v=d.p.clone().project(cam);if(v.z>1){d.n.style.display='none';continue}d.n.style.display='block';const S=this.scale;d.n.style.left=((v.x*.5+.5)*innerWidth+d.dx*d.t)/S+'px';d.n.style.top=((-v.y*.5+.5)*innerHeight-d.t*60)/S+'px';d.n.style.opacity=Math.max(0,1-d.t/.9)}
   // fps
   if(g.settings.fps){this.fpsAcc=(this.fpsAcc||0)+dt;this.fpsN=(this.fpsN||0)+1;if(this.fpsAcc>.5){this.q('#fps').textContent=Math.round(this.fpsN/this.fpsAcc)+' FPS';this.fpsAcc=0;this.fpsN=0}}
-  this.drawMinimap(g,tgt);if($('bigmap').style.display==='flex')this.drawMinimap(g,tgt,$('bm'));this.drawWorldMarks(g,me);
+  // the minimap redraws about 11 times a second: it is a small picture, and redrawing it every frame is wasted work
+  if(!this.mmT||performance.now()-this.mmT>90){this.mmT=performance.now();this.drawMinimap(g,tgt)}if($('bigmap').style.display==='flex')this.drawMinimap(g,tgt,$('bm'));this.drawWorldMarks(g,me);this.drawStructBar(g,dt);
   // scoreboard
   const bd=this.q('#board');if(I.down('score')){bd.style.display='block';if(!this.bt||performance.now()-this.bt>300){this.bt=performance.now();const l=g.list.slice().sort((a,b)=>b.kills-a.kills||(b.alive-a.alive));bd.innerHTML='<h3>Players</h3>'+l.slice(0,16).map(e=>`<div class="${e.alive?'':'dead'}"><span>${e.name}${e.bot?' 🤖':''}</span><b>${e.kills}</b></div>`).join('')}}else bd.style.display='none';
+ }
+ // health bar over the player-built structure you last hit; hidden 2 seconds after the last hit
+ drawStructBar(g,dt){
+  let bar=this.root.querySelector('#strbar');
+  if(!bar){bar=el('div','strbar','<i></i>');bar.id='strbar';this.root.appendChild(bar)}
+  const sb=g.structBar;
+  if(!sb){bar.style.display='none';return}
+  sb.t+=dt;
+  const p=g.pieces&&g.pieces.get(sb.id);
+  if(sb.t>2||!p||p.dead){g.structBar=null;bar.style.display='none';return}
+  const v=new THREE.Vector3(p.x,p.y+(p.ty==='floor'?.5:1.7),p.z).project(g.camera);
+  if(v.z>1){bar.style.display='none';return}
+  const S=this.scale;
+  bar.style.display='block';
+  bar.style.left=((v.x*.5+.5)*innerWidth)/S+'px';bar.style.top=((-v.y*.5+.5)*innerHeight)/S+'px';
+  bar.firstChild.style.width=clamp(p.hp/p.maxHp,0,1)*100+'%';
  }
  // driving: a panel for the car you are in (speed, car health, the controls)
  carHud(g,me,B){
@@ -294,7 +314,7 @@ export class HUD{
   const items=[];
   if(g.teamMode)for(const o of g.list){if(o===me||o.team!==me.team||!o.alive)continue;items.push({key:'m'+o.id,cls:'mate'+(o.knocked?' kn':''),x:o.pos.x,y:o.pos.y+2.3,z:o.pos.z,name:o.name+(o.knocked?' · knocked':''),d:o.pos})}
   if(g.teamMode){
-   for(const v of g.vans.values())items.push({key:'v'+v.id,cls:'vanm '+(v.state===VAN_READY?'ready':v.state===VAN_ACTIVE?'active':'cool'),x:v.x,y:v.y+4,z:v.z,name:'Reboot van',d:v});
+   if(holdsCard(g))for(const v of g.vans.values())items.push({key:'v'+v.id,cls:'vanm '+(v.state===VAN_READY?'ready':v.state===VAN_ACTIVE?'active':'cool'),x:v.x,y:v.y+4,z:v.z,name:'Reboot van',d:v});
    for(const cd of g.cards.values()){if(cd.team!==me.team)continue;const car=cd.carrier>=0?g.ents.get(cd.carrier):null;const px=car?car.pos.x:cd.x,py=car?car.pos.y:cd.y,pz=car?car.pos.z:cd.z;const ow=g.ents.get(cd.owner);
     items.push({key:'c'+cd.id,cls:'cardm',x:px,y:py+2.2,z:pz,name:'Reboot card'+(ow?' · '+ow.name:''),d:{x:px,z:pz}})}
   }
@@ -348,7 +368,7 @@ export class HUD{
     if(shape==='diamond'){x.moveTo(a,c-9);x.lineTo(a+7,c);x.lineTo(a,c+9);x.lineTo(a-7,c)}else if(shape==='square'){x.rect(a-6,c-6,12,12)}else x.arc(a,c,6,0,6.283);
     x.closePath();x.fill();x.stroke()};
    if(g.teamMode){
-    for(const v of g.vans.values())mark(v.x,v.z,vanCol(v.state),'square');
+    if(holdsCard(g))for(const v of g.vans.values())mark(v.x,v.z,vanCol(v.state),'square');
     for(const cd of g.cards.values()){if(cd.team!==g.me.team)continue;const car=cd.carrier>=0?g.ents.get(cd.carrier):null;mark(car?car.pos.x:cd.x,car?car.pos.z:cd.z,'#eafcff','square')}
    }
    for(const o of teammates)mark(o.pos.x,o.pos.z,o.knocked?'#ff6b6b':'#4dff8a','dot');
@@ -374,7 +394,7 @@ export class HUD{
   for(const s of g.supplies){const[a,c]=P(s.x,s.z);x.fillStyle='#ff5a5a';x.fillRect(a-7,c-7,14,14)}
   if(g.teamMode){
    x.font='800 14px Segoe UI,Arial,sans-serif';x.textAlign='center';x.lineWidth=4;x.strokeStyle='rgba(0,0,0,.8)';
-   for(const v of g.vans.values()){const[a,c]=P(v.x,v.z),col=vanCol(v.state);x.fillStyle=col;x.strokeStyle='#021';x.lineWidth=2;x.fillRect(a-8,c-8,16,16);x.strokeRect(a-8,c-8,16,16);
+   if(holdsCard(g))for(const v of g.vans.values()){const[a,c]=P(v.x,v.z),col=vanCol(v.state);x.fillStyle=col;x.strokeStyle='#021';x.lineWidth=2;x.fillRect(a-8,c-8,16,16);x.strokeRect(a-8,c-8,16,16);
     x.strokeStyle='rgba(0,0,0,.8)';x.lineWidth=4;x.strokeText('Van',a,c-13);x.fillStyle=col;x.fillText('Van',a,c-13)}
    for(const cd of g.cards.values()){if(cd.team!==g.me.team)continue;const car=cd.carrier>=0?g.ents.get(cd.carrier):null;const[a,c]=P(car?car.pos.x:cd.x,car?car.pos.z:cd.z);
     x.fillStyle='#eafcff';x.strokeStyle='#021';x.lineWidth=2;x.fillRect(a-6,c-8,12,16);x.strokeRect(a-6,c-8,12,16);

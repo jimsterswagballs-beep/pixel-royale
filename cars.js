@@ -6,6 +6,7 @@
 // Guests send their drive input ('carin') and seat requests ('car'). Clients only draw the cars they are sent.
 // The person getting in or out runs the animation on their own screen too, so their body moves smoothly.
 import * as THREE from 'three';
+import {bakeGroup} from './bake.js';
 import * as W from './world.js';
 import {clamp,lerp,mulberry32} from './data.js';
 
@@ -131,6 +132,9 @@ function makeCarGroup(id,t){
  const beams=new THREE.Group();beams.visible=false;const bm=new THREE.MeshBasicMaterial({color:'#fff6c8',transparent:true,opacity:.16,depthWrite:false});
  for(const x of[-.67,.67]){const cone=new THREE.Mesh(new THREE.ConeGeometry(1.5,9,12,1,true),bm);cone.rotation.x=-Math.PI/2;cone.position.set(x*hw,t.ly,-(L+4.6));beams.add(cone)}
  g.add(beams);
+ // the static body parts become one mesh; wheels spin on their own pivots, and the glowing parts are not lit, so they stay
+ const spinning=new Set();for(const w of wheels)w.pivot.traverse(o=>spinning.add(o));
+ bakeGroup(g,{keep:o=>spinning.has(o)});
  return{g,flame,beams,wheels,tails,style,color:P};
 }
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {WEAPONS,ITEMS,RARITY,AMMO,clamp,lerp,mulberry32} from './data.js';
 import * as W from './world.js';
+import {bakeGroup} from './bake.js';
 import {wstat,makeWeaponModel,mat} from './shared.js';
 import {MATS,rollMatItem} from './materials.js';
 const NW=WEAPONS.length;
@@ -161,7 +162,7 @@ export function makeItemLootVis(l){
  const platform=new THREE.Mesh(G.disc,lootMat('#202b40',.4,.25));platform.position.y=.07;platform.receiveShadow=true;g.add(platform);
  const trim=new THREE.Mesh(G.ground,glowMat(c,.7));trim.rotation.x=Math.PI/2;trim.position.y=.12;g.add(trim);
  const float=new THREE.Group();float.position.y=.22;g.add(float);
- const model=makeFloorItem(it);float.add(model);
+ const model=makeFloorItem(it);bakeGroup(model,{standard:true,roughness:.55,flatShading:true,castShadow:false});float.add(model);
  // effect tier: weapons scale with rarity; ammo/items stay subtle (valuable consumables get a halo)
  const tier=it.k==='w'?it.r:(it.k==='i'&&['chug','bigshield','medkit'].includes(it.id)?2:0);
  const hr=it.k==='w'?.82:it.k==='a'?.48:.58;
@@ -290,6 +291,7 @@ export const lootMethods={
   // top emblem
   if(gold){part(g,new THREE.CylinderGeometry(.2,.2,.035,6),trim,0,.88,0);part(g,new THREE.OctahedronGeometry(.12),supply?'#ff6a52':'#fff0a0',0,.99,0)}
   else{part(g,new THREE.BoxGeometry(.36,.08,.2),'#d9e7b5',0,.89,0);part(g,new THREE.BoxGeometry(.1,.12,.24),'#d9e7b5',0,.92,0)}
+  bakeGroup(g,{standard:true,roughness:.6,flatShading:true});   // the crate's parts become one mesh; the light beam stays separate
   const beam=new THREE.Mesh(new THREE.CylinderGeometry(gold?.38:.25,gold?.38:.25,18,10,1,true),glowMat(gold?(supply?'#ff4b42':'#ffd23d'):'#9bff78',.15));
   beam.position.y=9;g.add(beam);
   g.userData.crate=true;g.userData.phase=l.id*.91;g.position.set(l.x,l.y,l.z);

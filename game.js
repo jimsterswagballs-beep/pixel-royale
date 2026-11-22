@@ -16,6 +16,7 @@ import {carMethods} from './cars.js';
 import {chaosMethods} from './chaos.js';
 import {weatherMethods,makeWeatherSky} from './weather.js';
 import {finaleMethods} from './finale.js';
+import {buildScenery} from './scenery.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 
@@ -62,8 +63,8 @@ export class Game{
   this.view={recoilP:0,recoilY:0,kick:0,shake:0,bobT:0,eye:EYE,roll:0,fov:92,adsK:0,equipK:1,reloadK:0,sway:0,flash:0,hitK:0,burgerT:0};
   this.vfxInit();this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
  }
- ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
- renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
+ ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.scenery=buildScenery(this.scene,this.world.water);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
+ renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);if(this.scenery)this.scenery.update(dt,this.menuT);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
  // a human left mid-match: their team is told (team modes), then a bot takes over if they were still alive
  peerLeft(pid){const e=this.list.find(x=>x.peer===pid);if(!e)return;e.peer=undefined;
   if(this.teamMode&&e.alive)this.emit({k:'ntf',tm:e.team,c:'#ffd27a',t:`${e.name} left the match, a bot is taking over`});
@@ -76,7 +77,7 @@ export class Game{
   for(const l of this.loot.values())if(l.mesh)this.dynamic.remove(l.mesh);
   for(const t of this.traps.values())if(t.mesh)this.dynamic.remove(t.mesh);
   for(const p of this.pvis.values())this.dynamic.remove(p.mesh);
-  this.clearStructures();
+  this.clearStructures();this.structBar=null;
   this.finaleReset();
   if(this.busMesh){this.dynamic.remove(this.busMesh);this.busMesh=null}
   if(this.stormMesh){this.dynamic.remove(this.stormMesh);this.stormMesh=null}
@@ -235,7 +236,7 @@ export class Game{
    case'hit':{const t=this.ents.get(ev.t);if(!t)break;t.hitT=.16;t.punch=1;
     {const c=ev.h?'#ffd23d':ev.sh&&!ev.hp?'#5ac8ff':'#ff5a4a';fx.burst(ev.x,ev.y,ev.z,ev.h?16:10,ev.h?7:5,c,.35,10);fx.burst(ev.x,ev.y,ev.z,6,4,'#ffffff',.2,6);
      if(ev.h)fx.ring(new THREE.Vector3(ev.x,ev.y-.05,ev.z),1.1,'#ffd23d',.3);if(ev.sh&&ev.hp)fx.burst(ev.x,ev.y,ev.z,10,6,'#5ac8ff',.4,6)}
-    if(ev.by===this.myId&&ev.t!==this.myId){this.hud.hitmarker(false,!!ev.h,ev.sh&&!ev.hp);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
+    if(ev.by===this.myId&&ev.t!==this.myId){this.hud.hitmarker(false,!!ev.h,ev.sh&&!ev.hp);if(ev.h){this.hud.critPop();this.view.shake=Math.min(1,this.view.shake+.16)}else this.view.shake=Math.min(1,this.view.shake+.07);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
     if(ev.t===this.myId){this.hud.flashDamage(ev.by>=0&&this.ents.get(ev.by)?this.ents.get(ev.by).pos:null,this);au.play('hurt');this.view.shake=Math.min(1,this.view.shake+Math.min(.6,ev.d/60));if(me.use){me.use=null;this.hud.toast('Interrupted',"#ff7a7a")}}
     break}
    case'kill':{const v=this.ents.get(ev.v),b=ev.by>=0?this.ents.get(ev.by):null;
@@ -301,7 +302,7 @@ export class Game{
  update(dt){
   if(!this.running)return;dt=Math.min(dt,.05);this.t+=dt;this.emoteInput();this.rollInput();
   const me=this.me;
-  this.updateBus(dt);if(this.decor)this.decor.update(this.t);
+  this.updateBus(dt);if(this.decor)this.decor.update(this.t);if(this.scenery)this.scenery.update(dt,this.t);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
    this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}

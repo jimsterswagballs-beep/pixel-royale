@@ -1,8 +1,8 @@
 // Building materials and piece costs shared by loot, structures and the HUD.
 export const MATS={
- wood:{n:'Wood',c:'#c98a4a',dark:'#7a4d24',hp:120},
- stone:{n:'Stone',c:'#b4b9be',dark:'#5f666c',hp:320},
- metal:{n:'Metal',c:'#8aa3b8',dark:'#4b5d6c',hp:640}};
+ wood:{n:'Wood',c:'#c98a4a',dark:'#7a4d24',hp:60},
+ stone:{n:'Stone',c:'#b4b9be',dark:'#5f666c',hp:150},
+ metal:{n:'Metal',c:'#8aa3b8',dark:'#4b5d6c',hp:300}};
 export const MAT_KEYS=Object.keys(MATS);
 export const PIECES={wall:{n:'Wall',cost:10},floor:{n:'Floor',cost:10},ramp:{n:'Ramp',cost:14}};
 export const PIECE_KEYS=Object.keys(PIECES);

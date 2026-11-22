@@ -108,10 +108,10 @@ export const structMethods={
   const before=T.hp;T.hp-=amt;const dealt=Math.max(0,Math.min(before,amt));
   const killed=T.hp<=0;if(killed)T.hp=0;
   if(src==='pick')this.harvestYield(by,T,dealt,killed);
-  if(killed)this.partDestroy(T,0);else this.partSync(T);
+  if(killed)this.partDestroy(T,0);else this.partSync(T,by);
   return dealt},
- partSync(T){
-  if(T.pk==='piece')this.emit({k:'bh',id:T.id,hp:Math.round(T.hp)});
+ partSync(T,by){
+  if(T.pk==='piece')this.emit({k:'bh',id:T.id,hp:Math.round(T.hp),by:by?by.id:-1});
   else if(T.pk==='box')this.emit({k:'ph',t:'w',i:T.wi,hp:Math.round(T.hp)});
   else this.emit({k:'ph',t:T.pk,i:T.idx,hp:Math.round(T.hp)})},
  // break a part, then let anything it was holding up fall
@@ -222,7 +222,7 @@ export const structMethods={
  onWorldHit(sh,wh,wd,ex,ey,ez){
   if(this.role==='client'||!wh||!wh.obj)return;
   const T=partOf(wh.obj);if(!T)return;
-  if(this.partHit(T,(wd.dmg||20)*(wd.pellets>1?.45:.8),'bullet',null)>0)this.emit({k:'hv',x:ex,y:ey,z:ez,c:partColor(T)})},
+  if(this.partHit(T,(wd.dmg||20)*(wd.pellets>1?.45:.8),'bullet',sh)>0)this.emit({k:'hv',x:ex,y:ey,z:ez,c:partColor(T)})},
  // explosion: every part in reach takes damage that falls off with distance
  structBlast(x,y,z,r,dmg){
   if(this.role==='client')return;
@@ -290,7 +290,7 @@ export const structMethods={
   this.structEnsure();
   switch(ev.k){
    case'bp':{const p=this.structAddPiece(ev.p);if(p)this.fx.dust(p.x,p.y+.5,p.z,6,3,MATS[p.mat].dark);break}
-   case'bh':{const p=this.pieces.get(ev.id);if(p){p.hp=ev.hp;p.mat3.emissive.setHex(0x402000);p.flashT=.09;
+   case'bh':{if(ev.by===this.myId){this.structBar={id:ev.id,t:0};this.hud.hitmarker(false,false,false)}const p=this.pieces.get(ev.id);if(p){p.hp=ev.hp;p.mat3.emissive.setHex(0x402000);p.flashT=.09;
     p.boxes.forEach((b,bi)=>boxCrack(this.dynamic,'p'+p.id+':'+bi,b,stageFor(p)))}break}
    case'bx':{const p=this.pieces.get(ev.id);if(p)this.structDrop(p,ev.big);break}
    case'ph':{

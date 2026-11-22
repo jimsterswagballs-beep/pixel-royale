@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {mulberry32,clamp,lerp} from './data.js';
 import {MATS} from './materials.js';
+import {makeSeaMaterial,buildSeaDepth,makeRiverMesh} from './water.js';
 export const ISL=380,HALF=520,WATER=0;
 // v23: no cliff walls. Hills, dips, the lake and the road cuts shape the ground instead.
 export const CLIFFS=[];
@@ -73,13 +74,44 @@ export function rawH(x,z){
  return h;
 }
 const poiY=POIS.map(p=>{let s=0,n=0;for(let a=0;a<6.283;a+=.785)for(let r=0;r<=p.r*.9;r+=p.r*.3){s+=rawH(p.x+Math.cos(a)*r,p.z+Math.sin(a)*r);n++}return clamp(s/n,3.4,28)});
-export function H(x,z){
+// ---- the river and the beach ------------------------------------------------
+// A river rises on Radio Hill and winds down the south-west hills into the sea. The water never climbs: each point's
+// surface is at most the ground level of every point upstream (minus a margin), so it always runs downhill.
+export const RIVER={hw:4.6,depth:1.1,lip:.35,bank:2.6,fade:6.5,ribbon:6.3};
+const RIVER_PTS=[[-156,172],[-170,190],[-188,204],[-204,222],[-222,236],[-240,246],[-252,258],[-266,276],[-278,288],[-292,302]];
+export const RIVER_PATH=new THREE.CatmullRomCurve3(RIVER_PTS.map(([x,z])=>new THREE.Vector3(x,0,z)),false,'centripetal').getSpacedPoints(90).map(p=>({x:p.x,z:p.z}));
+export const RIVER_WS=(()=>{let pm=1e9;return RIVER_PATH.map(p=>{pm=Math.min(pm,rawH(p.x,p.z)-.6);return Math.max(pm,-.25)})})();
+const RB={x0:-290,x1:-130,z0:150,z1:300},RIVER_REACH=RIVER.hw+RIVER.bank+RIVER.fade+1;
+// the nearest point on the river: its distance from the centreline and the water level there (null when far away)
+export function riverAt(x,z){
+ if(x<RB.x0||x>RB.x1||z<RB.z0||z>RB.z1)return null;
+ let best=1e9,ws=0;
+ for(let i=0;i+1<RIVER_PATH.length;i++){
+  const a=RIVER_PATH[i],b=RIVER_PATH[i+1];const dx=b.x-a.x,dz=b.z-a.z;const L2=dx*dx+dz*dz||1;
+  const t=clamp(((x-a.x)*dx+(z-a.z)*dz)/L2,0,1);const d=Math.hypot(a.x+dx*t-x,a.z+dz*t-z);
+  if(d<best){best=d;ws=RIVER_WS[i]+(RIVER_WS[i+1]-RIVER_WS[i])*t}
+ }
+ return best<RIVER_REACH?{d:best,ws}:null;
+}
+export function riverDist(x,z){const r=riverAt(x,z);return r?r.d:1e9}
+// the channel: a flat bed below the water, banks that rise to a small lip, then the natural ground
+function riverH(x,z,h){
+ const r=riverAt(x,z);if(!r)return h;
+ const {hw,depth,lip,bank,fade}=RIVER;const bed=r.ws-depth,top=r.ws+lip;
+ if(r.d<=hw+bank)return lerp(bed,top,sstep(hw,hw+bank,r.d));
+ return lerp(h,top,1-sstep(hw+bank,hw+bank+fade,r.d));
+}
+// the beach landmark: a flattened sandy cove on the north shore, the sea edge running into it
+export const BEACH={x:0,z:352,r:22,h:1.05};
+function beachH(x,z,h){const d=Math.hypot(x-BEACH.x,z-BEACH.z);if(d>BEACH.r+12)return h;return lerp(h,BEACH.h,1-sstep(BEACH.r,BEACH.r+12,d))}
+function baseH(x,z){
  let h=rawH(x,z);
  for(let i=0;i<POIS.length;i++){const p=POIS[i];const dx=x-p.x,dz=z-p.z;if(dx>p.r*1.75||dx<-p.r*1.75||dz>p.r*1.75||dz<-p.r*1.75)continue;
   const d=Math.hypot(dx,dz);const w=sstep(p.r*1.7,p.r*.92,d);if(w>0)h=lerp(h,poiY[i],w);}
  for(const L of LAKES){const d=Math.hypot(x-L.x,z-L.z);const w=sstep(L.r*1.7,L.r*.95,d);if(w>0){const t=Math.min(1,d/L.r);h=lerp(h,L.bed+4.6*t*t,w)}}
  return h;
 }
+export function H(x,z){return riverH(x,z,beachH(x,z,baseH(x,z)))}
 export function slope(x,z){const e=1.2;return [(H(x+e,z)-H(x-e,z))/(2*e),(H(x,z+e)-H(x,z-e))/(2*e)]}
 export function poiAt(x,z){for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*1.1)return p;return null}
 
@@ -651,12 +683,13 @@ export function buildMap(){
   const tx=x+(rng()-.5)*7,tz=z+(rng()-.5)*7;const h=H(tx,tz);if(h<2.6||h>34)continue;
   const f=fbm(tx*.03+40,tz*.03+40);if(f<.46&&rng()<.85)continue;if(f<.52&&rng()<.5)continue;
   if(roadDist(tx,tz)<5)continue;
+  if(riverDist(tx,tz)<RIVER.ribbon+3)continue;
   let bad=false;for(const p of POIS)if(Math.hypot(tx-p.x,tz-p.z)<p.r*(p.type==='cabins'?.55:1.12)){bad=true;break}if(bad)continue;
   if(LAKES.some(L=>Math.hypot(tx-L.x,tz-L.z)<L.r+6))continue;
   const[gx,gz]=slope(tx,tz);if(Math.hypot(gx,gz)>.7)continue;
   const sc=.8+rng()*.8;const c={x:tx,z:tz,r:.55*sc,y0:h,y1:h+9*sc,tree:true,sc,kind:rng()<.25?1:0,pk:'tree',mat:'tree',hp:TREE_HP,maxHp:TREE_HP,idx:treeList.length};treeList.push(c);insertCircle(c);circles.push(c)}
  // rocks
- for(let i=0;i<160;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.9;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.9){bad=true;break}if(bad)continue;if(roadDist(x,z)<4)continue;
+ for(let i=0;i<160;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.9;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.9){bad=true;break}if(bad)continue;if(roadDist(x,z)<4)continue;if(riverDist(x,z)<RIVER.ribbon+3)continue;
   const sc=1+rng()*2.2;const c={x,z,r:1.1*sc,y0:h-1,y1:h+1.3*sc,rock:true,sc,rot:rng()*6,pk:'rock',mat:'rock',hp:rockHp(sc),maxHp:rockHp(sc),idx:rockList.length};rockList.push(c);insertCircle(c);circles.push(c)}
  // outdoor loot spots
  for(const p of POIS){const cnt=p.r>=50?16:p.r>=30?12:8;for(let i=0;i<cnt;i++){const a=rng()*6.283,r=Math.sqrt(rng())*p.r*.9;lootSpots.push({x:p.x+Math.cos(a)*r,z:p.z+Math.sin(a)*r,y:0,inside:false,chest:false,q:.7})}}
@@ -686,7 +719,7 @@ function fixLootSpots(){
  const keep=[];
  for(const s of lootSpots){
   if(!s.inside){ // outdoor: not in water, not on steep cliffs, not inside walls/trees/rocks
-   s.y=H(s.x,s.z)+.1;if(s.y<2.4)continue;
+   s.y=H(s.x,s.z)+.1;if(s.y<2.4||riverDist(s.x,s.z)<RIVER.ribbon+2)continue;
    const[gx,gz]=slope(s.x,s.z);if(Math.hypot(gx,gz)>.9)continue}
   if(!nudgeSpot(s,s.chest?.75:.4))continue; // drop spots that are buried in a wall/prop and can't be moved
   keep.push(s)}
@@ -819,11 +852,15 @@ export function buildMeshes(scene,quality={}){
   if(h>1.8&&h<34){const rd=roadDist(x,z);if(rd<4.2)c.lerp(new THREE.Color(rd<2.6?'#4b4e55':'#c4b89a'),clamp((4.2-rd)/1.2,0,1)*.95)}
   for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<ringR(p)-3&&h>1.8){c.lerp(new THREE.Color(p.type==='suburb'?'#7bb85a':'#9a9a96'),sstep(ringR(p)-3,p.r*.5,d)*.75)}}
   for(const nd of ROAD_NODES){if(!nd.gate)continue;const d=Math.hypot(x-nd.x,z-nd.z);if(d<11&&h>1.8)c.lerp(new THREE.Color('#9a9a96'),sstep(11,5,d)*.8)}
+  {const rv=riverAt(x,z);if(rv&&rv.d<RIVER.hw+RIVER.bank+2)c.lerp(new THREE.Color('#5f5b4a'),.7)}
+  {const bd=Math.hypot(x-BEACH.x,z-BEACH.z);if(bd<BEACH.r)c.lerp(new THREE.Color('#f6eccb'),.5*(1-sstep(BEACH.r-6,BEACH.r,bd)))}
   col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b}
  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.computeVertexNormals();
  const terrain=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));terrain.receiveShadow=true;g.add(terrain);
  g.add(buildRoads());
- const water=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),new THREE.MeshPhongMaterial({color:'#2f86c8',transparent:true,opacity:.82,shininess:90,specular:'#aee'}));water.rotation.x=-Math.PI/2;water.position.y=WATER;g.add(water);
+ const water=new THREE.Mesh(new THREE.PlaneGeometry(4000,4000),makeSeaMaterial(buildSeaDepth(H,HALF,400),HALF));water.rotation.x=-Math.PI/2;water.position.y=WATER;water.renderOrder=0;g.add(water);
+ const riverN=RIVER_WS.filter(w=>w>=.03).length; // the ribbon stops at the shoreline; the sea covers the rest
+ g.add(makeRiverMesh(RIVER_PATH.slice(0,riverN),RIVER_WS.slice(0,riverN),RIVER.ribbon));
  // boxes
  const bg=new THREE.BoxGeometry(1,1,1),bm=new THREE.MeshLambertMaterial({color:0xffffff});
  const im=new THREE.InstancedMesh(bg,bm,boxVis.length);const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),ps=new THREE.Vector3();
