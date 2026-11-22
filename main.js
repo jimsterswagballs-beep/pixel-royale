@@ -12,6 +12,7 @@ import {StarterIsland} from './starter.js';
 import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
 import {makeBotRoster} from './botnames.js';
+import {askPlatform,savedPlatform,storePlatform,TouchUI} from './touch.js';
 const INTER_SECS=10; // seconds everyone waits on the starter island before the bus leaves
 import {buildEntrants,MODES,MODE_KEYS,GM,GM_KEYS} from './teams.js';
 const $=id=>document.getElementById(id);
@@ -30,10 +31,10 @@ class App{
   {const bf=document.createElement('div');bf.id='boardFade';document.body.appendChild(bf)}
   this.inter=null;this.buildInter();
   this.game=new Game(this);this.screen='loading';this.paused=false;this.playing=false;this.net=null;this.lobby=null;
-  this.menuT=0;this.last=performance.now();
+  this.menuT=0;this.last=performance.now();this.mobile=false;this.touch=null;
   addEventListener('resize',()=>this.resize());document.addEventListener('fullscreenchange',()=>this.resize());
   this.applySettings();this.resize();
-  setTimeout(()=>{this.game.ensureWorld();this.buildScreens();this.go('title');requestAnimationFrame(t=>this.loop(t))},60);
+  setTimeout(()=>{this.game.ensureWorld();this.buildScreens();this.initPlatform();this.go('title');requestAnimationFrame(t=>this.loop(t))},60);
  }
  // ---------- state
  loadSettings(){let s={};try{s=JSON.parse(localStorage.getItem('brg_settings')||'{}')}catch(e){}this.settings=Object.assign({},DEFAULT_SETTINGS,s)}
@@ -59,7 +60,19 @@ class App{
   if(!l&&!this.paused&&!this.endCursor&&!this.input.capture){this.setPause(true)}}
  showCursor(on){this.endCursor=on;if(on&&document.pointerLockElement)document.exitPointerLock()}
  setPause(p){this.paused=p;$('pause').classList.toggle('show',p);if(p){this.renderPause('main')}else{this.lock()}}
- lock(){try{const r=this.canvas.requestPointerLock({unadjustedMovement:true});if(r&&r.catch)r.catch(()=>{try{this.canvas.requestPointerLock()}catch(e){}})}catch(e){}}
+ lock(){if(this.mobile){this.input.locked=true;return}try{const r=this.canvas.requestPointerLock({unadjustedMovement:true});if(r&&r.catch)r.catch(()=>{try{this.canvas.requestPointerLock()}catch(e){}})}catch(e){}}
+ // platform: PC (keyboard and mouse) or mobile (touch controls, no pointer lock)
+ initPlatform(){
+  const saved=savedPlatform();
+  if(saved){this.setPlatform(saved,false);return}
+  askPlatform(p=>{this.setPlatform(p,true);this.renderSettings?.()});
+ }
+ setPlatform(p,save){
+  this.mobile=p==='mobile';document.body.classList.toggle('mobile',this.mobile);this.input.touch=this.mobile;
+  if(!this.mobile)this.input.locked=false;
+  if(save)storePlatform(p);
+  if(this.mobile&&!this.touch)this.touch=new TouchUI(this);
+ }
  onKey(e){
   if(e.code==='Escape'){if(this.playing&&this.paused){this.setPause(false)}return}
   if(!this.playing)return;
@@ -118,7 +131,7 @@ buildTitle(){
      <button class="btn sec" data-go="online">Play with friends</button>
      <button class="btn play" id="playBtn">Play</button>
     </div>
-    <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>New Heroes: Chill Guy &amp; Jay</b><small>Stealth strikes and chaotic cooking</small></button>
+    <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>Mobile Support</b><small>Play with a joystick and touch buttons, or with keyboard and mouse</small></button>
    </div>
    <div class="glass sl-modes"><button class="gm-open" id="slGm"></button></div>
   </div>`;
@@ -209,40 +222,16 @@ buildTitle(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
-    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.8</div><h3>Revive &amp; Reboot Screens</h3><ul>
-     <li><b>Downed screen</b>: a clearer panel with your bleed-out timer, the revive progress, and what to do.</li>
-     <li><b>Reboot screen</b>: after you are eliminated, you now see the three steps to get back into the match, what is happening, and the card and van times.</li>
-     <li>The elimination card now waits until a reboot is no longer possible.</li>
-     <li><b>Reviver card</b>: a clearer card with the seconds left for the revive.</li>
-    </ul></section>
-    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.7</div><h3>Cars Remake</h3><ul>
-     <li><b>Six kinds of car</b>: Hatch, Sedan, Pickup, Van, Sports and Jeep, each with its own body details.</li>
-     <li><b>16 paints</b> with solid, two-tone roof, racing stripe and taxi styles.</li>
-     <li><b>Better tyres</b>: cars slide in fast turns and on wet roads, and grip pulls them back into line.</li>
-     <li><b>Car bumps</b>: cars push apart when they hit each other, and hard hits damage both.</li>
-     <li><b>Getting in</b> is an animation now: walk to a door and climb in. The prompt shows which seat you will get.</li>
-     <li><b>Getting out</b> steps you out to a clear spot beside or behind the car.</li>
-     <li>Your camera switches to third person while you climb in, and nobody can climb into a car going faster than a walk.</li>
-    </ul></section>
-    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.6</div><h3>Weather Remake</h3><ul>
-     <li><b>Changing weather</b>: the weather now changes during the match. Every match has its own sequence, and everyone plays the same one.</li>
-     <li><b>Seven weather types</b>: Clear, Overcast, Drizzle, Thunderstorm, Coastal fog, Night and Sandstorm.</li>
-     <li><b>Smooth transitions</b>: the sky, clouds, sun, fog and wetness fade into the next weather over about 14 seconds.</li>
-     <li><b>New sky</b>: clouds drift with the wind, stars come out at night, and sandstorms turn the sky yellow-brown.</li>
-     <li><b>Lightning</b>: thunderstorms flash a warning ring near you, then strike with a bolt, a flash and a thunderclap.</li>
-     <li><b>Rain and sand</b> fall around the camera and are blown along by the wind.</li>
-     <li><b>Driving in the wet</b>: cars lose grip and top speed as the roads get wetter, so drizzle is slippery and storms are much worse.</li>
-    </ul></section>
-    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.5</div><h3>Map Remake</h3><ul>
-     <li><b>New terrain</b>: rolling ground, a sandy east coast with dunes, and hills and ridges across the island.</li>
-     <li><b>Lake Muffin</b> sits in the middle of the island, with Lakeside Docks, a pier and canoes on its shore.</li>
-     <li><b>Better roads</b>: roads route around the lake and the sea, follow gentler slopes, and stay clear of the scenery.</li>
-     <li><b>New districts</b>: Thunder Dome stadium, Old Keep ruins, Camp Pinecone and a church in the towns.</li>
-     <li><b>New landmarks</b>: a radio tower, a windfarm, a water tower, a shipwreck, a stone arch and a sand pyramid.</li>
-     <li><b>Cars</b> now spawn mostly in district car parks, and the rest sit on quiet roads between districts.</li>
-     <li><b>Chests</b> are on hilltops, along the lake and the coast, and at landmarks, instead of scattered at random.</li>
-     <li><b>Fixed</b>: chests now show up during the bus ride and the drop, not only once you land.</li>
-    </ul></section>
+    <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.5</div><h3>Mobile Support &amp; World Update</h3><ul>
+     <li><b>Mobile support</b>: pick PC or Mobile when you first open the game. Mobile has a joystick on the left (push to the edge to sprint), drag on the right to look, and buttons for every action.</li>
+     <li>Tap a hotbar slot to pick it. Change your platform any time in Settings &gt; Controls.</li>
+     <li><b>Vehicles</b>: five cars (Sedan, Pickup, Van, Sports and Jeep), each with its own speed, handling and toughness. Use the interact key to get in and out.</li>
+     <li><b>Roads</b> now connect every town with smooth curves, kerbs and centre lines. Trees, rocks and buildings keep off the roads.</li>
+     <li><b>Collapsing buildings</b>: destroy half of a building's supports and it falls. Anyone underneath takes crush damage.</li>
+     <li><b>Decorations</b>: street lamps, benches, bins, beach umbrellas, deckchairs and boats.</li>
+     <li><b>Ambience</b>: bird flocks, gulls, drifting pollen, and wind, birdsong, crickets and waves.</li>
+     <li>Bots that jam at the same spot twice give up that loot and roam somewhere else.</li>
+    </section>
     <section class="update-entry"><div class="date">NOVEMBER 21, 2026 · VERSION 1.4</div><h3>Shop, Emotes &amp; Lobby Redesign</h3><ul>
      <li><b>Item Shop</b> (first tab): spend Swag Tokens on Chill Guy, Jay and emotes. Skins are coming later.</li>
      <li><b>Swag Tokens</b> are earned from eliminations, surviving longer, finishing in the top 10 and winning.</li>
@@ -284,7 +273,7 @@ buildTitle(){
    </div><div class="tip">More changes will appear here as Pixel Royale gets updated.</div></div>`;
   $('upBack').appendChild(this.back());
  }
- buildCredits(){$('credits').innerHTML=`<div class="pg" style="text-align:center"><div class="pg-head"><h2>Credits</h2><div id="crBack"></div></div><h1 class="logo" style="font-size:48px;transform:none">Pixel <span>Royale</span></h1><p style="margin:16px 0;font-size:18px;line-height:1.7">Characters: <b>Coolguy15</b>, <b>Zach</b>, <b>Chill Guy</b> &amp; <b>Jay</b> — your original 2D art<br>Game design &amp; code: built with Claude<br>Engine: <b>three.js</b> · Multiplayer: <b>PeerJS / WebRTC</b><br>Sound effects: procedurally synthesised with the Web Audio API<br>Music: Gymnopédie No. 1 by Erik Satie, performed by Kevin MacLeod (incompetech.com), CC BY 4.0 · Nocturne Op. 9 No. 2 by Chopin</p><p class="tip">Everything — island, weapons, sound effects — is generated in code, so the game runs fully offline.</p></div>`;$('crBack').appendChild(this.back())}
+ buildCredits(){$('credits').innerHTML=`<div class="pg" style="text-align:center"><div class="pg-head"><h2>Credits</h2><div id="crBack"></div></div><h1 class="logo" style="font-size:48px;transform:none">Pixel <span>Royale</span></h1><p style="margin:16px 0;font-size:18px;line-height:1.7">Characters: <b>Coolguy15</b>, <b>Zach</b>, <b>Chill Guy</b> &amp; <b>Jay</b> — your original 2D art<br>Game design &amp; code: built with Claude<br>Engine: <b>three.js</b> · Multiplayer: <b>PeerJS / WebRTC</b><br>Audio: procedurally synthesised with the Web Audio API</p><p class="tip">Everything — island, weapons, music — is generated in code, so the game runs fully offline.</p></div>`;$('crBack').appendChild(this.back())}
  // ---------- settings
  buildSettings(){
   const p=$('settings');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Settings</h2><div id="stBack"></div></div><div class="st-body"><div class="tabs" id="stTabs"></div><div id="stBody"></div></div></div>`;$('stBack').appendChild(this.back());
@@ -313,7 +302,7 @@ buildTitle(){
    tog('Show FPS counter','fps','Also toggles with F3 in game');
   }
   if(this.stTab==='Audio'){slider('Master volume','master',0,100,1,'',v=>v);slider('Sound effects','sfx',0,100,1,'',v=>v);slider('Music','music',0,100,1,'',v=>v)}
-  if(this.stTab==='Controls'){slider('Mouse sensitivity','sens',.2,3,.05,'Base look speed',v=>(+v).toFixed(2));slider('Camera sensitivity','camSens',.2,3,.05,'Look speed while not aiming',v=>(+v).toFixed(2));slider('Aim-down-sights sensitivity','adsSens',.2,2,.05,'Multiplier while zoomed',v=>(+v).toFixed(2));tog('Invert Y axis','invertY');tog('Toggle crouch','crouchToggle','Press once to crouch instead of holding');tog('Toggle aim','aimToggle');tog('Auto sprint','autoSprint','Sprint whenever you move forward')}
+  if(this.stTab==='Controls'){slider('Mouse sensitivity','sens',.2,3,.05,'Base look speed',v=>(+v).toFixed(2));slider('Camera sensitivity','camSens',.2,3,.05,'Look speed while not aiming',v=>(+v).toFixed(2));slider('Aim-down-sights sensitivity','adsSens',.2,2,.05,'Multiplier while zoomed',v=>(+v).toFixed(2));tog('Invert Y axis','invertY');tog('Toggle crouch','crouchToggle','Press once to crouch instead of holding');tog('Toggle aim','aimToggle');tog('Auto sprint','autoSprint','Sprint whenever you move forward');slider('Touch look sensitivity','touchSens',.3,3,.05,'Drag speed on the touch screen',v=>(+v).toFixed(2));{const pr=h(`<div class="set"><label>Control layout<span class="d">Keyboard &amp; mouse, or touch screen with a joystick</span></label><div class="row"><button class="btn sm">${this.mobile?'Use PC controls':'Use mobile controls'}</button></div></div>`);pr.querySelector('button').onclick=()=>{this.setPlatform(this.mobile?'pc':'mobile',true);this.sfx('ui');this.renderSettings()};body.appendChild(pr)}}
   if(this.stTab==='Gameplay'){sel('Crosshair colour','xcol',[['#ffffff','White'],['#4aff8a','Green'],['#4ad8ff','Cyan'],['#ffd84a','Yellow'],['#ff5a5a','Red'],['#ff7ab8','Pink']]);slider('Crosshair size','xsize',.6,2,.1,'',v=>(+v).toFixed(1));tog('Hit markers','hitmarkers');tog('Damage numbers','dmgNumbers');slider('Screen shake','shake',0,2,.1,'',v=>(+v).toFixed(1));slider('Head bob','bob',0,2,.1,'',v=>(+v).toFixed(1));tog('Rotate minimap with player','mapRotate')}
   if(this.stTab==='Key Bindings')this.renderBinds(body);
  }
@@ -385,7 +374,7 @@ buildTitle(){
   this.sfx('ui');
   if(this.lobby&&this.net){this.leaveMatch();return}   // party: back to the lobby to board again
   this.audio.init();this.audio.resume();
-  this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();
+  this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();this.input.locked=false;
   this.game.running=false;this.hud.hide();for(const id of ['elim','victory'])$(id).style.display='none';$('pause').classList.remove('show');$('bigmap').style.display='none';
   this.hud.finished=false;
   this.startOffline();
@@ -393,7 +382,7 @@ buildTitle(){
  leaveMatch(){
   const inParty=!!(this.lobby&&this.net&&this.net.peer);
   if(inParty&&!this.net.isHost&&this.playing&&!this.hud.finished)this.net.toHost({t:'quit'}); // mid-match quit: host hands our character to a bot
-  this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();
+  this.playing=false;this.paused=false;this.endCursor=false;if(document.pointerLockElement)document.exitPointerLock();this.input.locked=false;
   this.game.running=false;this.hud.hide();for(const id of ['elim','victory'])$(id).style.display='none';$('pause').classList.remove('show');$('bigmap').style.display='none';
   if(inParty){
    if(this.net.isHost)this.net.broadcast({t:'toLobby'});
@@ -441,7 +430,7 @@ buildTitle(){
    else if(m.t==='full'){this.toast('Lobby is full');this.leaveLobby()}
    else if(m.t==='toLobby'){this.leaveMatch()}};
   this.lobbyOnMsg=net.onMsg;
-  net.onClosed=()=>{this.toast('Disconnected from host');this.cancelIntermission();if(this.playing){this.playing=false;this.game.running=false;this.hud.hide();if(document.pointerLockElement)document.exitPointerLock();for(const id of ['elim','victory'])$(id).style.display='none'}this.leaveLobby(true)};
+  net.onClosed=()=>{this.toast('Disconnected from host');this.cancelIntermission();if(this.playing){this.playing=false;this.game.running=false;this.hud.hide();if(document.pointerLockElement)document.exitPointerLock();this.input.locked=false;for(const id of ['elim','victory'])$(id).style.display='none'}this.leaveLobby(true)};
  }
 buildLobby(){
   const p=$('lobby');
@@ -536,6 +525,7 @@ lobbyUpdate(noBroadcast,full){
  loop(now){
   requestAnimationFrame(t=>this.loop(t));
   let dt=(now-this.last)/1000;this.last=now;dt=Math.min(dt,.1);
+  if(this.touch)this.touch.sync(this.playing&&!this.paused&&!this.boarding&&!this.inter);
   const g=this.game;
   try{
    if(this.playing&&g.running){

@@ -772,43 +772,48 @@ body.look-drag{cursor:grabbing;user-select:none}
 #hud .kn-s{font-family:'Segoe UI',Arial,sans-serif}
 #bm{width:min(64vh,64vw);height:min(64vh,64vw)}
 
-/* ===================== v26: revive and reboot screens =====================
-   Downed: a panel low on screen with the bleed-out timer, the revive and your teammates.
-   Reboot: a panel higher up with the three steps to get you back, what is happening now and the card and van times.
-   Reviving: a small card for the revive you are doing. The elimination card only shows when no reboot is possible. */
-#rbwait{position:fixed;inset:auto;left:50%;top:auto;bottom:150px;transform:translateX(-50%);width:min(540px,92vw);display:none;flex-direction:column;align-items:stretch;gap:10px;padding:16px 18px;border-radius:16px;background:rgba(34,6,12,.88);border:1px solid rgba(255,120,120,.42);box-shadow:0 14px 40px rgba(0,0,0,.5);color:#fff;z-index:25;pointer-events:none;text-shadow:0 1px 3px #000}
-#rbwait.rb{top:20%;bottom:auto;background:rgba(6,20,50,.9);border-color:rgba(140,200,255,.42)}
-.rbs-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
-.rbs-tag{font:italic 900 24px var(--disp,Impact),Arial Black,sans-serif;letter-spacing:1.5px;text-transform:uppercase}
-.rbs-tag.dn{color:#ff8a8a}
-.rbs-tag.rb{color:#9fd8ff}
-.rbs-time{font-size:13px;font-weight:800;color:#ffe0e0}
-.rbs.rb .rbs-time{color:#d6ecff}
-.rbs-time b{font-size:30px;font-weight:900;color:#fff;margin-right:4px}
-.rbs-bleed{height:10px;background:rgba(255,255,255,.14);border-radius:6px;overflow:hidden}
-.rbs-bleed i{display:block;height:100%;transition:width .25s linear}
-.rbs-bleed.dn i{background:linear-gradient(90deg,#ff4d4d,#ff9a6a)}
-.rbs-bleed.rb i{background:linear-gradient(90deg,#6ec6ff,#c4ecff)}
-.rbs-revbar{height:12px;background:rgba(0,0,0,.45);border-radius:6px;overflow:hidden;border:1px solid rgba(180,255,200,.7)}
-.rbs-revbar i{display:block;height:100%;background:linear-gradient(90deg,#4dff8a,#b6ffcc);transition:width .15s linear}
-.rbs-msg{font-size:14px;font-weight:700;line-height:1.45;color:#ffe6e6;text-align:center}
-.rbs.rb .rbs-msg{color:#e4f3ff}
-.rbs-msg b{color:#b6ffcc}
-.rbs-msg kbd{font-family:inherit;font-weight:900;background:rgba(255,255,255,.16);border-radius:5px;padding:1px 6px;color:#fff}
-.rbs-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-.rbs-step{padding:9px 6px;border-radius:10px;background:rgba(255,255,255,.08);font-size:12px;font-weight:800;text-align:center;color:#9fb6ff;line-height:1.25}
-.rbs-step.done{color:#b6ffcc;background:rgba(77,255,138,.16)}
-.rbs-step.now{color:#fff;background:rgba(255,210,61,.22);box-shadow:0 0 0 1px #ffd23d}
-.rbs-foot{display:flex;justify-content:space-between;gap:10px;font-size:12px;font-weight:700;color:#cfe0ff}
-.rbs-mates{display:flex;flex-wrap:wrap;gap:6px;justify-content:center}
-.rb-m{padding:3px 9px;border-radius:7px;font-size:12px;font-weight:800;background:rgba(255,255,255,.1);color:#e6eef8}
-.rb-m.up{background:rgba(77,255,138,.2);color:#b6ffcc}
-.rb-m.down{background:rgba(255,107,107,.26);color:#ffd0d0}
-.rb-m.out{background:rgba(255,255,255,.08);color:#9aa6b8}
-/* the revive card (a teammate is reviving you, or you are reviving one) */
-#knock .kn-card.rv{width:min(360px,88vw);margin:0 auto;background:rgba(6,30,18,.9);border:1px solid rgba(120,255,160,.5);border-radius:14px;padding:12px 14px;gap:8px;color:#e6fff0}
-#knock .kn-top{display:flex;justify-content:space-between;align-items:baseline}
-#knock .kn-t{font-size:16px;font-weight:900;letter-spacing:.4px;color:#b6ffcc;text-shadow:none}
-#knock .kn-n{font-size:20px;font-weight:900;color:#fff}
-#knock .kn-card.rv .kn-bar{height:12px;border-radius:6px;background:rgba(255,255,255,.14);border:none}
-#knock .kn-card.rv .kn-bar i{background:linear-gradient(90deg,#4dff8a,#b6ffcc)}
+/* ---------- platform choice (PC or mobile) ---------- */
+#platform{position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;padding:16px;background:radial-gradient(ellipse at 50% 30%,#14307a 0%,#060b22 72%);transition:opacity .3s}
+#platform.out{opacity:0;pointer-events:none}
+.pf-card{width:min(760px,100%);text-align:center;color:#eef6ff;font-family:'Segoe UI',Arial,sans-serif}
+.pf-kick{font-weight:900;letter-spacing:3px;text-transform:uppercase;font-size:12px;color:#ffd84a}
+.pf-card h1{font:italic 900 34px/1.1 Impact,'Arial Narrow',sans-serif;margin:8px 0 6px;letter-spacing:1px}
+.pf-sub{margin:0 0 22px;color:#b8cdf0;font-size:14px}
+.pf-opts{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pf-opt{position:relative;background:rgba(14,26,68,.9);border:2px solid rgba(120,170,255,.35);border-radius:16px;padding:16px 16px 14px;color:#fff;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:6px;transition:transform .15s,border-color .15s,box-shadow .15s;font-family:inherit}
+.pf-opt:hover,.pf-opt:focus-visible{transform:translateY(-3px);border-color:#ffd84a;box-shadow:0 10px 30px rgba(255,210,74,.2);outline:none}
+.pf-opt svg{width:100%;max-width:300px;height:auto}
+.pf-opt b{font:italic 900 22px Impact,'Arial Narrow',sans-serif;letter-spacing:1px;margin-top:4px}
+.pf-opt span{font-size:13px;color:#9fb6e0}
+.pf-opt em{position:absolute;top:10px;right:10px;font-style:normal;font-size:11px;font-weight:900;background:#ffd84a;color:#2a1a00;padding:3px 8px;border-radius:6px}
+@media (max-width:560px){.pf-opts{grid-template-columns:1fr}.pf-card h1{font-size:26px}}
+
+/* ---------- mobile: touch controls ---------- */
+body.mobile #gl{touch-action:none}
+body.mobile{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+body.mobile input[type=text]{user-select:text}
+body.mobile .screen,body.mobile .pg{touch-action:pan-y}
+body.mobile #slots{pointer-events:auto;position:relative;z-index:31}
+body.mobile #slots .slot{pointer-events:auto;cursor:pointer}
+#touchUI{display:none;position:fixed;inset:0;z-index:30;pointer-events:none}
+body.mobile.tp #touchUI{display:block}
+#tzLook,#tzStick{position:absolute;top:0;bottom:0;pointer-events:auto;touch-action:none}
+#tzLook{right:0;width:55%}
+#tzStick{left:0;width:45%}
+.tz-hint{position:absolute;left:22px;bottom:22px;font:800 12px/1 'Segoe UI',Arial,sans-serif;color:rgba(255,255,255,.4);letter-spacing:2px;pointer-events:none}
+#tzRing{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;border-radius:50%;border:2px solid rgba(255,255,255,.4);background:rgba(255,255,255,.06);display:none;pointer-events:none}
+#tzRing.show{display:block}
+#tzRing i{position:absolute;left:50%;top:50%;width:50px;height:50px;margin:-25px 0 0 -25px;border-radius:50%;background:rgba(42,200,255,.6);border:2px solid #fff;transform:translate(var(--kx,0px),var(--ky,0px))}
+.tb{pointer-events:auto;touch-action:none;width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.5);background:rgba(10,18,44,.62);color:#fff;font:800 13px/1 'Segoe UI',Arial,sans-serif;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 3px 10px rgba(0,0,0,.35);user-select:none;-webkit-user-select:none;cursor:pointer}
+.tb.on{background:rgba(42,200,255,.75);transform:scale(.94)}
+#tzRight{position:absolute;right:160px;bottom:76px;display:grid;grid-template-columns:repeat(3,56px);gap:8px;pointer-events:none}
+#tzRight .tb{width:56px;height:56px;font-size:12px}
+.tb-fire{position:absolute;right:14px;bottom:14px;width:104px;height:104px;font-size:17px;background:rgba(255,190,40,.8);color:#2a1a00;border-color:#fff3c2}
+.tb-fire.on{background:rgba(255,226,120,.95)}
+#tzTop{position:absolute;left:12px;top:12px;display:flex;gap:8px;pointer-events:none}
+.tb-sm{width:54px;height:54px;font-size:11px}
+#tzSheet{position:absolute;left:12px;top:78px;display:none;grid-template-columns:repeat(3,58px);gap:8px;padding:10px;border-radius:14px;background:rgba(6,12,34,.82);border:1px solid rgba(120,170,255,.3);pointer-events:none}
+#tzSheet.open{display:grid}
+#tzSheet .tb{width:58px;height:58px}
+#tzRot{display:none;position:fixed;inset:0;z-index:40;align-items:center;justify-content:center;background:rgba(4,8,22,.94);color:#eef6ff;font:800 18px 'Segoe UI',Arial,sans-serif;text-align:center;padding:24px}
+@media (orientation:portrait){body.mobile.tp #tzRot{display:flex}}

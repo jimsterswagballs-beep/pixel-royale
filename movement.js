@@ -10,7 +10,7 @@ export const movementMethods={
   const I=this.input,s=this.settings,me=this.me;
   const active=this.app.inputActive();
   if(!active||me.emote){return {f:0,s:0,jump:false,jumpP:false,sprint:false,crouch:me.crouchState||false,crouchP:false}}
-  const f=(I.down('fwd')?1:0)-(I.down('back')?1:0),st=(I.down('right')?1:0)-(I.down('left')?1:0);
+  const q=I.stick;const f=Math.max(-1,Math.min(1,(I.down('fwd')?1:0)-(I.down('back')?1:0)+q.y)),st=Math.max(-1,Math.min(1,(I.down('right')?1:0)-(I.down('left')?1:0)+q.x));
   let sprint=I.down('sprint');if(s.autoSprint&&f>0)sprint=true;
   let crouch;if(s.crouchToggle){if(I.pressed('crouch'))me.crouchState=!me.crouchState;crouch=!!me.crouchState}else crouch=I.down('crouch');
   const crouchP=s.crouchToggle?I.pressed('crouch'):I.pressed('crouch');
@@ -22,8 +22,6 @@ export const movementMethods={
   const{dx,dy}=I.takeLook();
   const cur=me.inv[me.cur];const wd=cur&&cur.k==='w'?wstat(cur.w,cur.r):null;
   if(active){const ads=v.adsK>.05;const ratio=Math.tan(this.camera.fov*Math.PI/360)/Math.tan(s.fov*Math.PI/360);let k=.0022*s.sens*s.camSens*ratio*(ads?(1-v.adsK)+v.adsK*s.adsSens:1);if(me.eatT>0)k*=.3;me.yaw-=dx*k;me.pitch=clamp(me.pitch-dy*k*(s.invertY?-1:1),-1.5,1.5)}
-  // climbing in or out: the body follows the animation and nothing else moves it (the host runs it for everyone)
-  if(me.carAnim){if(this.role==='client'){this.stepCarAnim(me,dt);this.guestCarTick(me)}return}
   const inp=this.readInput();
   if(me.knocked){inp.jump=false;inp.jumpP=false;inp.sprint=false;inp.crouch=false;inp.crouchP=false}
   // bus
@@ -71,7 +69,7 @@ export const movementMethods={
  },
  leaveBus(e){if(e.drop!=='bus')return;e.drop='free';e.pos.copy(this.bus.pos);e.vel.set(this.bus.dx*this.bus.speed*.6,-2,this.bus.dz*this.bus.speed*.6);e.grounded=false;e.spawnT=this.t},
  move(e,inp,dt){
-  if(e.car>=0||e.carAnim)return;   // in a car, or climbing in or out: the car or the animation moves the body, not the legs
+  if(e.car>=0)return;   // in a car: the car moves the seat, not the legs
   if(!e.alive||e.drop==='bus')return;
   for(const k of ['stun','slip','dance','dazed','eatT','buffT','auraT','cloakT','coldT','slowT','cookT','energyT','spicyT'])if(e[k]>0)e[k]=Math.max(0,e[k]-dt);
   for(let i=0;i<3;i++)if(e.cd[i]>0)e.cd[i]-=dt;
