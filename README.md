@@ -1,3 +1,12 @@
+# Pixel Royale: v27 mobile support
+
+- Platform choice: on first open you pick PC or Mobile, with a picture of each. The device your browser looks like is marked "Suggested". Your choice is remembered, and you can switch in Settings > Controls.
+- Mobile controls: drag anywhere on the left half for a joystick (push it to the edge to sprint). Drag on the right half to look. Buttons cover fire, aim, jump, crouch, sprint, reload, interact, the three abilities, map and menu. More holds emote, drop, build, rotate, material, roll, car seat swap and previous/next weapon. Tap a hotbar slot to select it.
+- Touch controls only show during a match and hide while paused. Dragging a menu background turns the starter island camera, as the mouse does on PC.
+- Settings > Controls has a touch look sensitivity slider.
+- Touch buttons use the same key bindings as the keyboard, so remapped actions still apply.
+- Not done yet: on-screen hints still name keyboard keys (for example "Press Space"). Mobile was tested in a headless browser, not on real phones.
+
 # Pixel Royale: v26 revive and reboot screens
 
 - **Downed screen** (you are knocked): a panel low on screen with a bleed-out bar and seconds left, a revive bar when a teammate is reviving you, and what to do (crawl to cover, and where a teammate needs to stand to revive you). Teammates show as chips: up, down or out.
