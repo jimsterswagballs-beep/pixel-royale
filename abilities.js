@@ -256,6 +256,9 @@ export const heroMethods={
  vfx(ev){
   const fx=this.fx,au=this.audio,P=new THREE.Vector3(ev.x||0,ev.y||0,ev.z||0);
   switch(ev.t){
+   case'carcrash':{fx.spark(P.x,P.y,P.z,0,1,0,'#ffd070');fx.spark(P.x,P.y,P.z,1,.2,0,'#ffb040');fx.burst(P.x,P.y+.6,P.z,18,5,'#cfd6de',.7,-1);fx.puff(P.x,P.y+.6,P.z,0,1.2,0,'#6b6b70',1.1,.7,1.8,.5);break}
+   case'carbump':{fx.burst(P.x,P.y,P.z,8,2.5,'#d8d2c4',.45,-1);fx.spark(P.x,P.y,P.z,0,1,0,'#ffe9a8');break}
+   case'carhit':{fx.burst(P.x,P.y,P.z,26,6,'#c0392b',.6,-1);fx.burst(P.x,P.y,P.z,12,4,'#ffe2a0',.45,-1);fx.ring(P,1.6,'#ff8a6a',.3);break}
    case'poof':{fx.ring(P,2.8,'#9be0ff',.4);for(let i=0;i<10;i++){const a=rnd()*6.283,s=1+rnd()*2.2;fx.puff(P.x,P.y+.9,P.z,Math.cos(a)*s,.4+rnd()*1.2,Math.sin(a)*s,'#26334d',.8+rnd()*.5,1.1+rnd(),1.6,.7,-.4,1.6)}fx.burst(P.x,P.y+1,P.z,22,4.5,'#bff4ff',.7,-1.5);break}
    case'cold':{const e=this.ents.get(ev.i),p=e?e.pos:P;fx.ring(p,3.4,'#7fe0ff',.45);fx.ring(p,1.8,'#ffffff',.3);fx.burst(p.x,p.y+1,p.z,36,7,'#e8fbff',.75,2);fx.burst(p.x,p.y+1,p.z,22,5,'#4ac8ff',.6,1);break}
    case'dash':{const y=ev.y+1;for(let k=0;k<18;k++){const f=k/17,px=lerp(ev.x,ev.tx,f),pz=lerp(ev.z,ev.tz,f);

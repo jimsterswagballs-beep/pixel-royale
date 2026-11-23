@@ -13,6 +13,9 @@ import {clamp,lerp,mulberry32} from './data.js';
 export const CAR_HP=250;          // sedan health (the reference for the burn point)
 export const CAR_BURN=90;         // the sedan burns at or below this (other cars burn at the same share of their health)
 export const CAR_MAX=14;          // cars on the map at once
+export const ACCEL_BOOST=1.8;      // engines pull harder: the throttle's acceleration is multiplied by this
+export const CRASH_SPEED=10;       // a car only crashes (takes damage) when it hits something at this speed (m/s) or faster
+export const RUN_OVER_SPEED=5;     // a car knocks people into the air when it is moving at least this fast (m/s)
 export const CAR_RESPAWN_T=7;     // seconds between new cars appearing
 const ENTER_T=.5, EXIT_T=.6;      // seconds to climb in / step out
 const ENTER_RANGE=3.4;            // how close you must be to a door to get in
@@ -226,6 +229,7 @@ export const carMethods={
   const i=e.seat;c.seats[i]=-1;if(i===0)c.inp={th:0,st:0,br:0};
   const to=exitPoint(c,i);
   e.car=-1;e.seat=-1;e.vel.set(0,0,0);
+  this.emit({k:'vfx',t:'poof',i:e.id,x:e.pos.x,y:e.pos.y+1,z:e.pos.z});   // and reappear when they step out
   e.carAnim={k:'out',t:0,d:EXIT_T,from:{x:e.pos.x,y:e.pos.y,z:e.pos.z},to};
  },
  carSwap(e){
@@ -296,6 +300,7 @@ export const carMethods={
   if(c.resv[a.seat]===e.id)c.resv[a.seat]=-1;
   if(c.seats[a.seat]!==-1||!e.alive||e.knocked||e.drop)return;
   c.seats[a.seat]=e.id;e.car=c.id;e.seat=a.seat;
+  this.emit({k:'vfx',t:'poof',i:e.id,x:e.pos.x,y:e.pos.y+1,z:e.pos.z});   // they vanish into the car
  },
  // on a guest's own screen: the climb ends when the snapshot seats them (or after a timeout if the host said no),
  // and the step out ends with them on foot
@@ -324,7 +329,7 @@ export const carMethods={
   const wetK=this.wx?this.wx.wet:0,grip=1-.4*wetK;
   let v=c.v;
   // engine: pulls hard from a stop and tapers off near the top speed; reverse is slow
-  if(th>0)v+=th*spec.acc*grip*(1-.5*clamp(v/spec.vmax,0,1))*dt;
+  if(th>0)v+=th*spec.acc*ACCEL_BOOST*grip*(1-.35*clamp(v/spec.vmax,0,1))*dt;
   else if(th<0)v+=th*(v>0?spec.brake*3.2:spec.acc*.5)*dt;
   else v*=(1-.5*dt);                                              // coasting slows down a little
   if(br)v*=(1-spec.brake*grip*dt);
@@ -361,9 +366,14 @@ export const carMethods={
   // walls and water stop a car on the ground (steep uphill, or the lake); buildings stop it in the air too
   const hit=(!air&&(gnd<-.3||(steep&&gnd>c.y)))||W.blocked(nx,ny+.2,nz,1.3,1.3,.6);
   const speed=Math.hypot(v,c.lat);
-  if(hit&&speed>2.5){
-   c.hp-=speed*2.4;v=-v*.2;c.lat*=.2;this.emit({k:'ex',x:c.x,y:c.y+.8,z:c.z,r:1.2,c:'#cfd6de'});
-  }else if(hit){v=0;c.lat=0}
+  if(hit&&speed>=CRASH_SPEED){
+   // a real crash: the car is wrecked and bounces back, with sparks, smoke and a clang
+   c.hp-=speed*2.4;v=-v*.2;c.lat*=.2;
+   this.emit({k:'vfx',t:'carcrash',x:c.x,y:c.y+.6,z:c.z});this.emit({k:'snd',n:'clang',p:[c.x,c.y,c.z]});
+  }else if(hit){
+   // a slow bump just stops the car: no damage
+   if(speed>2)this.emit({k:'vfx',t:'carbump',x:c.x,y:c.y+.5,z:c.z});
+   v=0;c.lat=0}
   else{c.x=nx;c.z=nz}
   if(hit&&!air)ny=c.y;                 // a grounded car that is stopped keeps its height
   c.y=ny;c.air=air;c.vy=vy;
@@ -377,10 +387,12 @@ export const carMethods={
   for(const t of this.list){
    if(!t.alive||t.knocked||t.drop||t.car>=0||t.carAnim)continue;
    const dx=t.pos.x-c.x,dz=t.pos.z-c.z,d=Math.hypot(dx,dz);
-   if(d<1.9&&Math.abs(c.v)>4){
+   if(d<1.9&&Math.abs(c.v)>RUN_OVER_SPEED){
     if((c.hitT.get(t.id)||0)>this.t)continue;c.hitT.set(t.id,this.t+.8);
-    const dmg=clamp(Math.abs(c.v)*3.2,25,140);this.damage(t,dmg,driver||null,-20);
-    this.emit({k:'st',i:t.id,s:'kb',vx:fx*Math.abs(c.v)*.7,vy:4,vz:fz*Math.abs(c.v)*.7},t.id);
+    const s=Math.abs(c.v),dmg=clamp(s*3.2,25,140);this.damage(t,dmg,driver||null,-20);
+    // thrown into the air by the bonnet: a high launch that carries them on, and a ragdoll tumble while they fly
+    this.emit({k:'st',i:t.id,s:'rag',vx:fx*s*.8,vy:Math.min(16,6+s*.4),vz:fz*s*.8,w:(Math.random()<.5?-1:1)*(9+s*.5)},t.id);
+    this.emit({k:'vfx',t:'carhit',x:t.pos.x,y:t.pos.y+1,z:t.pos.z});this.emit({k:'snd',n:'clang',p:[t.pos.x,t.pos.y,t.pos.z]});
    }else if(d<1.7&&Math.abs(c.v)<.5){const k=(1.7-d)/Math.max(d,.01);t.pos.x+=dx*k;t.pos.z+=dz*k;if(t.tgt){t.tgt.x=t.pos.x;t.tgt.z=t.pos.z}}
   }
   // seats: people in a seat stay with the car (dead or knocked people are thrown out)
@@ -403,7 +415,7 @@ export const carMethods={
    if(d>=2.5||d<.01||Math.abs(a.y-b.y)>2)continue;
    const rel=Math.abs(a.v-b.v)+Math.abs(a.lat-b.lat)*.5,ov=(2.5-d)/2,nx=dx/d,nz=dz/d;
    a.x-=nx*ov;a.z-=nz*ov;b.x+=nx*ov;b.z+=nz*ov;a.v*=.6;b.v*=.6;
-   if(rel>4){const dmg=Math.min(60,rel*2);a.hp-=dmg;b.hp-=dmg;this.emit({k:'ex',x:(a.x+b.x)/2,y:a.y+.8,z:(a.z+b.z)/2,r:1,c:'#cfd6de'})}
+   if(rel>CRASH_SPEED*.8){const dmg=Math.min(60,rel*2);a.hp-=dmg;b.hp-=dmg;this.emit({k:'vfx',t:'carcrash',x:(a.x+b.x)/2,y:a.y+.8,z:(a.z+b.z)/2});this.emit({k:'snd',n:'clang',p:[(a.x+b.x)/2,a.y,(a.z+b.z)/2]})}
   }
  },
  seatPos(c,i){const r=right(c.yaw),f=fwd(c.yaw),s=SEATS[i];return[c.x+r[0]*s[0]+f[0]*s[1],c.z+r[1]*s[0]+f[1]*s[1]]},
@@ -482,6 +494,14 @@ export const carMethods={
    if(c.beams)c.beams.visible=this.weather==='night';
    if(c.burn){c.flame.scale.set(1,.7+Math.random()*.6,1);c.flame.rotation.y+=dt*3}
    c.dustT-=dt;if(Math.abs(c.v)>8&&c.dustT<=0){c.dustT=.09;const r=right(c.yaw);this.fx.emit(c.x-r[0]*1.1,c.y+.2,c.z-r[1]*1.1,(Math.random()-.5)*2,.6,(Math.random()-.5)*2,'#cfc3a4',.8,0,.4,1.4,.6,.5)}
+   // ---- car effects: exhaust while the engine works, tyre smoke when the car slides or brakes hard, smoke from a wrecked car
+   const [cfx,cfz]=fwd(c.yaw),[crx,crz]=right(c.yaw),cl=c.spec.L;
+   c.exT=(c.exT||0)-dt;
+   if(c.exT<=0&&Math.abs(c.v)>1.5&&c.group.visible){c.exT=acc>2?.07:.16;const ex=c.x-cfx*cl,ez=c.z-cfz*cl;this.fx.puff(ex,c.y+.55,ez,-cfx*.9+(Math.random()-.5)*.4,.7+Math.random()*.4,-cfz*.9+(Math.random()-.5)*.4,'#9d9a94',.8,.22,1.1,.5)}
+   c.skidT=(c.skidT||0)-dt;
+   const sliding=Math.abs(c.lat)>1.6&&Math.abs(c.v)>5,braking=c.braking&&Math.abs(c.v)>7;
+   if(c.skidT<=0&&(sliding||braking)){c.skidT=.05;for(const s of[-1,1]){const wx=c.x-cfx*cl*.6+crx*s*(c.spec.hw-.1),wz=c.z-cfz*cl*.6+crz*s*(c.spec.hw-.1);this.fx.puff(wx,c.y+.2,wz,(Math.random()-.5)*.6,.5,(Math.random()-.5)*.6,'#d8d2c4',.9,.3,1.3,.45)}}
+   if(c.hp<c.maxHp*.5&&!c.burn){c.smokeT=(c.smokeT||0)-dt;if(c.smokeT<=0){c.smokeT=.22;this.fx.puff(c.x+cfx*cl*.4,c.y+1.2,c.z+cfz*cl*.4,0,.9,0,'#3a3a3e',1.2,.35,1.5,.5)}}
    if(c.burn){c.fireT-=dt;if(c.fireT<=0){c.fireT=.06;this.fx.emit(c.x+(Math.random()-.5)*1.6,c.y+1.6,c.z+(Math.random()-.5)*1.6,0,2.2,0,'#ff8a2b',.6,0,.35,1,.3,1)}}
   }
  },

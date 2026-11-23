@@ -154,6 +154,7 @@ export const movementMethods={
  applyStatusLocal(e,st){
   switch(st.s){
    case'launch':e.vel.set(st.vx||0,st.vy||20,st.vz||0);e.grounded=false;e.sliding=false;e.airCap=Math.max(9,Math.hypot(st.vx||0,st.vz||0));if(e.local)this.audio.play('pad');break;
+   case'rag':e.vel.x+=st.vx||0;e.vel.y+=st.vy||0;e.vel.z+=st.vz||0;e.grounded=false;e.sliding=false;e.ragT=1.6;e.ragW=st.w||10;break;   // thrown by a car: tumbles through the air
    case'kb':e.vel.x+=st.vx||0;e.vel.y+=st.vy||0;e.vel.z+=st.vz||0;if((st.vy||0)>0){e.grounded=false}e.sliding=false;break;
    case'slip':e.slip=st.t||1.5;e.sliding=false;e.use=null;if(e.local)this.audio.play('slip');break;
    case'dance':e.dance=st.t||3;e.use=null;break;

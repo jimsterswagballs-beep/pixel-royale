@@ -150,7 +150,8 @@ export class Game{
   s.tex.needsUpdate=true}
  updateSprite(e,dt,cam){
   const s=e.spr;const spectating=!this.me.alive;const camTarget=this.viewEnt();
-  const vis=(e.alive||e.deadT<2)&&e.drop!=='bus'&&!(e===camTarget&&this.fpv&&(this.tpK||0)<.05);
+  // someone sitting in a car is hidden (the car is what you see); they reappear when they step out
+  const vis=(e.alive||e.deadT<2)&&e.drop!=='bus'&&!(e.car>=0)&&!(e===camTarget&&this.fpv&&(this.tpK||0)<.05);
   s.group.visible=vis;if(!vis)return;
   const P=e.rpos;s.group.position.copy(P);
   {const gl=s.glider,gliding=e.drop==='glide';s.gK=gliding?Math.min(1,(s.gK||0)+dt*4):0;gl.visible=gliding;
@@ -183,6 +184,10 @@ export class Game{
   if(e.char==='chillguy'){let gr=0,gg=0,gb=0;if(e.hitT>.09){gr=gg=gb=.7}else if(e.hitT>0){gr=.5}if(e.coldT>0){gg+=.12;gb+=.22}if(e.slowT>0){gg+=.1;gb+=.2}s.mat.glow.setRGB(gr,gg,gb)}
   if(!e.alive){e.deadT+=dt;const k=Math.min(1,e.deadT/.5);rz2=(flip>0?-1:1)*1.45*k;sy*=1-.2*k;s.mat.opacity=clamp(1.6-e.deadT,0,1);s.mat.transparent=true}
   else{s.mat.opacity=1;if(e.knocked)rz2=(flip>0?-1:1)*1.45}
+  // ragdoll: someone thrown by a car tumbles through the air, and settles upright (to a whole turn) when they land
+  if(e.ragT>0){e.ragT-=dt;e.ragA=(e.ragA||0)+(e.ragW||10)*dt}
+  else if(e.ragA){const tg=Math.round(e.ragA/6.2832)*6.2832;e.ragA+=(tg-e.ragA)*Math.min(1,dt*6);if(Math.abs(e.ragA-tg)<.01)e.ragA=0}
+  if(e.ragA)rz2+=e.ragA;
   if(this.over&&e.id===this.winnerId){const em=e.cos.emote||0;const t=this.t*(em===0?5:em===1?3:4);if(em===0){flip*=Math.cos(t)}else if(em===1){py=Math.abs(Math.sin(t*2))*1.1;rz2=Math.sin(t*2)*.15}else{rz2=(t*2)%6.283;py=.5+Math.sin(t)*.2}}
   // ---- hero ability animations
   if(e.animT>0){e.animT=Math.max(0,e.animT-dt);const k=1-e.animT/(e.animDur||.35);
