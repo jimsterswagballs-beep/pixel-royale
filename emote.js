@@ -3,6 +3,7 @@ import {matchXp} from './season2.js';
 // Media is embedded at build time (esbuild dataurl loader). Timers and state run on the host; clients get 'emo' events.
 import * as THREE from 'three';
 import {keyLabel} from './data.js';
+import {cosEmoteAnim} from './cosmetics.js';
 import BART from './bart.png';
 import BESTVID from './best_weapon.mp4';
 import LAUGH from './streamer_laugh.mp3';
@@ -13,7 +14,10 @@ export const EMOTE_LIST=[
  {id:'streamer',name:'Streamer Jumps',price:600,kind:'hop',dur:30,audio:LAUGH,icon:'\u{1F3AE}',desc:'Hop around and twirl to the baby laugh.'},
  {id:'bart',name:'Bart',price:700,kind:'bart',dur:36.5,audio:HOMER,img:BART,asp:204/567,desc:'Become Bart and slide around to Let the Barts Out.'},
  {id:'dab',name:'Dab',price:300,kind:'dab',dur:4,sfx:'bell',icon:'\u{1F646}',desc:'A quick pose with a chime.'},
- {id:'floss',name:'Floss',price:400,kind:'floss',dur:6,sfx:'fun',icon:'\u{1F483}',desc:'Sway side to side.'}
+ {id:'floss',name:'Floss',price:400,kind:'floss',dur:6,sfx:'fun',icon:'\u{1F483}',desc:'Sway side to side.'},
+ // Season 2 Battle Pass emotes (bp: earned in the pass, never sold in the shop)
+ {id:'emote_dance',name:'Spore Dance',bp:1,lvl:5,kind:'sdance',dur:12,sfx:'spore',icon:'\u{1F483}',desc:'Dance in a swirl of glowing spores.'},
+ {id:'emote_rise',name:'Mycelium Rise',bp:1,lvl:15,kind:'rise',dur:14,sfx:'pod',icon:'\u{1F331}',desc:'Four stages: roots creep in, you rise, mushrooms sprout, then a burst of spores.'}
 ];
 export const EMOTE_BY=Object.fromEntries(EMOTE_LIST.map(e=>[e.id,e]));
 export const CHAR_PRICES={chillguy:900,jay:900};
@@ -81,6 +85,7 @@ export const emoteMethods={
   else if(d.kind==='hop'){R.py=Math.abs(Math.sin(t*5.5))*.9;R.rz=Math.sin(t*5.5)*.08;const ph=t%2.6;if(ph<.7)R.sx=Math.abs(Math.cos(ph/.7*Math.PI))}
   else if(d.kind==='dab'){const k=Math.min(1,t/.25);R.rz=-.5*k;R.px=-.25*k;R.py=.05*k}
   else if(d.kind==='floss'){R.px=Math.sin(t*9)*.3;R.rz=Math.sin(t*9)*.22;R.py=Math.abs(Math.sin(t*9))*.12}
+  else if(d.kind==='sdance'||d.kind==='rise'){cosEmoteAnim(d,t,R);this.emoteExtra(e,em,t)}
   s.plane.scale.x=R.asp;
   return R;
  },

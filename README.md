@@ -1,3 +1,13 @@
+# Pixel Royale: v38 spore traps, ambience, 3 new sites, Battle Pass cosmetics
+
+- **Spore traps** (traps.js): 63 traps, 10 per heavy site, 5 per medium, 2 per light. Host-run. Trigger within 4 m, 6 m cloud for 5 s, one infection stack per player per burst, re-arm 20 s after the burst. Only caught players get the screen overlay (6 s fade). Killfeed name: Spore Trap.
+- **Ambience** (ambience.js): purple fog, violet sky and light, haze, brighter glow mushrooms, edge glow, hum and an entry banner. Tune with AMBIENCE in season2.js.
+- **New sites**: Quarry Rock (heavy), Misty Mill and Harbor Heights (medium), each with its own palette. 12 sites in all. Shared palettes get a hue shift.
+- **Battle Pass cosmetics** (cosmetics.js): all 14 remaining rewards work: nameplate, Puffcap, two backpacks, three gliders, two landing effects, two elimination effects, two weapon finishes, two emotes. Locker has a Cosmetics tab. Bots wear some.
+- There is no Sunset Beach in this source; Sunset Cabins is untouched.
+
+Known limits: checked with a build and Node tests of the trap logic and placement only, not in a browser. Model placement, glider shapes, weapon finishes and ambience strength are untested visually.
+
 # Pixel Royale: v29 five-left finale
 
 - **Five left**: when five players are still alive (counting bots), "5 PEOPLE LEFT" flashes in red across the top of the screen and fades away.

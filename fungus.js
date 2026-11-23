@@ -59,8 +59,8 @@ export function buildFungus(scene){
  const emit=[]; // giant and medium mushrooms that let off spores now and then
  const buildingsOf=s=>W.buildings.filter(b=>Math.hypot(b.x-s.x,b.z-s.z)<s.r*1.25);
  const nearBuilding=(x,z,list,pad)=>list.some(b=>Math.abs(x-b.x)<b.w/2+pad&&Math.abs(z-b.z)<b.d/2+pad);
- const capCol=(s,r)=>{C.set(s.theme.caps[(r()*3)|0]);C.offsetHSL((r()-.5)*.05,0,(r()-.5)*.1);return C};
- const glowCol=(s,r)=>{C.set(s.theme.glow[(r()*2)|0]);C.offsetHSL((r()-.5)*.04,0,0);return C};
+ const capCol=(s,r)=>{C.set(s.theme.caps[(r()*3)|0]);C.offsetHSL((r()-.5)*.05+(s.hue||0),0,(r()-.5)*.1);return C};
+ const glowCol=(s,r)=>{C.set(s.theme.glow[(r()*2)|0]);C.offsetHSL((r()-.5)*.04+(s.hue||0),0,0);return C};
 
  // a ground spot inside a site: not on a road, in a building, in water or on a cliff
  function spot(s,r,rmin,rmax,blds,pad){
@@ -225,12 +225,13 @@ export function buildFungus(scene){
 
  // ---------- per-frame
  let acc=0;
- return{
-  root,count:{giants:giantCap.n,mid:midCap.n,small:smallCap.n,glow:glowCap.n,shelves:shelves.length,roots:roots.length,rubble:rubble.length,patches:patches.length,motes:motes.length},
+ const api={
+  boost:0,root,count:{giants:giantCap.n,mid:midCap.n,small:smallCap.n,glow:glowCap.n,shelves:shelves.length,roots:roots.length,rubble:rubble.length,patches:patches.length,motes:motes.length},
   update(dt,t,cam,fx){
    T.value=t;
-   glowMat.color.setScalar(.88+.12*Math.sin(t*2.1));
-   patchMat.opacity=.5+.18*Math.sin(t*1.4);
+   const bo=api.boost||0;   // ambience.js: the gloomier it gets, the brighter the glowing mushrooms shine
+   glowMat.color.setScalar((.88+.12*Math.sin(t*2.1))*(1+.55*bo));
+   patchMat.opacity=(.5+.18*Math.sin(t*1.4))*(1+.6*bo);
    if(fx&&emit.length){acc+=dt;
     if(acc>.6){acc=0;
      for(let k=0;k<8;k++){const e=emit[(Math.random()*emit.length)|0];
@@ -240,4 +241,5 @@ export function buildFungus(scene){
       break}}}
   }
  };
+ return api;
 }

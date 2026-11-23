@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {shopMethods} from './shop.js';
 import {passMethods} from './pass.js';
+import {cosAppMethods} from './cosmetics.js';
 import {CHAR_PRICES} from './emote.js';
 import {CHARS,ACTIONS,DEFAULT_SETTINGS,keyLabel,clamp,WEAPONS,RARITY} from './data.js';
 import {Game} from './game.js';
@@ -42,7 +43,7 @@ class App{
  saveSettings(){try{localStorage.setItem('brg_settings',JSON.stringify(this.settings))}catch(e){}}
  loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,gm:'br',diff:'Normal',mode:'solo',fill:true,tokens:0,ownedChars:['coolguy15','zach'],ownedEmotes:[],equipEmote:''},p);const P=this.profile;P.ownedChars=[...new Set(['coolguy15','zach',...(P.ownedChars||[])])];P.ownedEmotes=P.ownedEmotes||[];if(!P.ownedChars.includes(P.char))P.char='coolguy15';if(P.equipEmote&&!P.ownedEmotes.includes(P.equipEmote))P.equipEmote='';this.s2Migrate()}
  saveProfile(){try{localStorage.setItem('brg_profile',JSON.stringify(this.profile))}catch(e){}}
- get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote,skin:(this.profile.skin||{})[this.profile.char]||''}}
+ get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote,skin:(this.profile.skin||{})[this.profile.char]||'',fx:this.cosFx()}}
  applySettings(){
   const s=this.settings;const q={Low:{pr:.6,fx:.4,fog:350},Medium:{pr:.85,fx:.7,fog:550},High:{pr:1,fx:1,fog:800}}[s.quality]||{pr:1,fx:1,fog:800};
   this.q=q;this.audio.setVol(s.master,s.sfx,s.music);if(this.game.fx)this.game.fx.density=q.fx*(s.particles==='Low'?.4:s.particles==='Medium'?.7:1);
@@ -104,7 +105,7 @@ class App{
  updateNav(name){
   const nav=$('nav');if(!nav)return;nav.querySelector('#navTok b').textContent=this.profile.tokens||0;nav.classList.toggle('show',!['lobby','loading','pause'].includes(name));
   const act={chars:'locker'}[name]||name;for(const b of $('navTabs').children)b.classList.toggle('on',b.dataset.go===act);
-  const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[artKey(c.id,this.cos)].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor;this.updatePassDot()}
+  const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[artKey(c.id,this.cos)].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor;sp.classList.toggle('np-spore',this.nameplateOn());this.updatePassDot()}
 buildTitle(){
   const t=$('title');
   t.innerHTML=`<div class="lb-bg"></div>
@@ -204,16 +205,17 @@ buildTitle(){
   <div class="lk-body"><div class="lk-prev"><div class="cart" id="lkArt"></div><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div></div>
   <div class="lk-side"><div class="lk-cats" id="lkCats"></div><div id="lkGrid"></div><div class="tip">Cosmetics are saved on this device and visible to other players in multiplayer.</div></div></div></div>`;
   $('lkBack').appendChild(this.back());this.lkTab=this.lkTab||'Outfit';
-  for(const c of ['Outfit','Name Color','Sprint Trail','Emote']){const b=h(`<button class="cat">${c}</button>`);b.onclick=()=>{this.lkTab=c;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
+  for(const c of ['Outfit','Name Color','Sprint Trail','Emote','Cosmetics']){const b=h(`<button class="cat">${c}</button>`);b.onclick=()=>{this.lkTab=c;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
  }
  enter_locker(){
   const P=this.profile,g=$('lkGrid');for(const b of $('lkCats').children)b.classList.toggle('on',b.textContent===this.lkTab);
-  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;$('lkRole').textContent=cd.name+' · '+cd.role;
+  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;n.classList.toggle('np-spore',this.nameplateOn());$('lkRole').textContent=cd.name+' · '+cd.role;
   $('lkInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div>`+(cd.passive?`<div class="abl pass"><img src="${ICON[cd.passive.ic]}" alt=""><div><b>${cd.passive.n}</b> <small>(passive)</small><br>${cd.passive.d}</div></div>`:'')+cd.ab.map(a=>`<div class="abl">${a.ic?`<img src="${abilityIcon(a)}" alt="">`:''}<div><b>${a.n}</b> <small>(${a.cd}s cooldown)</small><br>${a.d}</div></div>`).join('');
   g.innerHTML='';const tab=this.lkTab;
   const NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];const rc=i=>RARITY[Math.min(5,i%6)].c;
   const set=(k,v)=>{P[k]=v;this.saveProfile();this.enter_locker()};
   if(tab==='Emote'){g.appendChild(this.emotePicker());return}
+  if(tab==='Cosmetics'){g.appendChild(this.cosmeticsPicker());return}
   if(tab==='Outfit'){g.appendChild(this.charPicker(()=>P.char,id=>{P.char=id;this.saveProfile();this.enter_locker()}));g.appendChild(this.skinPicker());return}
   const box=h(`<div class="tiles"></div>`);
   if(tab==='Name Color')COLORS.forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i),pic:`<span class="swb" style="background:${c}"></span>`,label:NAMES[i],sel:P.nameColor===c,fn:()=>set('nameColor',c)})));
@@ -228,9 +230,10 @@ buildTitle(){
      <li><b>Fungus skins</b>: Fungus Jay at level 10 and Mycelium Zach at level 20. Skins change how a character looks, never their abilities or stats. Equip them in the Locker.</li>
      <li><b>Spore trails</b>: Spore Trail, Root Trail and Spore Cloud Trail for your sprint, at levels 2, 11 and 17.</li>
      <li><b>Fungal weapons</b>: Fungal Blaster, Root Shooter, Spore Launcher and Cap Shotgun have infinite ammo. Each hit adds an infection stack (up to 4) that deals damage over time, and the infected player\'s screen fills with fungus. They are found only in <b>Spore Pods</b>, which grow in Old Keep, Lonely Lodge, Sawmill Creek, Tomato Town and Camp Pinecone.</li>
-     <li><b>Lobby banner</b> and a one-time Season 2 summary show what is new. The rest of the pass (emotes, gliders, effects and more) is on the track and unlocks as it is released.</li>
-     <li><b>Map corruption</b>: the fungus has overgrown nine places. Old Keep and Lonely Lodge are overrun, Sawmill Creek, Tomato Town and Camp Pinecone are partly taken, and Mc Dongal's, Farmer's Folly, Radar Ridge and Fuel Stop 9 have the first signs. Expect giant mushrooms, roots, glowing patches, drifting spores and mushroom rings round the loot. Everything is for looks only and does not change how you move or fight.</li>
-     <li>Fungal weapons, spore traps, fungal chests and new gliders are coming later this season.</li>
+     <li><b>Lobby banner</b> and a one-time Season 2 summary show what is new. Every reward on the pass can now be claimed: nameplate, hat, backpacks, gliders, landing and elimination effects, weapon finishes and two emotes. Equip them in the Locker (Cosmetics and Emote tabs).</li>
+     <li><b>Map corruption</b>: the fungus has overgrown twelve places. Old Keep, Lonely Lodge and Quarry Rock are overrun, Sawmill Creek, Tomato Town, Camp Pinecone, Misty Mill and Harbor Heights are partly taken, and Mc Dongal's, Farmer's Folly, Radar Ridge and Fuel Stop 9 have the first signs. Expect giant mushrooms, roots, glowing patches, drifting spores and mushroom rings round the loot. Everything is for looks only and does not change how you move or fight.</li>
+     <li><b>Spore traps</b>: hidden pods in corrupted places (about 10 per heavy site, 5 per medium, 2 per light). Get within 4 m and one bursts into a 6 m spore cloud for 5 seconds that gives anyone inside one infection stack. Only caught players see the fungus overlay. Traps re-arm after 20 seconds.</li>
+     <li><b>Infected ambience</b>: purple fog, a violet sky and light, haze, brighter glowing mushrooms and a low hum inside corrupted places.</li>
     </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.11</div><h3>Five-Left Finale</h3><ul>
      <li><b>5 people left</b>: when five players are still alive, a red "5 PEOPLE LEFT" flashes across the top of the screen and fades away.</li>
@@ -527,7 +530,7 @@ lobbyUpdate(noBroadcast,full){
   $('lbCount').textContent=L.players.length+' / 8';
   const n=L.players.length+(L.bots?1:0);
   let html=L.players.map(p=>{const host=p.pid==='host',col=(p.cos&&p.cos.nameColor)||'#fff';
-   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
+   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn${p.cos&&p.cos.fx&&p.cos.fx.fr?' np-spore':''}" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
   if(L.bots)html+=`<div class="pl-slot"><span class="bi">&#129302;</span><div class="pl-who"><div class="pn">${L.bots} bot${L.bots>1?'s':''}</div><div class="ps">${esc(L.diff)} bots</div></div></div>`;
   for(let i=n;i<4;i++)html+=`<div class="pl-slot empty"><span class="bi">+</span><div class="pl-who"><div class="pn">Open slot</div><div class="ps">Invite a friend</div></div></div>`;
   $('lbPlayers').innerHTML=html;
@@ -592,5 +595,5 @@ lobbyUpdate(noBroadcast,full){
   this.input.endFrame();
  }
 }
-Object.assign(App.prototype,shopMethods,passMethods);
+Object.assign(App.prototype,shopMethods,passMethods,cosAppMethods);
 window.__W=W;window.app=new App();

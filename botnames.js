@@ -36,6 +36,9 @@ function gen(rng,persona){
  return pick(rng,NOUN)+(rng()<.5?'_':'')+(2005+Math.floor(rng()*21));
 }
 const NAME_COLS=['#ffffff','#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a','#ffd0d0'];
+import {BOT_FX} from './cosmetics.js';
+// about a third of bots wear one or two Battle Pass cosmetics (one per slot)
+function botFx(rng){const f={};if(rng()<.35){const n=1+(rng()<.4?1:0);for(let i=0;i<n;i++){const[k,id]=BOT_FX[Math.floor(rng()*BOT_FX.length)];f[k]=id}}return f}
 const TRAILS=['#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a'];
 /** Returns n unique bots: [{name, persona, char, cos}] */
 export function makeBotRoster(n,rng=Math.random){
@@ -45,7 +48,7 @@ export function makeBotRoster(n,rng=Math.random){
   do{name=gen(rng,persona).trim();tries++}while((used.has(name.toLowerCase())||name.length>16||name.length<2)&&tries<60);
   if(used.has(name.toLowerCase()))name=name.slice(0,12)+' '+(i+2);
   used.add(name.toLowerCase());
-  out.push({name,persona,char:CHARS[Math.floor(rng()*CHARS.length)].id,cos:{nameColor:rng()<.35?'#ffd0d0':pick(rng,NAME_COLS),trail:rng()<.3?pick(rng,TRAILS):'',emote:Math.floor(rng()*3)}});
+  out.push({name,persona,char:CHARS[Math.floor(rng()*CHARS.length)].id,cos:{nameColor:rng()<.35?'#ffd0d0':pick(rng,NAME_COLS),trail:rng()<.3?pick(rng,TRAILS):'',emote:Math.floor(rng()*3),fx:botFx(rng)}});
  }
  return out}
 export const NAME_POOL_SIZE=CURATED.length+ADJ.length*NOUN.length;

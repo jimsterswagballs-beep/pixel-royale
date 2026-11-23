@@ -1,4 +1,5 @@
 import {trailEmit} from './season2.js';
+import {finishWeapon} from './cosmetics.js';
 import * as THREE from 'three';
 import {WEAPONS,ITEMS,RARITY,BAL,clamp,lerp} from './data.js';
 import * as W from './world.js';
@@ -189,7 +190,7 @@ export const movementMethods={
   let key=cur?(cur.k==='w'?'w'+cur.w+'_'+cur.r:'i'+cur.id):'none';
   if(me.eatT>0)key='none';
   if(key!==this.vmKey){this.vmKey=key;if(this.vmModel)this.vmScene.remove(this.vmModel);this.vmModel=null;
-   if(key!=='none'){let m;if(cur.k==='w'){m=makeWeaponModel(cur.w,cur.r);m.rotation.y=0}else{m=makeFloorItem(cur);const c0=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());m.position.sub(c0);m.position.z-=.4}
+   if(key!=='none'){let m;if(cur.k==='w'){m=finishWeapon(makeWeaponModel(cur.w,cur.r),cur.w,this.me.cos);m.rotation.y=0}else{m=makeFloorItem(cur);const c0=new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3());m.position.sub(c0);m.position.z-=.4}
     m.scale.setScalar(.55);m.updateMatrixWorld(true);const bb=new THREE.Box3().setFromObject(m);this.vmTip=bb.min.z;this.vmModel=new THREE.Group();this.vmModel.add(m);this.vmScene.add(this.vmModel);
     const fl=new THREE.Mesh(new THREE.PlaneGeometry(.35,.35),new THREE.MeshBasicMaterial({color:'#ffd070',transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));fl.position.set(0,0,this.vmTip-.05);this.vmFlash=fl;this.vmModel.add(fl)}}
   if(!this.vmModel)return;

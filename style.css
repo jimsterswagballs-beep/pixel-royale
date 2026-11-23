@@ -967,3 +967,12 @@ body.mobile.tp #touchUI{display:block}
 @media(max-width:600px){.bp-card{flex-basis:104px}.s2-list li{grid-template-columns:30px 1fr}.s2-list i{display:none}.bp-arr{display:none}}
 .s2-shots{display:flex;gap:10px;padding:0 24px}.s2-shots img{flex:1;min-width:0;height:104px;object-fit:cover;object-position:center top;border:1px solid var(--line);background:#120a30}
 .s2-shots img{height:84px}.s2-list{gap:6px}.s2-list li{padding:7px 12px}
+
+/* ---- v38: fungal ambience. A violet glow round the edge of the screen inside corrupted places (never over the middle, never clickable) */
+#fgTint{position:fixed;inset:0;pointer-events:none;opacity:0;transition:opacity .8s ease;
+ background:radial-gradient(ellipse at 50% 50%,rgba(120,60,200,0) 52%,rgba(110,50,190,.22) 80%,rgba(70,25,130,.5) 100%),
+  radial-gradient(ellipse at 50% 100%,rgba(160,255,140,.1),rgba(160,255,140,0) 45%)}
+
+/* ---- v38: Spore Nameplate (Battle Pass level 1): a mossy plate behind the name */
+.np-spore{display:inline-block;padding:1px 12px;border-radius:9px;border:1px solid rgba(190,255,140,.85);
+ background:linear-gradient(180deg,rgba(120,170,60,.8),rgba(50,90,40,.85));text-shadow:0 1px 2px rgba(0,0,0,.7);box-shadow:0 0 8px rgba(150,255,110,.35),inset 0 0 6px rgba(20,50,20,.5)}

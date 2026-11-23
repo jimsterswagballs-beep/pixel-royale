@@ -113,7 +113,7 @@ export const CHARS=[
       {n:'Food Fight',cd:BAL.jay.food.cd,ic:'food',d:'Lob a random food: Burger heals a teammate '+BAL.jay.food.burger.heal+', Pizza makes a healing area, Chilli explodes, Banana makes a slippery patch.'},
       {n:'Kitchen Special',cd:BAL.jay.kitchen.cd,ic:'kitchen',d:'Cook up a healing station that restores teammates nearby for '+BAL.jay.kitchen.dur+' seconds.'}]},
 ];
-export const KILL_NAMES={'-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor','-25':'Building Collapse'};
+export const KILL_NAMES={'-26':'Spore Trap','-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor','-25':'Building Collapse'};
 export const ACTIONS=[
  ['fwd','Move Forward','KeyW'],['back','Move Back','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
  ['jump','Jump / Leave Bus','Space'],['sprint','Sprint','ShiftLeft'],['crouch','Crouch / Slide','KeyC'],

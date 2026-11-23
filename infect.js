@@ -3,6 +3,7 @@
 // ({k:'inf'}) to tint the sprite and, for the infected player's own screen, to grow the fungal overlay (overlay.js).
 import * as THREE from 'three';
 import {SporeOverlay,LEVELS} from './overlay.js';
+import {TRAP} from './season2.js';
 
 export const INF={
  perStack:1.5,    // HP per second for each stack
@@ -76,7 +77,9 @@ export const infectMethods={
  updateInfectVis(dt){
   if(!this.sporeFx)this.sporeFx=new SporeOverlay();
   const me=this.me,n=me&&me.alive?Math.min(4,me.infN|0):0;
-  this.sporeFx.update(dt,Math.max(LEVELS[n],me&&me.sporeT>0?Math.min(1,me.sporeT/2.5)*.9:0));
+  // a spore trap cloud: the fungus grows in over about a second, then fades out over the rest of the TRAP.overlay seconds (never past .8, so the middle of the view stays clear)
+  let trap=0;if(me&&me.sporeT>0){const T=TRAP.overlay,e=T-me.sporeT;trap=.8*Math.min(1,e/1.1)*Math.min(1,me.sporeT/(T*.75));me.sporeT-=dt}
+  this.sporeFx.update(dt,Math.max(LEVELS[n],trap));
   const cv=this.cloudVis;if(!cv||!cv.length)return;
   for(let i=cv.length-1;i>=0;i--){const c=cv[i];c.t-=dt;c.acc+=dt;
    if(c.acc>.09){c.acc=0;const a=Math.random()*6.283,b=Math.acos(2*Math.random()-1),r=c.r*.85*Math.cbrt(Math.random());

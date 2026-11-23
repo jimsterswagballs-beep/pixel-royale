@@ -4,6 +4,7 @@ import NOCTURNE from './nocturne-op9-no2.mp3';
 import GYM1 from './gymnopedie-1.mp3';
 const GUN={ref:9,max:170,lp:15000,lpD:20};
 const PROX={
+ strap:{ref:9,max:110,lp:14000,lpD:24},
  ar:GUN,smg:GUN,sg:GUN,pi:GUN,fun:GUN,laser:GUN,launch:GUN,
  sn:{ref:13,max:280,lp:14000,lpD:30},
  quiet:{ref:4,max:45,lp:9000,lpD:10},
@@ -18,6 +19,17 @@ export class Audio{
  init(){if(this.ctx)return;try{const C=window.AudioContext||window.webkitAudioContext;this.ctx=new C();this.master=this.ctx.createGain();this.sfxG=this.ctx.createGain();this.musG=this.ctx.createGain();this.sfxG.connect(this.master);this.musG.connect(this.master);this.master.connect(this.ctx.destination);
   const len=this.ctx.sampleRate;this.noiseBuf=this.ctx.createBuffer(1,len,this.ctx.sampleRate);const d=this.noiseBuf.getChannelData(0);for(let i=0;i<len;i++)d[i]=Math.random()*2-1;this.apply();this.startMusic()}catch(e){this.ctx=null}}
  apply(){if(!this.ctx)return;this.master.gain.value=this.vol.master;this.sfxG.gain.value=this.vol.sfx;this.musG.gain.value=this.vol.music*.35}
+ // Season 2: the low hum of an infected place. g is 0..1; created on first use, then only its volume moves.
+ setFungusHum(g){
+  const c=this.ctx;if(!c||!this.sfxG)return;
+  if(!this.hum){if(g<.02)return;
+   const out=c.createGain();out.gain.value=0;const lp=c.createBiquadFilter();lp.type='lowpass';lp.frequency.value=380;lp.connect(out);out.connect(this.sfxG);
+   const mk=(f,type,gain)=>{const o=c.createOscillator();o.type=type;o.frequency.value=f;const q=c.createGain();q.gain.value=gain;o.connect(q);q.connect(lp);o.start();return o};
+   const a=mk(55,'sine',.55),b=mk(82.6,'triangle',.3),d=mk(110.4,'sine',.18);
+   const lfo=c.createOscillator();lfo.frequency.value=.17;const lg=c.createGain();lg.gain.value=9;lfo.connect(lg);lg.connect(b.frequency);lfo.start();
+   const lfo2=c.createOscillator();lfo2.frequency.value=.09;const lg2=c.createGain();lg2.gain.value=140;lfo2.connect(lg2);lg2.connect(lp.frequency);lfo2.start();
+   this.hum={out,nodes:[a,b,d,lfo,lfo2]}}
+  this.hum.out.gain.setTargetAtTime(Math.max(0,Math.min(1,g))*.22,c.currentTime,.6)}
  setVol(m,s,mu){this.vol={master:m/100,sfx:s/100,music:mu/100};this.apply()}
  resume(){if(this.ctx&&this.ctx.state==='suspended')this.ctx.resume();this.resumeMusic()}
  noise(dur,f0,f1,g,type='lowpass',dest,delay=0){const c=this.ctx,s=c.createBufferSource();s.buffer=this.noiseBuf;const f=c.createBiquadFilter();f.type=type;f.frequency.setValueAtTime(f0,c.currentTime+delay);f.frequency.exponentialRampToValueAtTime(Math.max(30,f1),c.currentTime+delay+dur);const ga=c.createGain();ga.gain.setValueAtTime(g,c.currentTime+delay);ga.gain.exponentialRampToValueAtTime(.001,c.currentTime+delay+dur);s.connect(f);f.connect(ga);ga.connect(dest);s.start(c.currentTime+delay,Math.random()*.5,dur+.05)}
@@ -60,6 +72,7 @@ export class Audio{
    case'pick':this.tone(600,.07,.4,'triangle',dest,900);this.tone(900,.1,.4,'triangle',dest,1200,.06);break;
    case'spore':this.noise(.12,1800,500,.35,'bandpass',dest);this.tone(420,.12,.3,'sine',dest,200);this.tone(900,.06,.15,'triangle',dest,500);break;
    case'infect':this.tone(160,.35,.4,'sawtooth',dest,70);this.noise(.3,900,200,.35,'lowpass',dest);this.tone(520,.2,.2,'sine',dest,300,.05);break;
+   case'strap':this.noise(.6,2600,300,.7,'bandpass',dest);this.tone(110,.5,.6,'sine',dest,45);this.tone(240,.35,.3,'sawtooth',dest,90,.05);this.noise(.9,900,200,.35,'lowpass',dest,.1);break;
    case'pod':this.tone(200,.4,.45,'sine',dest,90);this.noise(.35,2200,400,.4,'bandpass',dest);this.tone(700,.25,.3,'triangle',dest,1300,.1);this.tone(1100,.3,.25,'sine',dest,1700,.18);break;
    case'chest':this.tone(300,.15,.4,'triangle',dest,600);this.tone(600,.2,.5,'triangle',dest,1200,.1);this.tone(1200,.3,.4,'sine',dest,null,.2);break;
    case'ab':this.tone(200,.35,.5,'sawtooth',dest,900);this.noise(.3,300,3000,.3,'bandpass',dest);break;

@@ -40,7 +40,7 @@ export const shopMethods={
    return `<div class="sh-card${owned?' owned':''}"><div class="sh-pic" style="background-image:url('${charArt(id)}')"><img src="${IMG[id].front}" alt=""></div>
     <div class="sh-info"><b>${c.name}</b><small>${c.role}</small></div>
     ${owned?'<div class="sh-own">Owned</div>':`<button class="btn play sm" data-buy="char:${id}">&#9670; ${CHAR_PRICES[id]}</button>`}</div>`}).join('');
-  $('shEmotes').innerHTML=EMOTE_LIST.map(d=>{
+  $('shEmotes').innerHTML=EMOTE_LIST.filter(d=>!d.bp).map(d=>{
    const owned=this.owns('emote',d.id);
    const pic=d.img?`<img src="${d.img}" alt="">`:`<span class="sh-ico">${d.icon}</span>`;
    return `<div class="sh-card${owned?' owned':''}"><div class="sh-pic emo-pic">${pic}</div>
@@ -57,7 +57,7 @@ export const shopMethods={
    const owned=this.owns('emote',d.id);
    const pic=d.img?`<img src="${d.img}" alt="" style="height:88%;image-rendering:auto">`:`<span class="emo">${d.icon}</span>`;
    box.appendChild(this.mkTile({rc:rc(i),pic,label:d.name+(owned?'':' &#128274;'),sel:P.equipEmote===d.id,fn:()=>{
-    if(!owned){this.toast('Unlock it in the Shop first');this.sfx('empty');return}
+    if(!owned){this.toast(d.bp?'Unlock it in the Battle Pass (level '+d.lvl+')':'Unlock it in the Shop first');this.sfx('empty');return}
     P.equipEmote=d.id;this.saveProfile();this.enter_locker()}}));
   });
   wrap.appendChild(box);

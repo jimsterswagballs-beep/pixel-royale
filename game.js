@@ -19,6 +19,10 @@ import {finaleMethods} from './finale.js';
 import {buildScenery} from './scenery.js';
 import {buildFungus} from './fungus.js';
 import {infectMethods} from './infect.js';
+import {trapMethods,buildSporeTrapVis} from './traps.js';
+import {TRAP} from './season2.js';
+import {ambienceMethods} from './ambience.js';
+import {cosGameMethods,fungalGlider,finishWeapon,drawNameplate,fxOf} from './cosmetics.js';
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 
@@ -65,8 +69,8 @@ export class Game{
   this.view={recoilP:0,recoilY:0,kick:0,shake:0,bobT:0,eye:EYE,roll:0,fov:92,adsK:0,equipK:1,reloadK:0,sway:0,flash:0,hitK:0,burgerT:0};
   this.vfxInit();this.accum={net:0,snap:0,think:0,loot:0,hud:0,ev:0};this.kills=[];this.spectateId=-1;this.winnerId=null;
  }
- ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.scenery=buildScenery(this.scene,this.world.water);this.fungus=buildFungus(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
- renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.decor)this.decor.update(this.menuT);if(this.scenery)this.scenery.update(dt,this.menuT);if(this.fungus)this.fungus.update(dt,this.menuT,this.camera.position,null);if(this.sporeFx)this.sporeFx.update(dt,0);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
+ ensureWorld(){if(!this.worldBuilt){W.buildMap();this.world=W.buildMeshes(this.scene);this.scenery=buildScenery(this.scene,this.world.water);this.fungus=buildFungus(this.scene);this.sporeTrapVis=buildSporeTrapVis(this.scene);this.decor=W.addDecor(this.scene);this.worldBuilt=true}}
+ renderMenu(dt){this.menuT=(this.menuT||0)+dt;if(this.fgK||this.fgTintV)this.fungusMenu();if(this.decor)this.decor.update(this.menuT);if(this.scenery)this.scenery.update(dt,this.menuT);if(this.fungus)this.fungus.update(dt,this.menuT,this.camera.position,null);if(this.sporeFx)this.sporeFx.update(dt,0);const a=this.menuT*.06,cam=this.camera;cam.position.set(Math.cos(a)*270,95+Math.sin(a*2)*15,Math.sin(a)*270);cam.lookAt(0,8,0);cam.fov=60;cam.updateProjectionMatrix();this.sky.position.copy(cam.position);updateSun(this,{position:{x:0,y:8,z:0}});this.scene.fog.color.set('#b9dcf5');if(this.worldBuilt)this.world.water.position.y=Math.sin(this.menuT*.8)*.08;this.renderWorld(cam)}
  // a human left mid-match: their team is told (team modes), then a bot takes over if they were still alive
  peerLeft(pid){const e=this.list.find(x=>x.peer===pid);if(!e)return;e.peer=undefined;
   if(this.teamMode&&e.alive)this.emit({k:'ntf',tm:e.team,c:'#ffd27a',t:`${e.name} left the match, a bot is taking over`});
@@ -101,7 +105,7 @@ export class Game{
   this.t=0;this.tokensPaid=false;this.deathT=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
   this.storm={phase:-1,state:'idle',t:25,cx:0,cz:0,r:480,ocx:0,ocz:0,or:480,tcx:0,tcz:0,tr:480,dmg:0};
   this.supplyT=45;this.supplies=[];
-  this.genLoot(mulberry32(this.seed+99));this.setupFields();
+  this.genLoot(mulberry32(this.seed+99));this.setupFields();this.resetSporeTraps();this.fungusReset&&this.fungusReset();
   this.initStormMesh();
   // cars: the host places them on the roads, guests wait for the snapshot
   this.clearCars();if(this.role!=='client')this.seedCars(12);
@@ -141,12 +145,12 @@ export class Game{
   const aura=new THREE.Mesh(new THREE.SphereGeometry(1.25,16,12),new THREE.MeshBasicMaterial({color:'#6ec6ff',transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}));aura.position.y=1;aura.visible=false;g.add(aura);
   const cv=document.createElement('canvas');cv.width=256;cv.height=64;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
   const nmat=crispMat(tex);const name=new THREE.Mesh(new THREE.PlaneGeometry(1,1),nmat);name.scale.set(2.8,.7,1);name.position.y=2.45;name.layers.set(1);bb.add(name);
-  const glider=makeGliderModel((CHARS.find(c=>c.id===e.char)||{}).color||'#6ec6ff');glider.visible=false;g.add(glider);
+  const fxg=fxOf(e.cos).gl;const glider=(fxg&&fungalGlider(fxg))||makeGliderModel((CHARS.find(c=>c.id===e.char)||{}).color||'#6ec6ff');glider.visible=false;g.add(glider);
   e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,hat,glider,gK:0,cloakK:0,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
-  this.dynamic.add(g);this.drawName(e,true)}
+  this.dynamic.add(g);this.attachCosSprite(e);this.drawName(e,true)}
  drawName(e,force){
   const s=e.spr;const key=Math.round(e.hp/5)*1000+Math.round(e.sh/5)+(e.ts>0?7:0);if(!force&&key===s.hpKey)return;s.hpKey=key;
-  const c=s.cv.getContext('2d');c.clearRect(0,0,256,64);c.font='bold 24px Arial Black, Arial';c.textAlign='center';c.lineWidth=5;c.strokeStyle='rgba(0,0,0,.8)';c.strokeText(e.name,128,24);c.fillStyle=e.cos.nameColor||'#fff';c.fillText(e.name,128,24);
+  const c=s.cv.getContext('2d');c.clearRect(0,0,256,64);if(fxOf(e.cos).fr)drawNameplate(c);c.font='bold 24px Arial Black, Arial';c.textAlign='center';c.lineWidth=5;c.strokeStyle='rgba(0,0,0,.8)';c.strokeText(e.name,128,24);c.fillStyle=e.cos.nameColor||'#fff';c.fillText(e.name,128,24);
   c.fillStyle='rgba(0,0,0,.65)';c.fillRect(40,34,176,10);c.fillStyle='#4cd964';c.fillRect(41,35,174*clamp(e.hp/e.maxHp,0,1),8);
   if(e.sh>0||e.ts>0){c.fillStyle='#3db8ff';c.fillRect(41,46,174*clamp((e.sh+e.ts)/100,0,1),5)}
   s.tex.needsUpdate=true}
@@ -209,11 +213,11 @@ export class Game{
     if(e.slowT>0)this.fx.emit(P.x+(rr()-.5),P.y+.1+rr()*.6,P.z+(rr()-.5),0,.3,0,'#7fe0ff',.5,0,.18,-.5,.6);
     if(e.cookT>0)this.fx.puff(P.x+(rr()-.5)*.6,P.y+1.9,P.z+(rr()-.5)*.6,0,1.2,0,'#ffffff',.8,.5,1.6,.5,0,.8)}}}
   const EA=e.emote&&e.spr?this.emoteAnim(e,s):null;if(EA){py+=EA.py;rz2+=EA.rz;sx*=EA.sx;sy*=EA.sy;s.pivot.position.x=EA.px}else s.pivot.position.x=0;
-  s.pivot.position.y=bob+py;s.pivot.rotation.z=rz2+tilt;s.pivot.scale.set(sx*flip,sy,1);
+  s.pivot.position.y=bob+py;s.pivot.rotation.z=rz2+tilt;s.pivot.scale.set(sx*flip,sy,1);if(s.cosG)this.updateCosSprite(e,s,view,dt);
   // aura / buffs
   const aOn=(e.flags&512)||(e.flags&1024)||e.coldT>0;s.aura.visible=!!aOn&&e.alive&&!(s.cloakK>.5);if(aOn){s.aura.material.color.set(e.coldT>0?'#7fe0ff':(e.flags&512)?'#5ab8ff':'#ffd84a');s.aura.scale.setScalar(1+Math.sin(this.t*10)*.06)}
   // weapon
-  const wi=e.wi;if(wi!==s.wKey){s.wKey=wi;if(s.wModel)s.wg.remove(s.wModel);s.wModel=null;if(wi>=0){const w=Math.floor(wi/10),r=wi%10;s.wModel=makeWeaponModel(w,r);s.wModel.scale.setScalar(.85);s.wModel.position.set(.36,.0,-.12);s.wg.add(s.wModel)}}
+  const wi=e.wi;if(wi!==s.wKey){s.wKey=wi;if(s.wModel)s.wg.remove(s.wModel);s.wModel=null;if(wi>=0){const w=Math.floor(wi/10),r=wi%10;s.wModel=finishWeapon(makeWeaponModel(w,r),w,e.cos);s.wModel.scale.setScalar(.85);s.wModel.position.set(.36,.0,-.12);s.wg.add(s.wModel)}}
   s.wg.visible=e.alive&&e.drop!=='free'&&!(s.cloakK>.5&&e!==camTarget);s.wg.position.set(0,1.1+(e.crouch?-.3:0)+(e.sliding?-.35:0),0);s.wg.rotation.set(e.pitch,e.yaw,0,'YXZ');
   const nd=Math.hypot(dx,dz);s.name.visible=e.alive&&nd<48&&e!==camTarget&&!(s.cloakK>.3);if(s.name.visible)this.drawName(e)
   const ss=clamp(1.1+nd*.012,1,2.2);s.name.scale.set(2.8*ss,.7*ss,1);
@@ -247,7 +251,7 @@ export class Game{
     if(ev.t===this.myId){this.hud.flashDamage(ev.by>=0&&this.ents.get(ev.by)?this.ents.get(ev.by).pos:null,this);au.play('hurt');this.view.shake=Math.min(1,this.view.shake+Math.min(.6,ev.d/60));if(me.use){me.use=null;this.hud.toast('Interrupted',"#ff7a7a")}}
     break}
    case'kill':{const v=this.ents.get(ev.v),b=ev.by>=0?this.ents.get(ev.by):null;
-    if(v){v.alive=false;v.hp=0;v.deadT=0;fx.burst(v.pos.x,v.pos.y+1,v.pos.z,40,9,'#ffd23d',.7,8);fx.burst(v.pos.x,v.pos.y+1,v.pos.z,24,6,'#ff6bd6',.8,6);fx.ring(v.pos,3,'#ffffff',.45)}
+    if(v){v.alive=false;v.hp=0;v.deadT=0;fx.burst(v.pos.x,v.pos.y+1,v.pos.z,40,9,'#ffd23d',.7,8);fx.burst(v.pos.x,v.pos.y+1,v.pos.z,24,6,'#ff6bd6',.8,6);fx.ring(v.pos,3,'#ffffff',.45);if(b&&b!==v)this.elimFx(v,b)}
     this.hud.killfeed({code:ev.w,head:!!ev.h,mine:ev.by===this.myId,died:ev.v===this.myId,
      killer:ev.by>=0?(b?{name:b.name,col:b.cdef&&b.cdef.color,me:ev.by===this.myId}:{gone:true}):null,
      victim:{name:v?v.name:'Player',col:v&&v.cdef?v.cdef.color:null,me:ev.v===this.myId}});
@@ -259,6 +263,8 @@ export class Game{
    case'emo':{const en=this.ents.get(ev.i);if(en){if(ev.on)this.applyEmote(en,ev.id);else this.clearEmote(en)}break}
    case'lt+':this.addLootObj(ev.l,true);break;
    case'lt-':this.removeLoot(ev.id);break;
+   case'strap':this.onTrapBurst(ev);break;
+   case'strapfx':if(me)me.sporeT=TRAP.overlay;break;
    case'inf':{const e=this.ents.get(ev.i);if(e)e.infN=ev.n;break}
    case'cho':{const l=this.loot.get(ev.id);if(l){l.opened=true;if(l.mesh){this.dynamic.remove(l.mesh);l.mesh=null}if(l.pod){au.play('pod',new THREE.Vector3(l.x,l.y,l.z));fx.burst(l.x,l.y+.6,l.z,34,5,'#9bff78',.9,2);fx.burst(l.x,l.y+.6,l.z,20,4,'#c58bff',.8,2);for(let i=0;i<6;i++)fx.puff(l.x,l.y+.5,l.z,(Math.random()-.5)*2,.6+Math.random(),(Math.random()-.5)*2,Math.random()<.5?'#a8ff7a':'#c9a8ff',1.2,1,1.6,.5,-.1,1)}else{au.play('chest',new THREE.Vector3(l.x,l.y,l.z));fx.burst(l.x,l.y+.6,l.z,30,5,'#ffd23d',.8,6)}}this.loot.delete(ev.id);break}
    case'strk':{const r=new THREE.Mesh(new THREE.RingGeometry(4.6,5.3,40),new THREE.MeshBasicMaterial({color:'#ff4d3d',transparent:true,opacity:.75,side:THREE.DoubleSide,depthWrite:false}));r.rotation.x=-Math.PI/2;r.position.set(ev.x,W.H(ev.x,ev.z)+.15,ev.z);this.dynamic.add(r);au.play('click',new THREE.Vector3(ev.x,W.H(ev.x,ev.z),ev.z));setTimeout(()=>this.dynamic.remove(r),(ev.t||2.5)*1000);break}
@@ -313,11 +319,11 @@ export class Game{
   this.updateBus(dt);if(this.decor)this.decor.update(this.t);if(this.scenery)this.scenery.update(dt,this.t);if(this.fungus)this.fungus.update(dt,this.t,this.camera.position,this.fx);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateInfection(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
-  else{this.updateClientSim(dt)}
+   this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateInfection(dt);this.updateSporeTraps(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
+  else{this.updateClientSim(dt);this.updateSporeTraps(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
-  this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);this.updateChaosVis(dt);
-  this.updateLootVis(dt);this.updateInfectVis(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
+  this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);this.updateFungusAmbience(dt);this.updateChaosVis(dt);
+  this.updateLootVis(dt);this.updateInfectVis(dt);this.updateSporeTrapVis();this.updateCosFx(dt);this.updateProjVis(dt);this.updateTrapVis(dt);this.updateStormVis(dt);this.updateHeroVis(dt);
   this.fx.update(dt);
   this.finaleUpdate(dt);
   this.structUpdateUI(dt);this.bldUpdate(dt);
@@ -408,4 +414,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,finaleMethods,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods,infectMethods);
+Object.assign(Game.prototype,finaleMethods,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods,infectMethods,trapMethods,ambienceMethods,cosGameMethods);

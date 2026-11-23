@@ -2,6 +2,7 @@
 // and the cycling banner in the lobby. App methods (mixed into App in main.js).
 import {SEASON,BP_LEVELS,xpFor,xpTotal,levelOf,REWARDS,SKINS,TRAILS,TYPE_LABEL,SLIDES} from './season2.js';
 import {IMG} from './shared.js';
+import {FX_SLOT} from './cosmetics.js';
 import imgPass from './s2_pass.png';
 import imgSkins from './s2_skins.png';
 import imgCorrupt from './s2_corrupt.png';
@@ -23,7 +24,11 @@ export const passMethods={
   // anything claimed is owned (this also repairs a profile whose lists were lost)
   for(const r of REWARDS)if(P.bp.claimed.includes(r.lvl)){
    if(r.type==='skin'&&!P.ownedSkins.includes(r.skin))P.ownedSkins.push(r.skin);
-   if(r.type==='trail'&&!P.ownedTrails.includes(r.id))P.ownedTrails.push(r.id)}
+   if(r.type==='trail'&&!P.ownedTrails.includes(r.id))P.ownedTrails.push(r.id);
+   if(r.type==='emote'&&!(P.ownedEmotes||(P.ownedEmotes=[])).includes(r.id))P.ownedEmotes.push(r.id)}
+  // v38: equipped Battle Pass cosmetics (hat, backpack, glider, effects, finishes, nameplate) must be claimed and sit in the right slot
+  P.eq=(P.eq&&typeof P.eq==='object')?P.eq:{};
+  for(const k of Object.keys(P.eq)){const id=P.eq[k],r=REWARDS.find(x=>x.id===id);if(!r||FX_SLOT[id]!==k||!P.bp.claimed.includes(r.lvl))delete P.eq[k]}
   P.skin=(P.skin&&typeof P.skin==='object')?P.skin:{};
   for(const c of Object.keys(P.skin)){const s=SKINS[P.skin[c]];if(!s||s.char!==c||!P.ownedSkins.includes(s.id))delete P.skin[c]}
   if(P.trail&&String(P.trail).startsWith('bp:')&&!P.ownedTrails.includes(P.trail))P.trail='';
@@ -48,6 +53,7 @@ export const passMethods={
   P.bp.claimed.push(lvl);
   if(r.type==='skin'&&!P.ownedSkins.includes(r.skin))P.ownedSkins.push(r.skin);
   if(r.type==='trail'&&!P.ownedTrails.includes(r.id))P.ownedTrails.push(r.id);
+  if(r.type==='emote'&&!P.ownedEmotes.includes(r.id))P.ownedEmotes.push(r.id);
   this.saveProfile();this.updatePassDot();return true;
  },
  claimAll(){let n=0;for(const r of this.claimable())if(this.claim(r.lvl))n++;if(n){this.sfx('chest');this.toast('Claimed '+n+' reward'+(n>1?'s':''))}this.passRender()},
@@ -110,6 +116,8 @@ export const passMethods={
   let act='';
   if(claimed&&r.type==='skin'){const on=P.skin[SKINS[r.skin].char]===r.skin;act=`<button class="btn sec sm" data-act="skin">${on?'Unequip':'Equip'}</button>`}
   else if(claimed&&r.type==='trail'){const on=P.trail===r.id;act=`<button class="btn sec sm" data-act="trail">${on?'Unequip':'Equip'}</button>`}
+  else if(claimed&&FX_SLOT[r.id]){const on=(P.eq||{})[FX_SLOT[r.id]]===r.id;act=`<button class="btn sec sm" data-act="cos">${on?'Unequip':'Equip'}</button>`}
+  else if(claimed&&r.type==='emote'){const on=P.equipEmote===r.id;act=`<button class="btn sec sm" data-act="emote">${on?'Unequip':'Equip'}</button>`}
   else if(claimed)act=`<div class="bp-note">Claimed</div>`;
   else if(!reached)act=`<div class="bp-note">Reach level ${r.lvl} · ${xpTotal(r.lvl)-I.xp} XP to go</div>`;
   else if(!r.live)act=`<div class="bp-note">Reached. It can be claimed once this reward is released.</div>`;
@@ -123,6 +131,8 @@ export const passMethods={
    if(a==='claim'){if(this.claim(r.lvl)){this.sfx('chest');this.toast('Claimed '+r.name)}}
    else if(a==='skin'){const c=SKINS[r.skin].char;this.equipSkin(c,this.profile.skin[c]===r.skin?'':r.skin);this.sfx('ui');this.updateNav('pass')}
    else if(a==='trail'){this.equipTrail(this.profile.trail===r.id?'':r.id);this.sfx('ui')}
+   else if(a==='cos'){const k=FX_SLOT[r.id];this.equipCos(k,(this.profile.eq||{})[k]===r.id?'':r.id);this.sfx('ui');this.updateNav('pass')}
+   else if(a==='emote'){this.profile.equipEmote=this.profile.equipEmote===r.id?'':r.id;this.saveProfile();this.sfx('ui')}
    this.passRender()};
  },
 
