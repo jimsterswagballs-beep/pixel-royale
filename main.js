@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {shopMethods} from './shop.js';
+import {passMethods} from './pass.js';
 import {CHAR_PRICES} from './emote.js';
 import {CHARS,ACTIONS,DEFAULT_SETTINGS,keyLabel,clamp,WEAPONS,RARITY} from './data.js';
 import {Game} from './game.js';
@@ -7,7 +8,7 @@ import {Input} from './input.js';
 import {Audio} from './audio.js';
 import {HUD} from './hud.js';
 import {Net,LocalNet} from './net.js';
-import {IMG} from './shared.js';
+import {IMG,artKey} from './shared.js';
 import {StarterIsland} from './starter.js';
 import {charArt,abilityIcon,ICON} from './icons.js';
 import * as W from './world.js';
@@ -34,14 +35,14 @@ class App{
   this.menuT=0;this.last=performance.now();this.mobile=false;this.touch=null;
   addEventListener('resize',()=>this.resize());document.addEventListener('fullscreenchange',()=>this.resize());
   this.applySettings();this.resize();
-  setTimeout(()=>{this.game.ensureWorld();this.buildScreens();this.initPlatform();this.go('title');requestAnimationFrame(t=>this.loop(t))},60);
+  setTimeout(()=>{this.game.ensureWorld();this.buildScreens();this.initPlatform();this.go('title');this.maybeSeasonSummary();requestAnimationFrame(t=>this.loop(t))},60);
  }
  // ---------- state
  loadSettings(){let s={};try{s=JSON.parse(localStorage.getItem('brg_settings')||'{}')}catch(e){}this.settings=Object.assign({},DEFAULT_SETTINGS,s)}
  saveSettings(){try{localStorage.setItem('brg_settings',JSON.stringify(this.settings))}catch(e){}}
- loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,gm:'br',diff:'Normal',mode:'solo',fill:true,tokens:0,ownedChars:['coolguy15','zach'],ownedEmotes:[],equipEmote:''},p);const P=this.profile;P.ownedChars=[...new Set(['coolguy15','zach',...(P.ownedChars||[])])];P.ownedEmotes=P.ownedEmotes||[];if(!P.ownedChars.includes(P.char))P.char='coolguy15';if(P.equipEmote&&!P.ownedEmotes.includes(P.equipEmote))P.equipEmote=''}
+ loadProfile(){let p={};try{p=JSON.parse(localStorage.getItem('brg_profile')||'{}')}catch(e){}this.profile=Object.assign({name:'Player'+Math.floor(Math.random()*900+100),char:'coolguy15',nameColor:'#ffffff',trail:'',emote:0,bots:19,gm:'br',diff:'Normal',mode:'solo',fill:true,tokens:0,ownedChars:['coolguy15','zach'],ownedEmotes:[],equipEmote:''},p);const P=this.profile;P.ownedChars=[...new Set(['coolguy15','zach',...(P.ownedChars||[])])];P.ownedEmotes=P.ownedEmotes||[];if(!P.ownedChars.includes(P.char))P.char='coolguy15';if(P.equipEmote&&!P.ownedEmotes.includes(P.equipEmote))P.equipEmote='';this.s2Migrate()}
  saveProfile(){try{localStorage.setItem('brg_profile',JSON.stringify(this.profile))}catch(e){}}
- get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote}}
+ get cos(){return{nameColor:this.profile.nameColor,trail:this.profile.trail,emote:this.profile.emote,skin:(this.profile.skin||{})[this.profile.char]||''}}
  applySettings(){
   const s=this.settings;const q={Low:{pr:.6,fx:.4,fog:350},Medium:{pr:.85,fx:.7,fog:550},High:{pr:1,fx:1,fog:800}}[s.quality]||{pr:1,fx:1,fog:800};
   this.q=q;this.audio.setVol(s.master,s.sfx,s.music);if(this.game.fx)this.game.fx.density=q.fx*(s.particles==='Low'?.4:s.particles==='Medium'?.7:1);
@@ -88,7 +89,7 @@ class App{
  // ---------- screens
  buildScreens(){
   $('loading').classList.remove('show');
-  this.buildNav();this.buildShop();this.buildTitle();this.buildOnline();this.buildLobby();this.buildLocker();this.buildSettings();this.buildCredits();this.buildUpdateLog();
+  this.buildNav();this.buildShop();this.buildPass();this.buildTitle();this.buildOnline();this.buildLobby();this.buildLocker();this.buildSettings();this.buildCredits();this.buildUpdateLog();this.initBanner();
   $('btnSpec').onclick=()=>{$('elim').style.display='none';this.endCursor=false;this.lock()};
   $('btnElimMenu').onclick=()=>this.leaveMatch();$('btnAgain').onclick=()=>this.leaveMatch();$('btnPlayAgain').onclick=$('btnPlayAgainV').onclick=()=>this.playAgain();
   document.addEventListener('pointerdown',()=>{this.audio.init();this.audio.resume()},{once:false});
@@ -97,19 +98,19 @@ class App{
  sfx(n){this.audio.play(n)} buildNav(){
   const n=h(`<div id="nav"><div class="nav-logo">PIXEL<span>ROYALE</span></div><div class="nav-tabs" id="navTabs"></div><div class="nav-right"><div class="tok" id="navTok"><i>&#9670;</i><b>0</b></div><div class="nav-me" id="navMe"><img alt=""><span></span></div><button class="nav-ico" id="navInfo" title="Credits">i</button><button class="nav-ico" id="navQuit" title="Quit game">&#x23FB;</button></div></div>`);
   $('ui').appendChild(n);
-  for(const[k,l]of[['shop','Shop'],['title','Lobby'],['online','Online'],['locker','Locker'],['updates','News'],['settings','Settings']]){const b=h(`<button data-go="${k}">${l}</button>`);b.onclick=()=>{this.sfx('ui');this.go(k)};b.onmouseenter=()=>this.sfx('click');$('navTabs').appendChild(b)}
+  for(const[k,l]of[['shop','Shop'],['title','Lobby'],['pass','Battle Pass'],['online','Online'],['locker','Locker'],['updates','News'],['settings','Settings']]){const b=h(`<button data-go="${k}">${l}</button>`);b.onclick=()=>{this.sfx('ui');this.go(k)};b.onmouseenter=()=>this.sfx('click');$('navTabs').appendChild(b)}
   $('navInfo').onclick=()=>{this.sfx('ui');this.go('credits')};$('navQuit').onclick=()=>{this.sfx('ui');this.exit()};
  }
  updateNav(name){
   const nav=$('nav');if(!nav)return;nav.querySelector('#navTok b').textContent=this.profile.tokens||0;nav.classList.toggle('show',!['lobby','loading','pause'].includes(name));
   const act={chars:'locker'}[name]||name;for(const b of $('navTabs').children)b.classList.toggle('on',b.dataset.go===act);
-  const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[c.id].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor}
+  const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[artKey(c.id,this.cos)].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor;this.updatePassDot()}
 buildTitle(){
   const t=$('title');
   t.innerHTML=`<div class="lb-bg"></div>
   <div class="sl">
    <div class="sl-left">
-    <span class="lb-chip">Season 1 · Solo · Battle Royale</span>
+    <span class="lb-chip">Season 2 · Solo · Battle Royale</span>
     <h1 class="sl-h">Battle <span>Royale</span></h1>
     <p class="sl-p">Drop from the battle bus, loot chests and outlast the storm. Plays fully offline against bots.</p>
     <div class="glass sl-setup">
@@ -131,7 +132,7 @@ buildTitle(){
      <button class="btn sec" data-go="online">Play with friends</button>
      <button class="btn play" id="playBtn">Play</button>
     </div>
-    <button class="lb-news" data-go="updates"><span class="tag">NEW</span><b>Mobile Support</b><small>Play with a joystick and touch buttons, or with keyboard and mouse</small></button>
+    <div class="s2-banner" id="s2Banner"></div>
    </div>
    <div class="glass sl-modes"><button class="gm-open" id="slGm"></button></div>
   </div>`;
@@ -178,7 +179,7 @@ buildTitle(){
  markChips(box,key){for(const c of box.children)c.classList.toggle('sel',c.dataset.k===key)}
  updateStage(){
   const P=this.profile,cd=CHARS.find(x=>x.id===P.char)||CHARS[0];
-  $('slImg').src=IMG[cd.id].front;$('slArt').style.backgroundImage=`url('${charArt(cd.id)}')`;
+  $('slImg').src=IMG[artKey(cd.id,this.cos)].front;$('slArt').style.backgroundImage=`url('${charArt(cd.id)}')`;
   const n=$('slHero');n.textContent=P.name;n.style.color=P.nameColor||'#fff';
   $('slRole').textContent=cd.name+' · '+cd.role;
   $('slInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div><div class="sl-ab">${cd.ab.map(a=>`<span>${esc(a.n)}</span>`).join('')}</div>`;
@@ -207,21 +208,30 @@ buildTitle(){
  }
  enter_locker(){
   const P=this.profile,g=$('lkGrid');for(const b of $('lkCats').children)b.classList.toggle('on',b.textContent===this.lkTab);
-  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[P.char].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;$('lkRole').textContent=cd.name+' · '+cd.role;
+  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;$('lkRole').textContent=cd.name+' · '+cd.role;
   $('lkInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div>`+(cd.passive?`<div class="abl pass"><img src="${ICON[cd.passive.ic]}" alt=""><div><b>${cd.passive.n}</b> <small>(passive)</small><br>${cd.passive.d}</div></div>`:'')+cd.ab.map(a=>`<div class="abl">${a.ic?`<img src="${abilityIcon(a)}" alt="">`:''}<div><b>${a.n}</b> <small>(${a.cd}s cooldown)</small><br>${a.d}</div></div>`).join('');
   g.innerHTML='';const tab=this.lkTab;
   const NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];const rc=i=>RARITY[Math.min(5,i%6)].c;
   const set=(k,v)=>{P[k]=v;this.saveProfile();this.enter_locker()};
   if(tab==='Emote'){g.appendChild(this.emotePicker());return}
-  if(tab==='Outfit'){g.appendChild(this.charPicker(()=>P.char,id=>{P.char=id;this.saveProfile();this.enter_locker()}));return}
+  if(tab==='Outfit'){g.appendChild(this.charPicker(()=>P.char,id=>{P.char=id;this.saveProfile();this.enter_locker()}));g.appendChild(this.skinPicker());return}
   const box=h(`<div class="tiles"></div>`);
   if(tab==='Name Color')COLORS.forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i),pic:`<span class="swb" style="background:${c}"></span>`,label:NAMES[i],sel:P.nameColor===c,fn:()=>set('nameColor',c)})));
-  if(tab==='Sprint Trail'){box.appendChild(this.mkTile({rc:rc(0),pic:`<span class="swb none">&#8709;</span>`,label:'None',sel:!P.trail,fn:()=>set('trail','')}));COLORS.slice(1).forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i+1),pic:`<span class="trl" style="--tc:${c}"></span>`,label:NAMES[i+1],sel:P.trail===c,fn:()=>set('trail',c)})))}
+  if(tab==='Sprint Trail'){box.appendChild(this.mkTile({rc:rc(0),pic:`<span class="swb none">&#8709;</span>`,label:'None',sel:!P.trail,fn:()=>set('trail','')}));COLORS.slice(1).forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i+1),pic:`<span class="trl" style="--tc:${c}"></span>`,label:NAMES[i+1],sel:P.trail===c,fn:()=>set('trail',c)})));this.trailTiles(box)}
   g.appendChild(box)}
  buildUpdateLog(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
+    <section class="update-entry"><div class="date">NOVEMBER 23, 2026 · VERSION 2.0</div><h3>Season 2: The Fungus</h3><ul>
+     <li><b>Battle Pass</b>: a free 20-level pass in its own lobby tab. You earn Battle Pass XP from the same things that earn Swag Tokens: playing a match, eliminations, time survived, the top 10 and wins.</li>
+     <li><b>Fungus skins</b>: Fungus Jay at level 10 and Mycelium Zach at level 20. Skins change how a character looks, never their abilities or stats. Equip them in the Locker.</li>
+     <li><b>Spore trails</b>: Spore Trail, Root Trail and Spore Cloud Trail for your sprint, at levels 2, 11 and 17.</li>
+     <li><b>Fungal weapons</b>: Fungal Blaster, Root Shooter, Spore Launcher and Cap Shotgun have infinite ammo. Each hit adds an infection stack (up to 4) that deals damage over time, and the infected player\'s screen fills with fungus. They are found only in <b>Spore Pods</b>, which grow in Old Keep, Lonely Lodge, Sawmill Creek, Tomato Town and Camp Pinecone.</li>
+     <li><b>Lobby banner</b> and a one-time Season 2 summary show what is new. The rest of the pass (emotes, gliders, effects and more) is on the track and unlocks as it is released.</li>
+     <li><b>Map corruption</b>: the fungus has overgrown nine places. Old Keep and Lonely Lodge are overrun, Sawmill Creek, Tomato Town and Camp Pinecone are partly taken, and Mc Dongal's, Farmer's Folly, Radar Ridge and Fuel Stop 9 have the first signs. Expect giant mushrooms, roots, glowing patches, drifting spores and mushroom rings round the loot. Everything is for looks only and does not change how you move or fight.</li>
+     <li>Fungal weapons, spore traps, fungal chests and new gliders are coming later this season.</li>
+    </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 22, 2026 · VERSION 1.11</div><h3>Five-Left Finale</h3><ul>
      <li><b>5 people left</b>: when five players are still alive, a red "5 PEOPLE LEFT" flashes across the top of the screen and fades away.</li>
      <li>The screen slowly gains a red tint, and the background music is replaced by the finale song until the next match.</li>
@@ -402,7 +412,7 @@ buildTitle(){
   const ents=buildEntrants({mode:P.mode,humans:[{name:P.name,char:P.char,cos:this.cos,hostMe:true}],roster:makeBotRoster(P.bots),fill:P.fill});
   const me=ents.find(e=>e.hostMe);
   this.net=new LocalNet();const cfg=this.makeCfg('host',this.net,(Math.random()*1e9)|0,ents,me.id,P.diff);cfg.mode=P.mode;cfg.gm=P.gm||'br';
-  cfg.crowd=ents.filter(e=>e!==me).map(e=>({name:e.name,char:e.char,nameColor:e.cos&&e.cos.nameColor}));
+  cfg.crowd=ents.filter(e=>e!==me).map(e=>({name:e.name,char:e.char,cos:e.cos,nameColor:e.cos&&e.cos.nameColor}));
   return cfg;
  }
  beginGame(cfg){
@@ -459,7 +469,7 @@ buildTitle(){
   if(this.playing){this.game.onNetMessage(pid,m);return}
   const L=this.lobby;if(!L)return;
   if(m.t==='hello'){if(L.players.length>=8){this.net.send(pid,{t:'full'});return}L.players.push({pid,name:(m.name||'Player').slice(0,14),char:m.char||'coolguy15',cos:m.cos||{}});this.lobbyUpdate();this.sfx('ui')}
-  else if(m.t==='setchar'){const p=L.players.find(x=>x.pid===pid);if(p){p.char=m.char;this.lobbyUpdate()}}
+  else if(m.t==='setchar'){const p=L.players.find(x=>x.pid===pid);if(p){p.char=m.char;if(m.cos)p.cos=m.cos;this.lobbyUpdate()}}
  }
  joinLobby(code){
   this.saveOnName();code=(code||'').trim().toUpperCase();if(code.length<4){$('onErr').textContent='Enter the 5-letter room code';return}
@@ -517,11 +527,11 @@ lobbyUpdate(noBroadcast,full){
   $('lbCount').textContent=L.players.length+' / 8';
   const n=L.players.length+(L.bots?1:0);
   let html=L.players.map(p=>{const host=p.pid==='host',col=(p.cos&&p.cos.nameColor)||'#fff';
-   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[p.char].front:''}" alt=""><div class="pl-who"><div class="pn" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
+   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
   if(L.bots)html+=`<div class="pl-slot"><span class="bi">&#129302;</span><div class="pl-who"><div class="pn">${L.bots} bot${L.bots>1?'s':''}</div><div class="ps">${esc(L.diff)} bots</div></div></div>`;
   for(let i=n;i<4;i++)html+=`<div class="pl-slot empty"><span class="bi">+</span><div class="pl-who"><div class="pn">Open slot</div><div class="ps">Invite a friend</div></div></div>`;
   $('lbPlayers').innerHTML=html;
-  const box=$('lbChars');box.innerHTML='';box.appendChild(this.charPicker(()=>this.profile.char,id=>{this.profile.char=id;this.saveProfile();if(L.host){const me=L.players.find(x=>x.pid==='host');if(me)me.char=id;this.lobbyUpdate()}else this.net.toHost({t:'setchar',char:id})},true));
+  const box=$('lbChars');box.innerHTML='';box.appendChild(this.charPicker(()=>this.profile.char,id=>{this.profile.char=id;this.saveProfile();if(L.host){const me=L.players.find(x=>x.pid==='host');if(me){me.char=id;me.cos=this.cos}this.lobbyUpdate()}else this.net.toHost({t:'setchar',char:id,cos:this.cos})},true));
   if(L.host)this.net.broadcast({t:'lobby',players:L.players,bots:L.bots,diff:L.diff,mode:L.mode,gm:L.gm,fill:L.fill});
  }
  leaveLobby(silent){this.lobbyActive=false;if(this.net&&this.net.close){this.net.close()}this.net=null;this.lobby=null;this.go('title')}
@@ -577,10 +587,10 @@ lobbyUpdate(noBroadcast,full){
     if(act){g.update(dt)}else g.fx.update(dt);
     g.render(dt);
     this.hud.update(g,dt);
-   }else if(this.screen==='lobby'||this.inter||this.boarding){if(this.inter)this.tickInter();this.starter.update(dt,this.profile.char);this.starter.render()}else{g.renderMenu(dt)}
+   }else if(this.screen==='lobby'||this.inter||this.boarding){if(this.inter)this.tickInter();this.starter.update(dt,artKey(this.profile.char,this.cos));this.starter.render()}else{g.renderMenu(dt)}
   }catch(e){console.error(e);window.__err=(window.__err||'')+e.stack+'\n'}
   this.input.endFrame();
  }
 }
-Object.assign(App.prototype,shopMethods);
+Object.assign(App.prototype,shopMethods,passMethods);
 window.__W=W;window.app=new App();

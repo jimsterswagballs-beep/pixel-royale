@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import {mulberry32,clamp,lerp} from './data.js';
 import {MATS} from './materials.js';
 import {makeSeaMaterial,buildSeaDepth,makeRiverMesh} from './water.js';
+import {CORRUPT,TIERS,THEMES} from './season2.js';
 export const ISL=380,HALF=520,WATER=0;
 // v23: no cliff walls. Hills, dips, the lake and the road cuts shape the ground instead.
 export const CLIFFS=[];
@@ -39,6 +40,19 @@ export const POIS=[
  {n:'Old Keep',x:-278,z:-121,r:24,type:'ruins'},
  {n:'Camp Pinecone',x:68,z:-183,r:22,type:'camp'},
 ];
+// Season 2: the places the fungus has taken. fungusAt(x,z) is 0..1 (how overgrown that spot is) and fungusSite() is the site it measured.
+export const SITES=POIS.filter(p=>CORRUPT[p.n]).map(p=>Object.assign({},p,CORRUPT[p.n],{theme:THEMES[CORRUPT[p.n].theme],T:TIERS[CORRUPT[p.n].tier]}));
+let lastSite=null;
+export function fungusSite(){return lastSite}
+export function fungusAt(x,z){
+ let best=0;lastSite=null;
+ for(const s of SITES){const R=s.r*s.T.reach,dx=x-s.x,dz=z-s.z;if(dx>R||dx<-R||dz>R||dz<-R)continue;
+  const d=Math.hypot(dx,dz);if(d>=R)continue;const t=Math.min(1,Math.max(0,(R-d)/(R*.65))),k=t*t*(3-2*t)*s.T.power;
+  if(k>best){best=k;lastSite=s}}
+ return best}
+
+// Season 2: is (x,z) inside a heavily or moderately corrupted place? (fungal chests only grow there). Returns the site or null.
+export function podAt(x,z){for(const s of SITES){if(s.tier==='light')continue;const dx=x-s.x,dz=z-s.z,R=s.r*1.05;if(dx*dx+dz*dz<R*R)return s}return null}
 
 // Lakes: a bowl that the sea plane fills. `bed` is the depth at the centre (below 0 is under water).
 export const LAKES=[{n:'Lake Muffin',x:75,z:85,r:30,bed:-3.5}];
@@ -851,6 +865,7 @@ export function buildMeshes(scene,quality={}){
   else{const pn=vnoise(x*.035+9,z*.035+4);c.set('#6fc04a').lerp(new THREE.Color('#4a9a38'),n*1.3).lerp(new THREE.Color('#9ad45a'),clamp(.5-n,0,.5)).lerp(new THREE.Color('#3f8a42'),clamp((pn-.5)*2,0,.7)).lerp(new THREE.Color('#b8d860'),clamp((.35-pn)*2,0,.5))}
   if(h>1.8&&h<34){const rd=roadDist(x,z);if(rd<4.2)c.lerp(new THREE.Color(rd<2.6?'#4b4e55':'#c4b89a'),clamp((4.2-rd)/1.2,0,1)*.95)}
   for(const p of POIS){const d=Math.hypot(x-p.x,z-p.z);if(d<ringR(p)-3&&h>1.8){c.lerp(new THREE.Color(p.type==='suburb'?'#7bb85a':'#9a9a96'),sstep(ringR(p)-3,p.r*.5,d)*.75)}}
+  {const fk=h>1.8&&h<34?fungusAt(x,z):0;if(fk>0){const th=lastSite.theme,gc=new THREE.Color(th.ground).lerp(new THREE.Color(th.glow[0]),clamp((n-.5)*1.6,0,.3)),rdm=clamp((roadDist(x,z)-2.6)/1.6,0,1);c.lerp(gc,fk*.85*rdm)}} // the fungus stains the ground but leaves the roads alone
   for(const nd of ROAD_NODES){if(!nd.gate)continue;const d=Math.hypot(x-nd.x,z-nd.z);if(d<11&&h>1.8)c.lerp(new THREE.Color('#9a9a96'),sstep(11,5,d)*.8)}
   {const rv=riverAt(x,z);if(rv&&rv.d<RIVER.hw+RIVER.bank+2)c.lerp(new THREE.Color('#5f5b4a'),.7)}
   {const bd=Math.hypot(x-BEACH.x,z-BEACH.z);if(bd<BEACH.r)c.lerp(new THREE.Color('#f6eccb'),.5*(1-sstep(BEACH.r-6,BEACH.r,bd)))}
@@ -872,7 +887,7 @@ export function buildMeshes(scene,quality={}){
  const tm=new THREE.InstancedMesh(trunkG,new THREE.MeshLambertMaterial({color:'#6b4a2b'}),treeList.length);
  const cm=new THREE.InstancedMesh(crownG,new THREE.MeshLambertMaterial({color:0xffffff}),treeList.length);
  const cm2=new THREE.InstancedMesh(crown2,new THREE.MeshLambertMaterial({color:0xffffff}),treeList.length);
- treeList.forEach((t,i)=>{ps.set(t.x,t.y0-.2,t.z);sc.set(t.sc,t.sc,t.sc);m4.compose(ps,q,sc);tm.setMatrixAt(i,m4);cm.setMatrixAt(i,m4);cm2.setMatrixAt(i,m4);const cc=t.kind?c.set('#3d7a44').offsetHSL(0,0,hash(i,5)*.06):c.set('#4f9a3a').offsetHSL(0,0,hash(i,9)*.08);cm.setColorAt(i,cc);cm2.setColorAt(i,cc)});
+ treeList.forEach((t,i)=>{ps.set(t.x,t.y0-.2,t.z);sc.set(t.sc,t.sc,t.sc);m4.compose(ps,q,sc);tm.setMatrixAt(i,m4);cm.setMatrixAt(i,m4);cm2.setMatrixAt(i,m4);const cc=fungusAt(t.x,t.z)>.2?c.set(lastSite.theme.caps[i%3]).offsetHSL(0,-.1,hash(i,9)*.1-.05):t.kind?c.set('#3d7a44').offsetHSL(0,0,hash(i,5)*.06):c.set('#4f9a3a').offsetHSL(0,0,hash(i,9)*.08);cm.setColorAt(i,cc);cm2.setColorAt(i,cc)});
  [tm,cm,cm2].forEach(m=>{m.instanceMatrix.needsUpdate=true;m.castShadow=m.receiveShadow=true;g.add(m)});cm.instanceColor.needsUpdate=true;cm2.instanceColor.needsUpdate=true;
  decorInst.tree=[tm,cm,cm2].map(m=>({m,orig:m.instanceMatrix.array.slice()}));
  const rm=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),new THREE.MeshLambertMaterial({color:'#8a8a85',flatShading:true}),rockList.length);
@@ -899,7 +914,7 @@ export function addDecor(scene){
  for(let i=0;i<1400;i++){const a=rng()*6.283,r=Math.sqrt(rng())*ISL*.92;const x=Math.cos(a)*r,z=Math.sin(a)*r;const h=H(x,z);if(h<2.2||h>30)continue;if(roadDist(x,z)<4)continue;let bad=false;for(const p of POIS)if(Math.hypot(x-p.x,z-p.z)<p.r*.8){bad=true;break}if(bad)continue;pts.push([x,h,z,.6+rng()*.9,rng()])}
  const g=new THREE.IcosahedronGeometry(1,0),m=new THREE.InstancedMesh(g,new THREE.MeshLambertMaterial({color:0xffffff,flatShading:true}),pts.length);
  const m4=new THREE.Matrix4(),q=new THREE.Quaternion(),sc=new THREE.Vector3(),ps=new THREE.Vector3(),c=new THREE.Color();
- pts.forEach((p,i)=>{ps.set(p[0],p[1]+p[3]*.35,p[2]);sc.set(p[3],p[3]*.7,p[3]);m4.compose(ps,q,sc);m.setMatrixAt(i,m4);m.setColorAt(i,p[4]<.12?c.set('#ff7ab8'):p[4]<.2?c.set('#ffd84a'):c.set('#3f9a3a').offsetHSL(0,0,(p[4]-.5)*.12))});
+ pts.forEach((p,i)=>{ps.set(p[0],p[1]+p[3]*.35,p[2]);sc.set(p[3],p[3]*.7,p[3]);m4.compose(ps,q,sc);m.setMatrixAt(i,m4);m.setColorAt(i,fungusAt(p[0],p[2])>.2?c.set(lastSite.theme.glow[i%2]).offsetHSL(0,-.1,(p[4]-.5)*.2):p[4]<.12?c.set('#ff7ab8'):p[4]<.2?c.set('#ffd84a'):c.set('#3f9a3a').offsetHSL(0,0,(p[4]-.5)*.12))});
  m.instanceMatrix.needsUpdate=true;m.instanceColor.needsUpdate=true;scene.add(m);
 
  const anim=[];const mk=(g,c,x,y,z,sx,sy,sz,rx,ry,rz,em)=>{const m=new THREE.Mesh(g,new THREE.MeshLambertMaterial(Object.assign({color:c,flatShading:true},em?{emissive:em,emissiveIntensity:.8}:{})));m.position.set(x,y,z);m.scale.set(sx,sy,sz);m.rotation.set(rx||0,ry||0,rz||0);return m};
@@ -931,7 +946,7 @@ export function addDecor(scene){
     if(LAKES.some(L=>Math.hypot(x-L.x,z-L.z)<L.r+4))continue;gp.push([x,h,z,.35+gr()*.4])}
    const tuft=new THREE.ConeGeometry(.18,.7,4);tuft.translate(0,.35,0);
    const gm=new THREE.InstancedMesh(tuft,new THREE.MeshLambertMaterial({color:0xffffff}),Math.max(1,gp.length));
-   gp.forEach((g,i)=>{m4.compose(ps.set(g[0],g[1],g[2]),q.identity(),sc.set(g[3],g[3],g[3]));gm.setMatrixAt(i,m4);gm.setColorAt(i,c.set(gr()<.2?'#d9c24a':gr()<.15?'#e87ab0':'#5fae45'))});
+   gp.forEach((g,i)=>{m4.compose(ps.set(g[0],g[1],g[2]),q.identity(),sc.set(g[3],g[3],g[3]));gm.setMatrixAt(i,m4);gm.setColorAt(i,fungusAt(g[0],g[2])>.2?c.set(lastSite.theme.caps[i%3]):c.set(gr()<.2?'#d9c24a':gr()<.15?'#e87ab0':'#5fae45'))});
    gm.count=gp.length;gm.instanceColor.needsUpdate=true;gm.instanceMatrix.needsUpdate=true;scene.add(gm);}
   {const flock=[];const br=mulberry32(33);
    const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,-1.2,.25,.2,0,0,.5,0,0,0,0,0,.5,1.2,.25,.2],3));bg.computeVertexNormals();

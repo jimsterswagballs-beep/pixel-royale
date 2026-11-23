@@ -2,7 +2,7 @@
 // The player's hero stands on the plaza, the party's Battle Bus is parked on the north side of the island,
 // and "Play" flies the bus off with the hero aboard before the match starts (see App.boardThen).
 import * as THREE from 'three';
-import {charTex,makeBusModel} from './shared.js';
+import {charTex,artKey,makeBusModel} from './shared.js';
 
 const ISLAND_R=62;               // walkable radius (Season 1: bigger island)               // walkable radius
 const sstep=(a,b,x)=>{const t=Math.min(1,Math.max(0,(x-a)/(b-a)));return t*t*(3-2*t)};
@@ -217,7 +217,7 @@ export class StarterIsland{
   const geo=this.crowdGeo||(this.crowdGeo=new THREE.PlaneGeometry(2.1,2.1));
   for(const p of list){
    const g=new THREE.Group();
-   const mat=new THREE.MeshBasicMaterial({map:charTex(p.char,'front'),transparent:true,alphaTest:.35,side:THREE.DoubleSide});
+   const mat=new THREE.MeshBasicMaterial({map:charTex(artKey(p.char,p.cos),'front'),transparent:true,alphaTest:.35,side:THREE.DoubleSide});
    const plane=new THREE.Mesh(geo,mat);plane.position.y=.88;g.add(plane);
    const tag=nameTag(p.name,p.nameColor||(p.cos&&p.cos.nameColor));g.add(tag);
    const s=this.spot();g.position.set(s.x,islandH(s.x,s.z),s.z);this.scene.add(g);

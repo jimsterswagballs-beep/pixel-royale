@@ -107,7 +107,8 @@ export class HUD{
  elimCard(p){const g=p.g;if(g.over)return;const e=$('elim');e.style.display='flex';const r=this.app.lastReward||{total:0,why:''};
    $('elimPlace').textContent='#'+p.place;$('elimOf').textContent='of '+g.list.length+' players';$('elimBy').textContent=p.by?'Eliminated by '+p.by:'Eliminated';
    $('elimStats').innerHTML=this.statTiles([['Eliminations',p.kills],['Survived',this.fmtTime(g.deathT||g.t)],['Players left',g.aliveCount()]]);
-   $('elimTok').textContent=r.total?`+${r.total} Swag Tokens · ${r.why}`:'';this.app.showCursor(true)}
+   $('elimTok').textContent=this.rewardText(r);this.app.showCursor(true)}
+ rewardText(r){const a=r.total?`+${r.total} Swag Tokens · ${r.why}`:'',b=r.xp?`+${r.xp} Battle Pass XP`:'';return [a,b].filter(Boolean).join('   |   ')}
  showVictory(g){}
 
  onEnd(g,ev){this.finished=true;$('elim').style.display='none';const won=g.me.team===ev.tm;const v=$('victory');v.classList.toggle('lose',!won);v.style.display='flex';
@@ -115,7 +116,7 @@ export class HUD{
   if(won){$('vicTitle').textContent='Victory Royale';$('vicSub').textContent=g.teamMode?'#1 · Your team is last standing':'#1 · Last one standing'}
   else{const w=g.ents.get(ev.win);$('vicTitle').textContent=(w?w.name:'Nobody')+' wins';$('vicSub').textContent='You placed #'+g.me.place}
   $('vicStats').innerHTML=this.statTiles([['Eliminations',g.me.kills],['Survived',this.fmtTime(g.me.alive?g.t:(g.deathT||g.t))],['Placed','#'+(won?1:(g.me.place||'-'))]]);
-  $('vicTok').textContent=r.total?`+${r.total} Swag Tokens · ${r.why}`:'';
+  $('vicTok').textContent=this.rewardText(r);
   if(won)this.confetti();setTimeout(()=>this.app.showCursor(true),800)}
  confetti(){const c=$('confetti');c.innerHTML='';for(let i=0;i<90;i++){const p=el('i');p.style.left=Math.random()*100+'%';p.style.background=`hsl(${Math.random()*360},90%,60%)`;p.style.animationDelay=Math.random()*2+'s';p.style.animationDuration=2.5+Math.random()*2.5+'s';c.appendChild(p)}}
  update(g,dt){
@@ -147,6 +148,7 @@ export class HUD{
   if(cur&&cur.k==='w'&&cur.w!==0){const wd=wstat(cur.w,cur.r);ab.style.display='flex';this.q('#magN').textContent=cur.mag;this.q('#resN').textContent='/ '+me.ammo[wd.ammo];this.q('#ammoT').textContent=me.reload>0?'RELOADING':AMMO[wd.ammo].n;this.q('#ammoT').style.color=me.reload>0?'#ffd23d':'#aab';this.q('#magN').style.color=cur.mag<=Math.ceil(wd.mag*.25)?'#ff6b6b':'#fff'}
   else if(cur&&cur.k==='i'){ab.style.display='flex';this.q('#magN').textContent=cur.n;this.q('#resN').textContent='';this.q('#ammoT').textContent=ITEMS[cur.id].n}
   else ab.style.display='none';
+  if(cur&&cur.k==='w'&&cur.w!==0&&wstat(cur.w,cur.r).fungal){this.q('#magN').textContent='\u221E';this.q('#resN').textContent='';this.q('#ammoT').textContent='SPORES';this.q('#ammoT').style.color='#b6ff8a';this.q('#magN').style.color='#b6ff8a'}
   if(!me.use)this.q('#usebar').style.display='none';
   // abilities: a radial sweep shows the remaining cooldown
   me.cdef.ab.forEach((a,i)=>{const d=this.abilEls[i];if(!d)return;const cd=me.cd[i];const f=cd>0?Math.min(100,cd/a.cd*100):0;

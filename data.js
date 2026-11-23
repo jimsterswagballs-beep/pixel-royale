@@ -37,6 +37,10 @@ export const WEAPONS=[
  w({n:'Potato Cannon',t:'fun',ammo:'light',dmg:32,speed:85,grav:8,rps:3,mag:10,reload:2.2,rc:1.2,auto:false,col:'#b08a55',sp2:'potato',lw:9}),
  w({n:'Fish Slapper',t:'melee',dmg:42,rps:2,range:3,melee:true,kb:8,col:'#5ab0d0',lw:8,auto:true}),
  w({n:'Pirate Blunderbuss',t:'sg',ammo:'shells',dmg:14,pellets:14,rps:.6,mag:1,reload:2.2,sp:.1,rc:4,range:30,kb:10,auto:false,col:'#6a3d1a',lw:5}),
+  w({n:'Fungal Blaster',t:'fg',fungal:1,ammo:'light',dmg:14,speed:70,rps:4.5,mag:30,sp:.014,rc:.8,life:2.2,stk:1,sp2:'spore',col:'#7affb0',lw:0}),
+  w({n:'Root Shooter',t:'fg',fungal:1,ammo:'light',dmg:24,speed:115,rps:2,mag:12,sp:.004,rc:1.4,life:2,stk:1,sp2:'root',col:'#9bd04a',auto:false,lw:0}),
+  w({n:'Spore Launcher',t:'fg',fungal:1,ammo:'light',dmg:8,splash:4,speed:34,grav:14,rps:.9,mag:6,rc:1.2,life:3,cloud:4,sp2:'sporeball',col:'#c58bff',auto:false,lw:0}),
+  w({n:'Cap Shotgun',t:'fg',fungal:1,ammo:'light',dmg:6,pellets:6,speed:60,rps:1.1,mag:4,sp:.075,rc:2.6,life:.5,stk:1,sp2:'cap',col:'#ff7ab8',auto:false,lw:0}),
   w({n:'Homing Missile Launcher',t:'ex',ammo:'rockets',dmg:62,splash:4.5,speed:30,grav:0,homing:1,rps:1.1,mag:4,reload:3,rc:1.2,auto:false,col:'#5a7a4a',lw:5}),
 ];
 export const ITEMS={

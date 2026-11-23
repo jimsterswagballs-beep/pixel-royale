@@ -1,3 +1,4 @@
+import {trailEmit} from './season2.js';
 import * as THREE from 'three';
 import {WEAPONS,ITEMS,RARITY,BAL,clamp,lerp} from './data.js';
 import * as W from './world.js';
@@ -67,7 +68,7 @@ export const movementMethods={
   me.flags=this.packFlags(me);
   // sprint trail
   if(me.spicyT>0&&Math.random()<.8)this.fx.emit(me.pos.x+(Math.random()-.5)*.4,me.pos.y+1+Math.random()*.4,me.pos.z+(Math.random()-.5)*.4,(Math.random()-.5)*1.2,1.8+Math.random()*1.5,(Math.random()-.5)*1.2,'#ff7a1a',.45,0);
-  if(me.sprinting&&me.cos.trail&&Math.random()<.6)this.fx.emit(me.pos.x,me.pos.y+.2,me.pos.z,(Math.random()-.5)*.6,.5,(Math.random()-.5)*.6,me.cos.trail,.6,0);
+  if(me.sprinting&&me.cos.trail){if(String(me.cos.trail).startsWith('bp:')){if(Math.random()<.7)trailEmit(this.fx,me.pos,me.cos.trail)}else if(Math.random()<.6)this.fx.emit(me.pos.x,me.pos.y+.2,me.pos.z,(Math.random()-.5)*.6,.5,(Math.random()-.5)*.6,me.cos.trail,.6,0)}
  },
  leaveBus(e){if(e.drop!=='bus')return;e.drop='free';e.pos.copy(this.bus.pos);e.vel.set(this.bus.dx*this.bus.speed*.6,-2,this.bus.dz*this.bus.speed*.6);e.grounded=false;e.spawnT=this.t},
  move(e,inp,dt){

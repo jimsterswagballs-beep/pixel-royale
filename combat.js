@@ -48,6 +48,7 @@ export const combatMethods={
   if(!slot){e.aiming=false;return}
   if(slot.k==='i'){e.aiming=false;if(c.firePressed&&e.equipT<=0)this.startUseItem(e,slot);return}
   const wd=wstat(slot.w,slot.r);
+  if(wd.fungal)slot.mag=wd.mag;   // fungal weapons never run dry
   e.aiming=c.aim&&!e.sprinting&&!e.sliding&&e.equipT<=.1&&!wd.melee;
   if(c.reload&&!wd.melee&&slot.mag<wd.mag&&e.ammo[wd.ammo]>0&&e.reload<=0){e.reload=e.reloadDur=wd.reload;if(e.local)this.audio.play('reload');else this.audio.play('reload',e.pos,.5);return}
   if(e.equipT>0||e.fireCd>0)return;
@@ -72,7 +73,7 @@ export const combatMethods={
   if(e.local){
    if(this.t-(v.lastShot||-9)>.45)e.shotIdx=0;e.shotIdx=(e.shotIdx||0)+1;v.lastShot=this.t;const ph=Math.sin(e.shotIdx*1.7)*(1-Math.exp(-e.shotIdx*.4));
    v.recoilP+=wd.rc*.0085*(e.aiming?.62:1)*(e.shotIdx<4?1.1:.9);v.recoilY+=ph*wd.rc*.0042*(e.aiming?.6:1);v.kick=Math.min(1,v.kick+wd.rc*.04);v.recoilKick=Math.min(1.6,(v.recoilKick||0)+wd.rc*.35);v.flash=.05;v.shake=Math.min(.5,v.shake+wd.rc*.006);
-   this.audio.play(wd.quiet?'quiet':wd.laser?'laser':wd.t==='ar'?'ar':wd.t==='smg'?'smg':wd.t==='sg'?'sg':wd.t==='sn'?'sn':wd.t==='pi'?'pi':wd.t==='ex'?'launch':'fun',{x:o[0],y:o[1],z:o[2]},wd.quiet?.7:1);
+   this.audio.play(wd.quiet?'quiet':wd.fungal?'spore':wd.laser?'laser':wd.t==='ar'?'ar':wd.t==='smg'?'smg':wd.t==='sg'?'sg':wd.t==='sn'?'sn':wd.t==='pi'?'pi':wd.t==='ex'?'launch':'fun',{x:o[0],y:o[1],z:o[2]},wd.quiet?.7:1);
    if(slot.mag<=0&&this.settings&&e.ammo[wd.ammo]>0&&e.reload<=0){}}
   e.shootT=.12;this.revealEnt(e);
   if(this.role==='client'&&e.local){this.net.toHost({t:'fire',o,d:dirs,w:e.wi});
@@ -85,7 +86,8 @@ export const combatMethods={
   const ox=o[0],oy=o[1],oz=o[2];
   if(wd.speed){ // projectile weapon
    const dx=dirs[0],dy=dirs[1],dz=dirs[2];
-   const cm=this.dmgMulOf(sh);this.spawnProj(sh,ox+dx*.6,oy-.12+dy*.6,oz+dz*.6,dx*wd.speed,dy*wd.speed,dz*wd.speed,cm===1?wd:Object.assign({},wd,{dmg:wd.dmg*cm}),wi);
+   const cm=this.dmgMulOf(sh),wq=cm===1?wd:Object.assign({},wd,{dmg:wd.dmg*cm});
+   for(let q=0;q<(wd.fungal?wd.pellets:1);q++){const ax=dirs[q*3],ay=dirs[q*3+1],az=dirs[q*3+2];this.spawnProj(sh,ox+ax*.6,oy-.12+ay*.6,oz+az*.6,ax*wd.speed,ay*wd.speed,az*wd.speed,wq,wi)}
    this.emit({k:'sh',i:sh.id,w:wi>=0?Math.floor(wi/10):-1,o:[ox,oy-.1,oz]});return}
   const ends=[],imps=[];const n=wd.pellets;let didHit=new Set();
   for(let p=0;p<n;p++){
@@ -260,7 +262,7 @@ export const combatMethods={
  spawnProj(owner,x,y,z,vx,vy,vz,wd,wi){
   const id=this.nextProjId++;
   const p={id,owner:owner.id,x,y,z,vx,vy,vz,dmg:wd.dmg,splash:wd.splash||0,grav:wd.grav||0,bounce:wd.bounce||0,fuse:wd.fuse||0,kb:wd.kb||0,sp2:wd.sp2||'',wi,life:wd.life||6,shard:!!wd.shard,
-   direct:!wd.fuse||wd.sp2==='ball',stick:wd.n==='Sticky Bomb Launcher'?1:0,age:0,kind:wd.kind||'',col:wd.col,stuck:null,sx:0,sy:0,sz:0,ex:wd.n&&wd.n.includes('Rocket'),food:wd.food||'',team:owner.team,homing:wd.homing?1:0,tgt:null,retarget:0,syncT:0};
+   direct:!wd.fuse||wd.sp2==='ball',stick:wd.n==='Sticky Bomb Launcher'?1:0,age:0,kind:wd.kind||'',col:wd.col,stuck:null,sx:0,sy:0,sz:0,ex:wd.n&&wd.n.includes('Rocket'),food:wd.food||'',team:owner.team,homing:wd.homing?1:0,tgt:null,retarget:0,syncT:0,fg:!!wd.fungal,stk:wd.stk||1,cloud:wd.cloud||0};
   if(wd.n==='Grenade Launcher'||wd.n==='Sticky Bomb Launcher')p.direct=false;
   if(wd.n==='Potato Cannon'){p.splash=0}
   this.projs.push(p);
@@ -305,6 +307,7 @@ export const combatMethods={
   if(o.circ===false){const d=[Math.abs(x-o.x0),Math.abs(x-o.x1),Math.abs(y-o.y0),Math.abs(y-o.y1),Math.abs(z-o.z0),Math.abs(z-o.z1)];let m=0;for(let i=1;i<6;i++)if(d[i]<d[m])m=i;return[[-1,0,0],[1,0,0],[0,-1,0],[0,1,0],[0,0,-1],[0,0,1]][m]}
   const dx=x-o.x,dz=z-o.z,l=Math.hypot(dx,dz)||1;return[dx/l,0,dz/l]},
  projHitEnt(p,t,ux,uz){
+  if(p.fg){this.fungalHit(p,t);return}
   if(p.food){this.foodHit(p,t,ux,uz);return}
   const owner=this.ents.get(p.owner);
   if(p.shard){this.damage(t,p.dmg,owner,p.wi,false,[p.x,p.y,p.z]);this.emit({k:'st',i:t.id,s:'kb',vx:ux*p.kb,vy:3,vz:uz*p.kb},t.id);return}
@@ -312,6 +315,7 @@ export const combatMethods={
   else{this.damage(t,p.dmg,owner,p.wi,false,[p.x,p.y,p.z]);this.emit({k:'st',i:t.id,s:'kb',vx:ux*(p.kb||3),vy:2,vz:uz*(p.kb||3)},t.id)}
   if(p.sp2==='potato')this.emit({k:'snd',n:'hit',p:[p.x,p.y,p.z]})},
  projBoom(p,direct){
+  if(p.fg){if(!direct)this.fungalBoom(p);return}
   if(p.food){this.foodLand(p,direct);return}
   if(p.kind==='flare'){this.spawnFlare(p.x,p.y,p.z);return}
   const owner=this.ents.get(p.owner);
@@ -407,6 +411,10 @@ export const combatMethods={
   const col=ev.c||'#fff';let m;
   if(ev.sh){m=new THREE.Mesh(new THREE.OctahedronGeometry(.25),new THREE.MeshBasicMaterial({color:'#8fdcff'}))}
   else if(ev.r){m=new THREE.Group();const b=new THREE.Mesh(new THREE.CylinderGeometry(.1,.1,.7,8),new THREE.MeshLambertMaterial({color:'#ccc'}));b.rotation.x=Math.PI/2;m.add(b);const c=new THREE.Mesh(new THREE.ConeGeometry(.13,.3,8),new THREE.MeshLambertMaterial({color:'#e33'}));c.rotation.x=-Math.PI/2;c.position.z=-.5;m.add(c)}
+  else if(ev.s==='spore'){m=new THREE.Mesh(new THREE.SphereGeometry(.17,8,6),new THREE.MeshBasicMaterial({color:'#9bff78'}))}
+  else if(ev.s==='sporeball'){m=new THREE.Group();m.add(new THREE.Mesh(new THREE.SphereGeometry(.3,10,8),new THREE.MeshBasicMaterial({color:'#b078ff'})));const hl=new THREE.Mesh(new THREE.SphereGeometry(.45,10,8),new THREE.MeshBasicMaterial({color:'#e0c0ff',transparent:true,opacity:.3,depthWrite:false}));m.add(hl)}
+  else if(ev.s==='root'){m=new THREE.Mesh(new THREE.ConeGeometry(.09,.9,6),new THREE.MeshBasicMaterial({color:'#b6e060'}));m.geometry.rotateX(Math.PI/2)}
+  else if(ev.s==='cap'){m=new THREE.Mesh(new THREE.SphereGeometry(.13,6,5),new THREE.MeshBasicMaterial({color:'#ff7ab8'}))}
   else if(ev.s&&ev.s.startsWith('f_')){m=makeFoodMesh(ev.s)}
   else if(ev.s==='banana'){m=new THREE.Mesh(new THREE.TorusGeometry(.25,.09,6,10,3.5),new THREE.MeshLambertMaterial({color:'#ffe14a'}))}
   else if(ev.s==='chicken'){m=new THREE.Group();const b=new THREE.Mesh(new THREE.SphereGeometry(.3,10,8),new THREE.MeshLambertMaterial({color:'#fff08a'}));b.scale.z=1.4;m.add(b);const h=new THREE.Mesh(new THREE.SphereGeometry(.15,8,6),new THREE.MeshLambertMaterial({color:'#ff5a3a'}));h.position.set(0,.2,-.4);m.add(h)}

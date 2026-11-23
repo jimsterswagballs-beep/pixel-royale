@@ -5,7 +5,7 @@ import {bakeGroup} from './bake.js';
 import {wstat,makeWeaponModel,mat} from './shared.js';
 import {MATS,rollMatItem} from './materials.js';
 const NW=WEAPONS.length;
-const WEAPON_W=WEAPONS.map((w,i)=>i===0?0:(w.t==='ar'?10:w.t==='smg'?8:w.t==='sg'?8:w.t==='sn'?4:w.t==='pi'?7:w.t==='ex'?3.5:w.t==='melee'?1.5:5));
+const WEAPON_W=WEAPONS.map((w,i)=>i===0||w.fungal?0:(w.t==='ar'?10:w.t==='smg'?8:w.t==='sg'?8:w.t==='sn'?4:w.t==='pi'?7:w.t==='ex'?3.5:w.t==='melee'?1.5:5));
 function pick(rng,ws){let t=0;for(const w of ws)t+=w;let r=rng()*t;for(let i=0;i<ws.length;i++){r-=ws[i];if(r<=0)return i}return ws.length-1}
 export function rollRarity(rng,boost=1,min=0){const ws=RARITY.map((r,i)=>i<min?0:r.w*(i>=2?boost:1));return pick(rng,ws)}
 export function rollItem(rng,q=1,min=0){
@@ -203,6 +203,11 @@ export const lootMethods={
     if(off&&W.blocked(x,y,z,.3,1,.05)){x=s.x;z=s.z}
     this.addLootObj({id:id++,x,y,z,item:it})}
   }
+  // Season 2: Spore Pods grow only in heavily and moderately corrupted places
+  for(const s of W.SITES){if(s.tier==='light')continue;const want=s.tier==='heavy'?6:3;let placed=0;
+   for(let k=0;k<80&&placed<want;k++){const a=rng()*6.283,r=Math.sqrt(rng())*s.r*.95;const x=s.x+Math.cos(a)*r,z=s.z+Math.sin(a)*r;const y=W.H(x,z);
+    if(y<2.5||W.blocked(x,y+.1,z,.9,1.2,.05)||Math.abs(W.groundAt(x,z,y+.6,.3,.6)-y)>.5)continue;
+    this.addLootObj({id:id++,x,y,z,chest:1,pod:1,q:2});placed++}}
   // ammo crates
   for(let i=0;i<28;i++){const a=rng()*6.283,r=Math.sqrt(rng())*W.ISL*.8;const x=Math.cos(a)*r,z=Math.sin(a)*r;const y=W.H(x,z);if(y<2.5||W.blocked(x,y+.1,z,.5,1,.05))continue;this.addLootObj({id:id++,x,y:y+.1,z,ammobox:1})}
  },
@@ -217,7 +222,13 @@ export const lootMethods={
   this.outEvents.push({k:'lt+',l:{id,x:l.x,y:l.y,z:l.z,item}});return l},
  spawnChest(x,y,z,supply,id){const l={id:id||this.nextLootId++,x,y,z,chest:1,supply:supply?1:0,q:2};this.loot.set(l.id,Object.assign(l,{mesh:null}));this.outEvents.push({k:'lt+',l:{id:l.id,x,y,z,chest:1,supply:l.supply,q:2}});return l},
  openChest(l){ // host
-  this.emit({k:'cho',id:l.id});const rng=Math.random;const items=[];
+  this.emit({k:'cho',id:l.id,pod:l.pod?1:0});const rng=Math.random;const items=[];
+  if(l.pod){ // Spore Pod: a fungal weapon, a heal and a little extra
+   const fw=[];WEAPONS.forEach((w,i)=>{if(w.fungal)fw.push(i)});
+   const w=fw[Math.floor(rng()*fw.length)],r=rollRarity(rng,1.6,2);items.push({k:'w',w,r,mag:wstat(w,r).mag,d:1});
+   items.push({k:'i',id:rng()<.5?'bandage':'minishield',n:rng()<.5?3:2});if(rng()<.5)items.push(rollItem(rng,1.2));if(rng()<.7)items.push(rollMatItem(rng,1));
+   items.forEach((it,i)=>{const a=i/items.length*6.283+rng(),x=l.x+Math.cos(a)*1.6,z=l.z+Math.sin(a)*1.6;this.spawnLoot(it,W.blocked(x,l.y+.1,z,.3,1,.05)?l.x:x,W.blocked(x,l.y+.1,z,.3,1,.05)?l.z:z,W.groundAt(x,z,l.y+.5,.3,.6)+.1)});
+   this.loot.delete(l.id);return}
   if(l.supply){items.push(rollItem(rng,3,3));items.push(rollItem(rng,3,2));items.push({k:'i',id:'bigshield',n:2});items.push({k:'i',id:'medkit',n:2});items.push({k:'a',t:['med','light','heavy'][Math.floor(rng()*3)],n:60})}
   else{let w=rollItem(rng,1.6,1);while(w.k!=='w')w=rollItem(rng,1.6,1);items.push(w);items.push(rollItem(rng,1.4));items.push({k:'a',t:WEAPONS[w.w].ammo||'light',n:AMMO[WEAPONS[w.w].ammo||'light'].box});if(rng()<.6)items.push(rollItem(rng,1.2))}
   if(rng()<.85)items.push(rollMatItem(rng,l.supply?1.6:1));
@@ -232,7 +243,7 @@ export const lootMethods={
   for(const l of this.loot.values()){const dx=l.x-me.pos.x,dz=l.z-me.pos.z,lim=bd*this.lootReach(me,l);if(dx*dx+dz*dz>lim*lim||Math.abs(l.y-me.pos.y)>3)continue;const d=Math.hypot(dx,dz);if(l.item&&l.item.k==='a')continue;
    const dot=d<.01?1:(dx*fx+dz*fz)/d;const score=d/this.lootReach(me,l)-dot*1.2;if(dot>-.2&&score<bd){bd=score;best=l}}
   this.near=best;this.hud.setPrompt(best?this.lootLabel(best):null,best)},
- lootLabel(l){if(l.chest)return l.supply?'Open Supply Drop':'Open Chest';if(l.ammobox)return 'Open Ammo Box';return itemName(l.item)},
+ lootLabel(l){if(l.pod)return 'Open Spore Pod';if(l.chest)return l.supply?'Open Supply Drop':'Open Chest';if(l.ammobox)return 'Open Ammo Box';return itemName(l.item)},
  pickupLocal(me,l){
   if(this.role==='client'){this.net.toHost({t:'pick',id:l.id});this.audio.play('click');return}
   this.hostPick(me,l)},
@@ -275,6 +286,7 @@ export const lootMethods={
     this.removeLoot(l.id);this.emit({k:'lt-',id:l.id});if(e.peer!==undefined&&!e.local)this.emit({k:'grant',g:it},e.id);else this.applyGrantLocal(e,it)}}},
  // ---- visuals
  makeLootMesh(l){
+  if(l.pod)return this.makePodMesh(l);
   if(!(l.chest||l.ammobox)){const g=makeItemLootVis(l);g.position.set(l.x,l.y,l.z);return g}
   const g=new THREE.Group(),gold=!!l.chest,supply=!!l.supply;
   const wood=gold?(supply?'#a83232':'#8a5a26'):'#526b48',trim=gold?'#f4bd45':'#a8b98b';
@@ -298,6 +310,17 @@ export const lootMethods={
   if(supply)g.scale.setScalar(1.45);
   return g;
  },
+ // Season 2: a Spore Pod is a fat purple bulb on a stem with a ring of glowing mushrooms
+ makePodMesh(l){
+  const g=new THREE.Group();
+  part(g,new THREE.CylinderGeometry(.34,.5,.5,8),'#4a3a2a',0,.25,0);
+  part(g,new THREE.SphereGeometry(.62,12,9),'#7a3fd0',0,.85,0,1,.92,1,0,0,0,.35);
+  part(g,new THREE.SphereGeometry(.4,10,8),'#a870ff',0,1.18,0,1,.7,1,0,0,0,.5);
+  for(const[a,s]of[[0,.9],[1.3,.7],[2.6,1],[3.9,.75],[5.1,.85]]){const x=Math.cos(a)*.95,z=Math.sin(a)*.95;part(g,new THREE.CylinderGeometry(.05,.07,.3*s,5),'#e9dcc0',x,.15*s,z);part(g,new THREE.SphereGeometry(.17*s,8,6),a>2.5?'#3fe0c0':'#c8ff5a',x,.34*s,z,1,.6,1,0,0,0,.6)}
+  for(const[a,y]of[[.5,.9],[2.2,1.0],[4.0,.8]]){part(g,new THREE.SphereGeometry(.09,6,5),'#d8ffb0',Math.cos(a)*.6,y,Math.sin(a)*.6,1,1,1,0,0,0,.9)}
+  bakeGroup(g,{standard:true,roughness:.6,flatShading:true});
+  const beam=new THREE.Mesh(new THREE.CylinderGeometry(.34,.34,18,10,1,true),glowMat('#9bff78',.17));beam.position.y=9;g.add(beam);
+  g.userData.crate=true;g.userData.phase=l.id*.91;g.position.set(l.x,l.y,l.z);return g},
  updateLootVis(dt){
   this.accum.lv=(this.accum.lv||0)+dt;const cam=this.camera.position;
   if(this.accum.lv>.25){this.accum.lv=0;const R2=(this.settings.dist==='Far'?85:this.settings.dist==='Medium'?65:45)**2;

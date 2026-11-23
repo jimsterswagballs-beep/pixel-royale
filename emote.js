@@ -1,3 +1,4 @@
+import {matchXp} from './season2.js';
 // Emotes and Swag Tokens. An emote stuns the player until they press the emote key again, get shot, or the emote ends.
 // Media is embedded at build time (esbuild dataurl loader). Timers and state run on the host; clients get 'emo' events.
 import * as THREE from 'three';
@@ -92,5 +93,7 @@ export const emoteMethods={
   if(won)parts.push(['Victory Royale',TOKENS.win]);else if(me.place&&me.place<=10)parts.push(['Top 10',TOKENS.top10]);
   const total=parts.reduce((a,p)=>a+p[1],0);
   this.app.addTokens(total,parts.filter(p=>p[1]>0).map(p=>p[0]+' +'+p[1]).join(' · '));
+  // Battle Pass XP is paid with the tokens, from the same events (season2.js has the rates)
+  const xp=matchXp({kills:me.kills,minutes:Math.floor(survived/60),won,place:me.place});this.app.addXp(xp.total);
  }
 };

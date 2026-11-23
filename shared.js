@@ -4,8 +4,14 @@ import zf from './zach_front.png';import zs from './zach_side.png';import zb fro
 import cf from './coolguy15_front.png';import cs from './coolguy15_side.png';import cb from './coolguy15_back.png';
 import kf from './chill_guy_front.png';import ks from './chill_guy_side.png';import kb from './chill_guy_back.png';
 import jf from './jay_front.png';import js from './jay_side.png';import jb from './jay_back.png';
+import jyf from './jay_fungus_front.png';import jys from './jay_fungus_side.png';import jyb from './jay_fungus_back.png';
+import zmf from './zach_mycelium_front.png';import zms from './zach_mycelium_side.png';import zmb from './zach_mycelium_back.png';
+import {SKINS} from './season2.js';
 // every character needs front / side / back art: updateSprite() picks the view from the camera angle and mirrors the side view
-export const IMG={zach:{front:zf,side:zs,back:zb},coolguy15:{front:cf,side:cs,back:cb},chillguy:{front:kf,side:ks,back:kb},jay:{front:jf,side:js,back:jb}};
+export const IMG={zach:{front:zf,side:zs,back:zb},coolguy15:{front:cf,side:cs,back:cb},chillguy:{front:kf,side:ks,back:kb},jay:{front:jf,side:js,back:jb},
+ jay_fungus:{front:jyf,side:jys,back:jyb},zach_mycelium:{front:zmf,side:zms,back:zmb}};
+// the art to draw for a character: the equipped skin when it belongs to that character, otherwise the character itself
+export function artKey(ch,cos){const s=cos&&cos.skin,d=s&&SKINS[s];return d&&d.char===ch&&IMG[s]?s:ch}
 export const R=.42,HSTAND=1.8,HCROUCH=1.3,EYE=1.65,EYEC=1.1,EYES=.85,GRAV=23,JUMP=7.8,WALK=5.8,SPRINT=9.4,CROUCH=3;
 export const texCache={};
 export function charTex(ch,view){const k=ch+view;if(texCache[k])return texCache[k];const t=new THREE.TextureLoader().load(IMG[ch][view]);t.colorSpace=THREE.SRGBColorSpace;t.magFilter=THREE.NearestFilter;t.minFilter=THREE.LinearMipmapLinearFilter;t.anisotropy=4;return texCache[k]=t}
@@ -29,6 +35,7 @@ export function makeWeaponModel(w,r){
  else if(d.n==='Bouncy Ball Gun'){g.add(B(bx,'#3cd0ff',0,0,-.25,.1,.12,.5));g.add(B(sp,'#ff4a8a',0,.12,-.2,.16,.16,.16));g.add(B(cy,'#222',0,0,-.55,.06,.3,.06,Math.PI/2))}
  else if(d.n==='Disco Laser'){g.add(B(bx,'#ff3dff',0,0,-.25,.1,.12,.55));g.add(B(sp,'#ffffff',0,.1,-.5,.1,.1,.1,0,'#ff3dff'));g.add(B(cy,'#222',0,0,-.65,.05,.25,.05,Math.PI/2))}
  else if(d.n==='Potato Cannon'){g.add(B(cy,'#b08a55',0,0,-.35,.16,.7,.16,Math.PI/2));g.add(B(bx,'#555',0,-.12,-.05,.06,.18,.08))}
+ else if(t==='fg'){g.add(B(bx,col,0,0,-.3,.11,.13,.6));g.add(B(sp,'#7a3fd0',0,.1,-.2,.2,.16,.2,0,'#7a3fd0'));g.add(B(cy,'#e9dcc0',0,0,-.68,.07,.28,.07,Math.PI/2));g.add(B(sp,col,0,0,-.84,.14,.14,.14,0,col));g.add(B(bx,'#4a3a2a',0,-.12,-.03,.06,.2,.08))}
  else if(t==='ar'||t==='smg'){const L=t==='ar'?.7:.5;g.add(B(bx,col,0,0,-L/2+.1,.08,.1,L));g.add(B(bx,dark,0,0,-L-.1,.03,.03,.3));g.add(B(bx,dark,0,-.12,-L*.4,.05,.18,.07,.15));g.add(B(bx,col,0,-.02,.3,.07,.12,.25));if(d.zoom>1)g.add(B(bx,dark,0,.09,-L*.4,.05,.05,.2))}
  else if(t==='sg'){g.add(B(bx,col,0,0,-.4,.09,.1,.75));g.add(B(bx,dark,0,.01,-.78,.05,.05,.3));g.add(B(bx,'#6b4a2a',0,-.02,.2,.08,.14,.35));if(d.mag===2)g.add(B(bx,dark,0,.05,-.45,.05,.05,.6))}
  else if(t==='sn'){g.add(B(bx,col,0,0,-.45,.07,.09,.95));g.add(B(bx,dark,0,0,-1,.03,.03,.4));g.add(B(cy,dark,0,.09,-.4,.07,.4,.07,Math.PI/2));g.add(B(bx,col,0,-.02,.25,.07,.13,.3))}

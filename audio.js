@@ -58,6 +58,9 @@ export class Audio{
    case'kill':this.tone(660,.12,.5,'triangle',dest);this.tone(990,.2,.5,'triangle',dest,null,.1);break;
    case'expl':this.noise(1.1,2500,60,1.4,'lowpass',dest);this.tone(70,.9,1,'sine',dest,25);break;
    case'pick':this.tone(600,.07,.4,'triangle',dest,900);this.tone(900,.1,.4,'triangle',dest,1200,.06);break;
+   case'spore':this.noise(.12,1800,500,.35,'bandpass',dest);this.tone(420,.12,.3,'sine',dest,200);this.tone(900,.06,.15,'triangle',dest,500);break;
+   case'infect':this.tone(160,.35,.4,'sawtooth',dest,70);this.noise(.3,900,200,.35,'lowpass',dest);this.tone(520,.2,.2,'sine',dest,300,.05);break;
+   case'pod':this.tone(200,.4,.45,'sine',dest,90);this.noise(.35,2200,400,.4,'bandpass',dest);this.tone(700,.25,.3,'triangle',dest,1300,.1);this.tone(1100,.3,.25,'sine',dest,1700,.18);break;
    case'chest':this.tone(300,.15,.4,'triangle',dest,600);this.tone(600,.2,.5,'triangle',dest,1200,.1);this.tone(1200,.3,.4,'sine',dest,null,.2);break;
    case'ab':this.tone(200,.35,.5,'sawtooth',dest,900);this.noise(.3,300,3000,.3,'bandpass',dest);break;
    case'slam':this.tone(120,.5,.9,'sine',dest,30);this.noise(.5,2500,100,.8,'lowpass',dest);break;
