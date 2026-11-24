@@ -150,7 +150,7 @@ export class Game{
   this.dynamic.add(g);this.attachCosSprite(e);this.drawName(e,true)}
  drawName(e,force){
   const s=e.spr;const key=Math.round(e.hp/5)*1000+Math.round(e.sh/5)+(e.ts>0?7:0);if(!force&&key===s.hpKey)return;s.hpKey=key;
-  const c=s.cv.getContext('2d');c.clearRect(0,0,256,64);{const fr=fxOf(e.cos).fr;if(fr)drawNameplate(c,fr)}c.font='bold 24px Arial Black, Arial';c.textAlign='center';c.lineWidth=5;c.strokeStyle='rgba(0,0,0,.8)';c.strokeText(e.name,128,24);c.fillStyle=e.cos.nameColor||'#fff';c.fillText(e.name,128,24);
+  const c=s.cv.getContext('2d');c.clearRect(0,0,256,64);if(fxOf(e.cos).fr)drawNameplate(c);c.font='bold 24px Arial Black, Arial';c.textAlign='center';c.lineWidth=5;c.strokeStyle='rgba(0,0,0,.8)';c.strokeText(e.name,128,24);c.fillStyle=e.cos.nameColor||'#fff';c.fillText(e.name,128,24);
   c.fillStyle='rgba(0,0,0,.65)';c.fillRect(40,34,176,10);c.fillStyle='#4cd964';c.fillRect(41,35,174*clamp(e.hp/e.maxHp,0,1),8);
   if(e.sh>0||e.ts>0){c.fillStyle='#3db8ff';c.fillRect(41,46,174*clamp((e.sh+e.ts)/100,0,1),5)}
   s.tex.needsUpdate=true}

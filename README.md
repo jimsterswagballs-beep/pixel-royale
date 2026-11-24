@@ -1,14 +1,3 @@
-# Pixel Royale: v39 Item Shop and Locker
-
-- **Item Shop** (shopcos.js, shop.js): 37 new cosmetics bought with Swag Tokens. 7 nameplates, 6 gliders, 5 backpacks, 6 hats, 4 landing effects, 4 elimination effects, 5 sprint trails. All data is in SHOP_COS in shopcos.js: add a line there and the shop, locker, saving and bots pick it up (a new 3D model or particle effect still needs a case in cosmetics.js).
-- **Featured row**: 4 items, 20% off, chosen from the date (same for everyone, changes at local midnight, never two of the same kind). Tune with FEATURED_COUNT and FEATURED_OFF. A filter bar jumps to a kind of item, and owned items have an Equip button.
-- **Locker** (cosmetics.js, main.js): tabs are Outfit, Accessories, Glider, Nameplate, Effects, Weapons, Emote (LOCKER_TABS). Each row shows owned/total, owned items first, locked ones with price or Battle Pass level, and an Item Shop shortcut. An Equipped list under the hero jumps to the tab, plus Unequip all. Name colour moved into Nameplate, sprint trails into Effects.
-- **Saving**: bought items are in profile.ownedCos. Equipped ones use the same eq slots as Battle Pass items. s2Migrate drops unknown ids, items you do not own, and wrong-slot ids. Shop trails use `sh:` ids like Battle Pass trails use `bp:`.
-- **Nameplates** now draw from one table (NAMEPLATES in shopcos.js) for the name tag in the match, the lobby, nav bar and locker. Unknown nameplate ids draw nothing, and unknown glider ids fall back to the standard glider.
-- **Bots** wear the new items too.
-
-Known limits: checked with an esbuild bundle (three and peerjs left external), Node tests of the catalog, featured rotation, buying, equipping and save repair, builders run against a stand-in for three, and headless Chromium screenshots of the Shop and Locker pages. The 3D models (hats, backpacks, gliders), the particle effects and the in-match nameplates have NOT been seen in the real game, because the game bundle could not be built here (no three package, no network). Run `npm install` and `npm run build`, then check the look of each item in a match. Sizes and positions are guesses.
-
 # Pixel Royale: v38 spore traps, ambience, 3 new sites, Battle Pass cosmetics
 
 - **Spore traps** (traps.js): 63 traps, 10 per heavy site, 5 per medium, 2 per light. Host-run. Trigger within 4 m, 6 m cloud for 5 s, one infection stack per player per burst, re-arm 20 s after the burst. Only caught players get the screen overlay (6 s fade). Killfeed name: Spore Trap.

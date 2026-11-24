@@ -3,7 +3,6 @@
 import {SEASON,BP_LEVELS,xpFor,xpTotal,levelOf,REWARDS,SKINS,TRAILS,TYPE_LABEL,SLIDES} from './season2.js';
 import {IMG} from './shared.js';
 import {FX_SLOT} from './cosmetics.js';
-import {SHOP_BY} from './shopcos.js';
 import imgPass from './s2_pass.png';
 import imgSkins from './s2_skins.png';
 import imgCorrupt from './s2_corrupt.png';
@@ -28,16 +27,11 @@ export const passMethods={
    if(r.type==='trail'&&!P.ownedTrails.includes(r.id))P.ownedTrails.push(r.id);
    if(r.type==='emote'&&!(P.ownedEmotes||(P.ownedEmotes=[])).includes(r.id))P.ownedEmotes.push(r.id)}
   // v38: equipped Battle Pass cosmetics (hat, backpack, glider, effects, finishes, nameplate) must be claimed and sit in the right slot
-  // v39: things bought in the Item Shop live in ownedCos (only real shop ids are kept)
-  P.ownedCos=[...new Set(Array.isArray(P.ownedCos)?P.ownedCos:[])].filter(id=>SHOP_BY[id]);
   P.eq=(P.eq&&typeof P.eq==='object')?P.eq:{};
-  for(const k of Object.keys(P.eq)){const id=P.eq[k],r=REWARDS.find(x=>x.id===id);
-   const okPass=!!r&&FX_SLOT[id]===k&&P.bp.claimed.includes(r.lvl),okShop=!!SHOP_BY[id]&&FX_SLOT[id]===k&&P.ownedCos.includes(id);
-   if(!okPass&&!okShop)delete P.eq[k]}
+  for(const k of Object.keys(P.eq)){const id=P.eq[k],r=REWARDS.find(x=>x.id===id);if(!r||FX_SLOT[id]!==k||!P.bp.claimed.includes(r.lvl))delete P.eq[k]}
   P.skin=(P.skin&&typeof P.skin==='object')?P.skin:{};
   for(const c of Object.keys(P.skin)){const s=SKINS[P.skin[c]];if(!s||s.char!==c||!P.ownedSkins.includes(s.id))delete P.skin[c]}
   if(P.trail&&String(P.trail).startsWith('bp:')&&!P.ownedTrails.includes(P.trail))P.trail='';
-  if(P.trail&&String(P.trail).startsWith('sh:')&&!P.ownedCos.includes(P.trail))P.trail='';
   P.s2seen=+P.s2seen||0;
  },
  bpInfo(){return levelOf(this.profile.bp.xp)},
@@ -64,7 +58,7 @@ export const passMethods={
  },
  claimAll(){let n=0;for(const r of this.claimable())if(this.claim(r.lvl))n++;if(n){this.sfx('chest');this.toast('Claimed '+n+' reward'+(n>1?'s':''))}this.passRender()},
  equipSkin(char,id){const P=this.profile;if(id&&(!SKINS[id]||SKINS[id].char!==char||!P.ownedSkins.includes(id)))return;if(id)P.skin[char]=id;else delete P.skin[char];this.saveProfile()},
- equipTrail(id){const P=this.profile;if(id&&String(id).startsWith('sh:')){if(!P.ownedCos.includes(id))return}else if(id&&!P.ownedTrails.includes(id))return;P.trail=id;this.saveProfile()},
+ equipTrail(id){const P=this.profile;if(id&&!P.ownedTrails.includes(id))return;P.trail=id;this.saveProfile()},
  updatePassDot(){const b=document.querySelector('#navTabs button[data-go="pass"]');if(b)b.classList.toggle('dot',this.claimable().length>0)},
 
  // ---------- the Battle Pass screen
