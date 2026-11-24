@@ -8,8 +8,6 @@ import {WEAPONS,RARITY} from './data.js';
 import {REWARDS,TYPE_LABEL,TRAILS} from './season2.js';
 import * as W from './world.js';
 import {SHOP_COS,SHOP_BY,SHOP_FX_SLOT,paintNameplate,npStyle,npChip} from './shopcos.js';
-import {makeWeaponModel} from './shared.js';
-import {thumb,fxPreview} from './preview.js';
 
 const TAU=Math.PI*2;
 const $=id=>document.getElementById(id);
@@ -29,27 +27,6 @@ export function cosInfo(id){
  const r=REWARDS.find(x=>x.id===id);if(r)return{id,name:r.name,icon:r.icon,desc:r.desc,rar:3,from:'pass',lvl:r.lvl};
  return null}
 export const REWARD_BY_ID=Object.fromEntries(REWARDS.map(r=>[r.id,r]));
-// the 3D model behind a cosmetic's picture: hats, backpacks, gliders and weapon finishes (null for anything else)
-function cosModel(id){
- const slot=FX_SLOT[id];
- if(slot==='ht')return id==='hat_puffcap'?makePuffcap():makeShopHat(id);
- if(slot==='pk')return id==='pk_root'?makeRootPack():id==='pk_glow'?makeGlowPack():makeShopPack(id);
- if(slot==='gl')return fungalGlider(id);
- if(slot==='wb'||slot==='wr'){
-  const w=WEAPONS.findIndex(x=>x.n===(slot==='wb'?'Fungal Blaster':'Root Shooter'));
-  return w<0?null:finishWeapon(makeWeaponModel(w,2),w,{fx:{[slot]:id}});
- }
- return null}
-// the picture of a cosmetic in a tile, card or Battle Pass slot: a 3D render, an effect loop or a nameplate chip.
-// '' when there is none, and the caller then shows the emoji.
-export function cosVisual(id){
- const slot=FX_SLOT[id];
- if(!slot)return '';
- if(slot==='fr')return npStyle(id)?npChip(id,'Player'):'';
- if(slot==='ld'||slot==='el')return fxPreview(id);
- const url=thumb(id,()=>cosModel(id));
- return url?`<img class="pv-3d" src="${url}" alt="">`:'';
-}
 // the bots wear some of it too, so a solo match shows it off
 export const BOT_FX=[['ht','hat_puffcap'],['pk','pk_root'],['pk','pk_glow'],['gl','gl_cloud'],['gl','gl_mushroom'],['gl','gl_roots'],['ld','land_ring'],['ld','land_burst'],['el','el_burst'],['el','el_bloom'],['fr','frame_spore'],...SHOP_COS.filter(c=>c.slot!=='tr').map(c=>[c.slot,c.id])];
 const known=(slot,id)=>!!id&&FX_SLOT[id]===slot;
@@ -435,7 +412,7 @@ export const cosAppMethods={
  // the picture on a locker tile
  cosPic(id){
   if(npStyle(id))return `<span class="npv">${npChip(id,this.profile.name||'Player')}</span>`;
-  const i=cosInfo(id);return cosVisual(id)||`<span class="emo">${i?i.icon:''}</span>`},
+  const i=cosInfo(id);return `<span class="emo">${i?i.icon:''}</span>`},
  // one group of tiles (a hat row, a glider row...): "None", then what you own, then what you don't
  cosSection(title,slot,ids){
   const P=this.profile,wrap=document.createElement('div');wrap.className='lk-sec';

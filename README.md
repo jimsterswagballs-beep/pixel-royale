@@ -1,16 +1,3 @@
-# Pixel Royale: v40 cosmetic and emote previews
-
-- **Previews instead of emoji**: the Item Shop, Locker and Battle Pass show what an item looks like, not just an icon.
-  - Hats, backpacks, gliders and weapon finishes: a 3D picture of the real model, rendered once in an offscreen WebGL canvas and cached (`thumb` in preview.js, `cosModel` and `cosVisual` in cosmetics.js). The models are the same builders the match uses.
-  - Landing and elimination effects: a looping CSS mini scene in the effect's own colours (`fxPreview`, table `FX`). Elimination effects show a little player who pops.
-  - Emotes: the player's own sprite does the emote's motion (`emotePreview`, CSS in style.css, classes `pv-*`). Best Weapon plays its video on hover (the video URL is only set on the first hover). Bart shows his art, sliding. The three victory poses animate too.
-  - Nameplates and sprint trails already had live previews and are unchanged.
-- **Fallback**: if WebGL is unavailable, or a picture cannot be drawn, the old emoji is shown.
-- **Where**: `shop.js` (cards and the Emote tab), `cosmetics.js` (locker tiles through `cosPic`), `pass.js` (reward icons, `pvw` boxes).
-- **Looks only**: nothing here changes stats, hit boxes, abilities or what the server decides.
-
-Known limits: this build was made without network access, so `three` and `esbuild` could not be installed, and nothing was run in a browser. Checked: JavaScript syntax of the changed files, and the preview HTML and fallback paths with a stand-in for `three`. Not checked: how the 3D pictures frame and light in the real game, the exact size of the CSS loops, and hover video in a live browser. Run `npm install` and `npm run build`, then open the Shop, the Locker (Accessories, Glider, Effects, Weapons, Emote) and the Battle Pass, and check each preview. The camera framing (`thumb`), the effect loop sizes (`.pv-fx`) and the Battle Pass box sizes (`.pvw`) are the first things to adjust if something looks off.
-
 # Pixel Royale: v39 Item Shop and Locker
 
 - **Item Shop** (shopcos.js, shop.js): 37 new cosmetics bought with Swag Tokens. 7 nameplates, 6 gliders, 5 backpacks, 6 hats, 4 landing effects, 4 elimination effects, 5 sprint trails. All data is in SHOP_COS in shopcos.js: add a line there and the shop, locker, saving and bots pick it up (a new 3D model or particle effect still needs a case in cosmetics.js).

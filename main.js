@@ -246,9 +246,6 @@ buildTitle(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
-    <section class="update-entry"><div class="date">NOVEMBER 24, 2026 · VERSION 2.2</div><h3>Previews</h3><ul>
-     <li><b>See before you buy</b>: hats, backpacks, gliders and weapon finishes show a 3D picture of the real item. Landing and elimination effects play a short loop. Emotes show your own character doing the move, Best Weapon plays its video while you hover, and Bart shows his art. Looks only, nothing changes stats.</li>
-    </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 24, 2026 · VERSION 2.1</div><h3>Bigger Item Shop, tidier Locker</h3><ul>
      <li><b>37 new Item Shop items</b>, bought with Swag Tokens: 7 nameplates, 6 gliders, 5 backpacks, 6 hats, 4 landing effects, 4 elimination effects and 5 sprint trails. All of them are looks only.</li>
      <li><b>Daily Featured row</b>: four items at 20% off that change every day. A filter bar at the top of the shop jumps to any kind of item, and you can equip what you own right from the shop.</li>

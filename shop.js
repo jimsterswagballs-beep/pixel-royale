@@ -6,14 +6,11 @@ import {IMG} from './shared.js';
 import {charArt} from './icons.js';
 import {EMOTE_LIST,EMOTE_BY,CHAR_PRICES,TOKENS} from './emote.js';
 import {SHOP_BY,SHOP_COS,SHOP_SECTIONS,featuredIds,priceOf,featuredResetIn,FEATURED_OFF,npStyle,npChip} from './shopcos.js';
-import {cosVisual} from './cosmetics.js';
-import {emotePreview} from './preview.js';
 
 const $=id=>document.getElementById(id);
 const h=html=>{const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstElementChild};
-const VICTORY_POSES=[['Flip-Flop','&#128378;','vflip'],['Victory Hop','&#127942;','vhop'],['Spin Cycle','&#127744;','vspin']];
+const VICTORY_POSES=[['Flip-Flop','&#128378;'],['Victory Hop','&#127942;'],['Spin Cycle','&#127744;']];
 const FILTERS=[['all','All'],['feat','Featured'],['chars','Characters'],['emotes','Emotes'],...SHOP_SECTIONS.map(x=>[x.key,x.title])];
-const heroFront=ch=>(IMG[ch]||IMG.coolguy15).front;
 const fmtLeft=sec=>{const hh=Math.floor(sec/3600),mm=Math.floor(sec%3600/60);return hh?hh+'h '+mm+'m':mm+'m'};
 
 export const shopMethods={
@@ -43,7 +40,7 @@ export const shopMethods={
  shopPic(c){
   if(npStyle(c.id))return `<span class="sh-np">${npChip(c.id,this.profile.name||'Player')}</span>`;
   if(c.slot==='tr')return `<span class="bp-trl" style="--c1:${c.c1};--c2:${c.c2}"><i></i><i></i><i></i><i></i></span>`;
-  return cosVisual(c.id)||`<span class="sh-ico">${c.icon}</span>`},
+  return `<span class="sh-ico">${c.icon}</span>`},
  shopCard(id,featured){
   const c=SHOP_BY[id],owned=this.owns('cos',id),rar=RARITY[Math.min(5,c.rar)],price=priceOf(id),on=this.shopEquipped(id);
   let act;
@@ -91,7 +88,7 @@ export const shopMethods={
     ${owned?'<div class="sh-own">Owned</div>':`<button class="btn play sm" data-buy="char:${id}">&#9670; ${CHAR_PRICES[id]}</button>`}</div>`}).join('');
   $('shEmotes').innerHTML=EMOTE_LIST.filter(d=>!d.bp).map(d=>{
    const owned=this.owns('emote',d.id);
-   const pic=emotePreview(d,heroFront(P.char));
+   const pic=d.img?`<img src="${d.img}" alt="">`:`<span class="sh-ico">${d.icon}</span>`;
    return `<div class="sh-card${owned?' owned':''}"><div class="sh-pic emo-pic">${pic}</div>
     <div class="sh-info"><b>${d.name}</b><small>${d.desc}</small></div>
     ${owned?'<div class="sh-own">Owned</div>':`<button class="btn play sm" data-buy="emote:${d.id}">&#9670; ${d.price}</button>`}</div>`}).join('');
@@ -111,7 +108,7 @@ export const shopMethods={
   const rc=i=>RARITY[Math.min(5,i+1)].c;
   EMOTE_LIST.forEach((d,i)=>{
    const owned=this.owns('emote',d.id);
-   const pic=emotePreview(d,heroFront(P.char));
+   const pic=d.img?`<img src="${d.img}" alt="" style="height:88%;image-rendering:auto">`:`<span class="emo">${d.icon}</span>`;
    box.appendChild(this.mkTile({rc:rc(i),pic,label:d.name+(owned?'':' &#128274;'),sel:P.equipEmote===d.id,fn:()=>{
     if(!owned){this.toast(d.bp?'Unlock it in the Battle Pass (level '+d.lvl+')':'Unlock it in the Shop first');this.sfx('empty');return}
     P.equipEmote=d.id;this.saveProfile();this.enter_locker()}}));
@@ -119,7 +116,7 @@ export const shopMethods={
   wrap.appendChild(box);
   wrap.appendChild(h(`<div class="k lk-sub" style="margin-top:22px">Victory pose · shown on the win screen</div>`));
   const pose=h(`<div class="tiles small"></div>`);
-  VICTORY_POSES.forEach(([name,ic,kind],i)=>pose.appendChild(this.mkTile({rc:rc(i+2),pic:emotePreview({kind},heroFront(P.char)),label:name,sel:P.emote===i,fn:()=>{P.emote=i;this.saveProfile();this.enter_locker()}})));
+  VICTORY_POSES.forEach(([name,ic],i)=>pose.appendChild(this.mkTile({rc:rc(i+2),pic:`<span class="emo">${ic}</span>`,label:name,sel:P.emote===i,fn:()=>{P.emote=i;this.saveProfile();this.enter_locker()}})));
   wrap.appendChild(pose);
   return wrap;
  }

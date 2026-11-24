@@ -2,9 +2,7 @@
 // and the cycling banner in the lobby. App methods (mixed into App in main.js).
 import {SEASON,BP_LEVELS,xpFor,xpTotal,levelOf,REWARDS,SKINS,TRAILS,TYPE_LABEL,SLIDES} from './season2.js';
 import {IMG} from './shared.js';
-import {FX_SLOT,cosVisual} from './cosmetics.js';
-import {EMOTE_BY} from './emote.js';
-import {emotePreview} from './preview.js';
+import {FX_SLOT} from './cosmetics.js';
 import {SHOP_BY} from './shopcos.js';
 import imgPass from './s2_pass.png';
 import imgSkins from './s2_skins.png';
@@ -73,9 +71,7 @@ export const passMethods={
  rewardPic(r,big){
   if(r.type==='skin')return `<img class="bp-sk" src="${IMG[r.skin].front}" alt="">`;
   if(r.type==='trail'){const t=TRAILS[r.id];return `<span class="bp-trl" style="--c1:${t.c1};--c2:${t.c2}"><i></i><i></i><i></i><i></i></span>`}
-  const hero=IMG[this.profile.char]?IMG[this.profile.char].front:'';
-  const ev=r.type==='emote'&&EMOTE_BY[r.id]?emotePreview(EMOTE_BY[r.id],hero):(cosVisual(r.id)||'');
-  return ev?`<span class="bp-ico pvw${big?' lg':''}">${ev}</span>`:`<span class="bp-ico${big?' lg':''}">${r.icon}</span>`;
+  return `<span class="bp-ico${big?' lg':''}">${r.icon}</span>`;
  },
  buildPass(){
   const p=$('pass');
