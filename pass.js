@@ -2,7 +2,8 @@
 // and the cycling banner in the lobby. App methods (mixed into App in main.js).
 import {SEASON,BP_LEVELS,xpFor,xpTotal,levelOf,REWARDS,SKINS,TRAILS,TYPE_LABEL,SLIDES} from './season2.js';
 import {IMG} from './shared.js';
-import {FX_SLOT} from './cosmetics.js';
+import {FX_SLOT,SHOP_ITEMS} from './cosmetics.js';
+import {pvSpan} from './previews.js';
 import imgPass from './s2_pass.png';
 import imgSkins from './s2_skins.png';
 import imgCorrupt from './s2_corrupt.png';
@@ -28,10 +29,11 @@ export const passMethods={
    if(r.type==='emote'&&!(P.ownedEmotes||(P.ownedEmotes=[])).includes(r.id))P.ownedEmotes.push(r.id)}
   // v38: equipped Battle Pass cosmetics (hat, backpack, glider, effects, finishes, nameplate) must be claimed and sit in the right slot
   P.eq=(P.eq&&typeof P.eq==='object')?P.eq:{};
-  for(const k of Object.keys(P.eq)){const id=P.eq[k],r=REWARDS.find(x=>x.id===id);if(!r||FX_SLOT[id]!==k||!P.bp.claimed.includes(r.lvl))delete P.eq[k]}
+  P.ownedCos=(Array.isArray(P.ownedCos)?P.ownedCos:[]).filter(id=>SHOP_ITEMS[id]);   // v39: things bought in the Item Shop
+  for(const k of Object.keys(P.eq)){const id=P.eq[k],r=REWARDS.find(x=>x.id===id);const ok=FX_SLOT[id]===k&&((r&&P.bp.claimed.includes(r.lvl))||(SHOP_ITEMS[id]&&P.ownedCos.includes(id)));if(!ok)delete P.eq[k]}
   P.skin=(P.skin&&typeof P.skin==='object')?P.skin:{};
   for(const c of Object.keys(P.skin)){const s=SKINS[P.skin[c]];if(!s||s.char!==c||!P.ownedSkins.includes(s.id))delete P.skin[c]}
-  if(P.trail&&String(P.trail).startsWith('bp:')&&!P.ownedTrails.includes(P.trail))P.trail='';
+  if(P.trail&&/^(bp|sh):/.test(String(P.trail))&&!P.ownedTrails.includes(P.trail))P.trail='';
   P.s2seen=+P.s2seen||0;
  },
  bpInfo(){return levelOf(this.profile.bp.xp)},
@@ -64,7 +66,9 @@ export const passMethods={
  // ---------- the Battle Pass screen
  rewardPic(r,big){
   if(r.type==='skin')return `<img class="bp-sk" src="${IMG[r.skin].front}" alt="">`;
-  if(r.type==='trail'){const t=TRAILS[r.id];return `<span class="bp-trl" style="--c1:${t.c1};--c2:${t.c2}"><i></i><i></i><i></i><i></i></span>`}
+  if(r.type==='trail')return pvSpan('trail:'+r.id,big?'big':'');
+  if(r.type==='emote')return pvSpan('emote:'+r.id,big?'big':'');
+  if(FX_SLOT[r.id])return pvSpan('cos:'+r.id,big?'big':'');
   return `<span class="bp-ico${big?' lg':''}">${r.icon}</span>`;
  },
  buildPass(){
@@ -107,7 +111,7 @@ export const passMethods={
    c.onclick=()=>{this.sfx('click');this.bpSel=r.lvl;this.passRender()};
    tr.appendChild(c)}
   if(center){const sel=tr.querySelector('.sel');if(sel)tr.scrollLeft=Math.max(0,sel.offsetLeft-tr.clientWidth/2+sel.offsetWidth/2)}else tr.scrollLeft=keep;
-  this.passPreview();
+  this.passPreview();this.pvMount($('bpTrack'),104);
  },
  passPreview(){
   const P=this.profile,I=this.bpInfo(),r=REWARDS.find(x=>x.lvl===this.bpSel)||REWARDS[0];
@@ -134,6 +138,7 @@ export const passMethods={
    else if(a==='cos'){const k=FX_SLOT[r.id];this.equipCos(k,(this.profile.eq||{})[k]===r.id?'':r.id);this.sfx('ui');this.updateNav('pass')}
    else if(a==='emote'){this.profile.equipEmote=this.profile.equipEmote===r.id?'':r.id;this.saveProfile();this.sfx('ui')}
    this.passRender()};
+  this.pvMount(el);
  },
 
  // ---------- the locker: skins under the character picker, battle pass trails with the colour trails

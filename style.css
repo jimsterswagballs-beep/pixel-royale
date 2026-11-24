@@ -976,3 +976,42 @@ body.mobile.tp #touchUI{display:block}
 /* ---- v38: Spore Nameplate (Battle Pass level 1): a mossy plate behind the name */
 .np-spore{display:inline-block;padding:1px 12px;border-radius:9px;border:1px solid rgba(190,255,140,.85);
  background:linear-gradient(180deg,rgba(120,170,60,.8),rgba(50,90,40,.85));text-shadow:0 1px 2px rgba(0,0,0,.7);box-shadow:0 0 8px rgba(150,255,110,.35),inset 0 0 6px rgba(20,50,20,.5)}
+
+/* ===== v39: previews, the reorganised Locker and the bigger Item Shop ===== */
+.pv{display:flex;align-items:center;justify-content:center;width:100%;height:100%;min-height:0}
+.pv-c,.pv-img{max-width:100%;max-height:100%;width:auto;height:100%;object-fit:contain;image-rendering:auto}
+.tile .tp .pv-img,.sh-pic .pv-img{height:100%;image-rendering:auto;filter:drop-shadow(0 6px 6px rgba(0,0,0,.45))}
+.pv-plate{width:94%;height:auto;image-rendering:auto}
+.pv-emo{position:relative;width:100%;height:100%;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
+.pv-char{height:76%;width:auto;image-rendering:pixelated;transform-origin:50% 90%;will-change:transform}
+.pv-bart{height:94%;width:auto;image-rendering:auto;transform-origin:50% 90%}
+.pv-vid{width:100%;height:100%;object-fit:cover}
+.tile .tp .pv-c{height:100%}
+.tile .tn small.tl,.bp-nm small.tl{display:block;font:700 11px var(--ui,system-ui);letter-spacing:.3px;text-transform:none;color:#ffd84a;margin-top:2px}
+.lk-sec{display:flex;align-items:baseline;gap:10px;margin:22px 0 10px}.lk-sec:first-child{margin-top:0}
+.lk-sec .cnt,.sh-sec .k .cnt{font:700 12px var(--ui,system-ui);color:#8ea6e8;letter-spacing:.4px;text-transform:none;margin-left:10px}
+#lkCats{flex-wrap:wrap;row-gap:0}
+#lkCats .cat{padding:8px 14px 10px;font-size:15px}
+.sh-chips{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px;position:sticky;top:0;z-index:5;padding:8px 0;background:linear-gradient(#0a1030 60%,transparent)}
+.sh-chips .chip{cursor:pointer;color:#cfe0ff}.sh-chips .chip.sel{color:#fff;background:rgba(80,160,255,.45);border-color:#fff}
+.sh-pic{height:168px;position:relative}
+.sh-pic .pv{height:100%}
+.sh-pic.char{align-items:flex-end}.sh-pic.char .cart{position:absolute;inset:0;background-size:cover;background-position:center}.sh-pic.char img{position:relative;z-index:1}
+.sh-pic.emo-pic .pv{align-items:flex-end}
+.sh-card.focus{border-color:#ffd23d;box-shadow:0 0 0 3px #ffd23d,0 0 30px rgba(255,210,61,.6);animation:shfocus 1.6s ease-out 2}
+@keyframes shfocus{50%{box-shadow:0 0 0 3px #fff,0 0 40px rgba(255,255,255,.8)}}
+.sh-info small{display:block;margin-top:3px;line-height:1.25}
+.tile .tp{padding:6px}
+/* nameplates in the lobby and locker: one look per plate */
+.np-gold,.np-neon,.np-pixel,.np-flame,.np-ice{display:inline-block;padding:1px 12px;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.np-gold{border-radius:6px;border:1px solid #fff3b0;background:linear-gradient(180deg,#ffe27a,#c8901a);color:#3a2600;text-shadow:none;box-shadow:0 0 8px rgba(255,210,80,.5)}
+.np-neon{border-radius:8px;border:2px solid #00e5ff;background:rgba(8,6,30,.8);box-shadow:0 0 10px #00e5ff,inset 0 0 8px #ff3ad0}
+.np-pixel{border:3px dashed #ffd23d;background:#10102a;border-radius:0}
+.np-flame{border-radius:6px;border:1px solid #ffd23d;background:linear-gradient(180deg,#ff9a1a,#a01800);box-shadow:0 -6px 10px -4px #ff7a1a}
+.np-ice{border-radius:6px;border:1px solid #fff;background:linear-gradient(180deg,#e8f8ff,#6ab8e8);color:#103a5a;text-shadow:none;box-shadow:0 0 8px rgba(160,230,255,.6)}
+.bp-pic .pv,.bp-stage .pv{height:100%}.bp-stage .pv.big{min-height:170px}
+.tile.locked{filter:brightness(.88) saturate(.8)}
+.tile.locked .tn{background:rgba(2,6,30,.95)}
+
+/* ===== v40: forecast line (weather) ===== */
+#wxTag{position:fixed;left:50%;top:auto;bottom:14px;transform:translateX(-50%);z-index:20;pointer-events:none;display:none;padding:6px 14px;border-radius:999px;background:rgba(6,10,30,.72);border:1px solid rgba(160,200,255,.35);color:#e6f0ff;font:800 13px/1.2 system-ui,Arial,sans-serif;letter-spacing:.3px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,.35)}

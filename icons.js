@@ -5,6 +5,8 @@ const icon=(a,b,body)=>uri(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
 const flake=(cx,cy,r,col,w)=>[0,60,120].map(a=>`<line x1="${cx}" y1="${cy-r}" x2="${cx}" y2="${cy+r}" transform="rotate(${a} ${cx} ${cy})" stroke="${col}" stroke-width="${w}" stroke-linecap="round"/>`).join('');
 
 export const ICON={
+ // ---- Cal's passive: Thick Skin (a shield badge)
+ tough:icon('#3a1410','#8a2a20',`<path d="M32 13l16 6v12c0 11-7 19-16 22-9-3-16-11-16-22V19z" fill="#ffd0c8" stroke="#fff" stroke-width="2"/><path d="M32 22v20" stroke="#8a2a20" stroke-width="3" stroke-linecap="round"/>`),
  // ---- Chill Guy (ice / stealth)
  disappear:icon('#0d1e3d','#1b5a86',
   `<path d="M20 50V28c0-8 5-14 12-14s12 6 12 14v22" fill="none" stroke="#e8fbff" stroke-width="3" stroke-dasharray="5 4" stroke-linecap="round"/>
@@ -41,6 +43,9 @@ export const ICON={
 // ----- selection artwork (portrait scenes that sit behind the character sprite) -----
 const dots=(n,seed,w,h,col,rmin,rmax)=>{let s=seed,o='';const r=()=>{s=(s*16807)%2147483647;return s/2147483647};for(let i=0;i<n;i++)o+=`<circle cx="${(r()*w).toFixed(0)}" cy="${(r()*h).toFixed(0)}" r="${(rmin+r()*(rmax-rmin)).toFixed(1)}" fill="${col}" opacity="${(.25+r()*.6).toFixed(2)}"/>`;return o};
 const ART={
+ // Doran (v41): a fresh-green backdrop; his own pixel picture is drawn on top by the <img> in each tile
+ cal:()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="a" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#ffe0d8"/><stop offset=".55" stop-color="#e8473a"/><stop offset="1" stop-color="#4a0f0a"/></radialGradient></defs><rect width="600" height="800" fill="url(#a)"/><g fill="#ffffff" opacity=".2"><circle cx="90" cy="120" r="24"/><circle cx="520" cy="220" r="18"/><circle cx="510" cy="650" r="28"/><circle cx="100" cy="700" r="20"/></g></svg>`,
+ doran:()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice"><defs><radialGradient id="a" cx=".5" cy=".5" r=".7"><stop offset="0" stop-color="#e9ffd6"/><stop offset=".55" stop-color="#6fd46a"/><stop offset="1" stop-color="#1d4a24"/></radialGradient></defs><rect width="600" height="800" fill="url(#a)"/><g fill="#ffffff" opacity=".22"><circle cx="90" cy="110" r="26"/><circle cx="520" cy="200" r="18"/><circle cx="500" cy="640" r="30"/><circle cx="110" cy="690" r="20"/></g></svg>`,
  chillguy:()=>`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" preserveAspectRatio="xMidYMid slice">
   <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#050a1c"/><stop offset=".55" stop-color="#0b3556"/><stop offset="1" stop-color="#58c6e8"/></linearGradient>
   <radialGradient id="moon" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffffff"/><stop offset=".6" stop-color="#d6f6ff"/><stop offset="1" stop-color="#9be0ff" stop-opacity="0"/></radialGradient>

@@ -19,8 +19,15 @@ export const EMOTE_LIST=[
  {id:'emote_dance',name:'Spore Dance',bp:1,lvl:5,kind:'sdance',dur:12,sfx:'spore',icon:'\u{1F483}',desc:'Dance in a swirl of glowing spores.'},
  {id:'emote_rise',name:'Mycelium Rise',bp:1,lvl:15,kind:'rise',dur:14,sfx:'pod',icon:'\u{1F331}',desc:'Four stages: roots creep in, you rise, mushrooms sprout, then a burst of spores.'}
 ];
+// v39 Item Shop emotes (same motions as the Battle Pass ones, drawn in cosmetics.js)
+EMOTE_LIST.push(
+ {id:'emote_spin',name:'Whirl',price:350,kind:'spin',dur:5,sfx:'fun',icon:'\u{1F300}',desc:'Spin round and round on the spot.'},
+ {id:'emote_joy',name:'Happy Jump',price:400,kind:'joy',dur:6,sfx:'bell',icon:'\u{1F389}',desc:'Squash, stretch and jump for joy.'},
+ {id:'emote_shake',name:'Shake It',price:500,kind:'shake',dur:5,sfx:'fun',icon:'\u{1F4F3}',desc:'Wobble and shake like a maraca.'}
+);
+export const COS_KINDS=new Set(['sdance','rise','spin','joy','shake']);
 export const EMOTE_BY=Object.fromEntries(EMOTE_LIST.map(e=>[e.id,e]));
-export const CHAR_PRICES={chillguy:900,jay:900};
+export const CHAR_PRICES={chillguy:900,jay:900,cal:1200};   // v41: Cal costs 1200 Swag Tokens
 export const TOKENS={kill:15,perMinute:2,top10:25,win:100,played:10};
 
 let bartTex=null;
@@ -28,6 +35,17 @@ function bartTexture(){if(!bartTex){bartTex=new THREE.TextureLoader().load(BART)
 // the fullscreen overlay is used only for the local player's Best Weapon video
 function showFullscreen(v){let o=document.getElementById('emoteFull');if(!o){o=document.createElement('div');o.id='emoteFull';document.body.appendChild(o)}o.appendChild(v);o.style.display='block'}
 function hideFullscreen(v){const o=document.getElementById('emoteFull');if(!o)return;if(v&&v.parentNode===o)o.removeChild(v);o.style.display='none'}
+
+// the sprite offsets of an emote t seconds in (menus use this for previews; the game's emoteAnim does the same plus particles)
+export function emoteRig(d,t){
+ const R={py:0,rz:0,sx:1,sy:1,px:0,asp:1};
+ if(d.kind==='video')R.asp=d.asp;
+ else if(d.kind==='bart'){R.asp=d.asp;R.px=Math.sin(t*3.1)*.85;R.rz=Math.cos(t*3.1)*.14;R.py=Math.abs(Math.sin(t*6.2))*.06}
+ else if(d.kind==='hop'){R.py=Math.abs(Math.sin(t*5.5))*.9;R.rz=Math.sin(t*5.5)*.08;const ph=t%2.6;if(ph<.7)R.sx=Math.abs(Math.cos(ph/.7*Math.PI))}
+ else if(d.kind==='dab'){const k=Math.min(1,t/.25);R.rz=-.5*k;R.px=-.25*k;R.py=.05*k}
+ else if(d.kind==='floss'){R.px=Math.sin(t*9)*.3;R.rz=Math.sin(t*9)*.22;R.py=Math.abs(Math.sin(t*9))*.12}
+ else if(COS_KINDS.has(d.kind))cosEmoteAnim(d,t,R);
+ return R}
 
 export const emoteMethods={
  // local player: the emote key starts the equipped emote, or cancels one that is playing
@@ -85,7 +103,7 @@ export const emoteMethods={
   else if(d.kind==='hop'){R.py=Math.abs(Math.sin(t*5.5))*.9;R.rz=Math.sin(t*5.5)*.08;const ph=t%2.6;if(ph<.7)R.sx=Math.abs(Math.cos(ph/.7*Math.PI))}
   else if(d.kind==='dab'){const k=Math.min(1,t/.25);R.rz=-.5*k;R.px=-.25*k;R.py=.05*k}
   else if(d.kind==='floss'){R.px=Math.sin(t*9)*.3;R.rz=Math.sin(t*9)*.22;R.py=Math.abs(Math.sin(t*9))*.12}
-  else if(d.kind==='sdance'||d.kind==='rise'){cosEmoteAnim(d,t,R);this.emoteExtra(e,em,t)}
+  else if(COS_KINDS.has(d.kind)){cosEmoteAnim(d,t,R);if(d.kind==='sdance'||d.kind==='rise')this.emoteExtra(e,em,t)}
   s.plane.scale.x=R.asp;
   return R;
  },

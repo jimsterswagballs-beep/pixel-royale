@@ -26,8 +26,8 @@ function makeShockMesh(){
  const bolt=new THREE.Mesh(new THREE.ConeGeometry(.1,.3,4),new THREE.MeshBasicMaterial({color:'#fff3a0'}));bolt.position.y=.27;g.add(bolt);
  return g}
 export const combatMethods={
- packFlags(e){return (e.crouch?1:0)|(e.sliding?2:0)|(e.sprinting?4:0)|(e.grounded?8:0)|(e.drop==='free'?16:0)|(e.drop==='glide'?32:0)|(e.drop==='bus'?64:0)|(e.use||e.eatT>0?128:0)|(e.stun>0?256:0)|(e.auraT>0?512:0)|((e.buffT>0||e.ts>0)?1024:0)|(e.dance>0?2048:0)|(e.slip>0?8192:0)|(e.swim?16384:0)|(e.cloakT>0?4096:0)|(e.coldT>0?32768:0)|(e.slowT>0?65536:0)|(e.cookT>0?131072:0)|(e.spicyT>0?262144:0)|(e.knocked?524288:0)},
- unpackFlags(e,f){e.flags=f;e.crouch=!!(f&1);e.sliding=!!(f&2);e.sprinting=!!(f&4);e.grounded=!!(f&8);e.drop=(f&16)?'free':(f&32)?'glide':(f&64)?'bus':null;e.eatT=(f&128)?1:0;e.stun=(f&256)?1:0;e.auraT=(f&512)?1:0;e.buffT=(f&1024)?1:0;e.dance=(f&2048)?1:0;e.slip=(f&8192)?1:0;e.swim=!!(f&16384);e.cloakT=(f&4096)?1:0;e.coldT=(f&32768)?1:0;e.slowT=(f&65536)?1:0;e.cookT=(f&131072)?1:0;e.spicyT=(f&262144)?1:0;e.knocked=!!(f&524288)},
+ packFlags(e){return (e.crouch?1:0)|(e.sliding?2:0)|(e.sprinting?4:0)|(e.grounded?8:0)|(e.drop==='free'?16:0)|(e.drop==='glide'?32:0)|(e.drop==='bus'?64:0)|(e.use||e.eatT>0?128:0)|(e.stun>0?256:0)|(e.auraT>0?512:0)|((e.buffT>0||e.ts>0)?1024:0)|(e.dance>0?2048:0)|(e.slip>0?8192:0)|(e.swim?16384:0)|(e.cloakT>0?4096:0)|(e.coldT>0?32768:0)|(e.slowT>0?65536:0)|(e.cookT>0?131072:0)|(e.spicyT>0?262144:0)|(e.knocked?524288:0)|(e.dive?1048576:0)},
+ unpackFlags(e,f){e.flags=f;e.crouch=!!(f&1);e.sliding=!!(f&2);e.sprinting=!!(f&4);e.grounded=!!(f&8);e.drop=(f&16)?'free':(f&32)?'glide':(f&64)?'bus':null;e.eatT=(f&128)?1:0;e.stun=(f&256)?1:0;e.auraT=(f&512)?1:0;e.buffT=(f&1024)?1:0;e.dance=(f&2048)?1:0;e.slip=(f&8192)?1:0;e.swim=!!(f&16384);e.cloakT=(f&4096)?1:0;e.coldT=(f&32768)?1:0;e.slowT=(f&65536)?1:0;e.cookT=(f&131072)?1:0;e.spicyT=(f&262144)?1:0;e.knocked=!!(f&524288);e.dive=!!(f&1048576)},
  eyeOf(e){return e.pos.y+(e.sliding?.85:e.crouch?1.1:1.65)},
  curWeapon(e){const c=e.inv[e.cur];return c&&c.k==='w'?wstat(c.w,c.r):null},
  hbH(e){return (e.crouch||e.sliding)?HCROUCH:HSTAND},
@@ -178,6 +178,7 @@ export const combatMethods={
  damage(t,amount,by,wid,head,pos,quiet){
   if(this.role==='client'||!t.alive||t.drop==='bus')return;
   if(by&&by!==t&&(by.bot)){amount*=this.botDmg}
+  if(t.cdef&&t.cdef.id==='cal')amount*=.9;           // Cal's Thick Skin passive: 10% less damage from everything
   if(amount<=0)return;
   if(t.emote)this.stopEmote(t);
   let rem=amount,shHit=0;
@@ -209,13 +210,39 @@ export const combatMethods={
  // place for someone who just went out: one more than the number of teams still standing
  placeOf(t){const teams=new Set(this.list.filter(e=>e.alive&&!e.knocked&&e!==t).map(e=>e.team));return teams.size+1},
  // ================= abilities
+ // Doran's three abilities: the owner's machine starts the local part, and the host applies the effects
+ doranUse(e,i,net){
+  const x=e.pos.x,y=e.pos.y,z=e.pos.z,yaw=e.yaw;
+  if(i===2){e.dash={vx:-Math.sin(yaw)*22,vz:-Math.cos(yaw)*22,t:.22,kind:'dodge'};e.vel.y=Math.max(e.vel.y,3);e.grounded=false}
+  if(e.local){
+   this.audio.play('ab');
+   if(i===0){this.view.shake=Math.max(this.view.shake,.25);this.hud.toast('HONK!','#9cf07a')}
+   else if(i===1)this.hud.toast('Snack Break','#6cff8a');
+  }
+  this.fx.ring(e.pos,i===0?7:3,'#6fd46a',.4);
+  if(net)this.net.toHost({t:'ab',i,x,y,z,yaw,pt:e.pitch});else this.abilityEffect(e,i,x,y,z,yaw);
+ },
+ // Cal's three abilities (offence and tank, no healing). Same split as Doran: local start, host effects.
+ calUse(e,i,net){
+  const x=e.pos.x,y=e.pos.y,z=e.pos.z,yaw=e.yaw;
+  if(e.local){
+   this.audio.play('ab');
+   if(i===0)this.hud.toast('Brace!','#c9d4ff');
+   else if(i===1){this.view.shake=Math.max(this.view.shake,.35);this.hud.toast('STOMP!','#ffb347')}
+   else this.hud.toast('RAGE!','#ff5a4a');
+  }
+  this.fx.ring(e.pos,i===1?5:3,i===2?'#ff5a4a':'#c9d4ff',.4);
+  if(net)this.net.toHost({t:'ab',i,x,y,z,yaw,pt:e.pitch});else this.abilityEffect(e,i,x,y,z,yaw);
+ },
  useAbility(e,i){
   if(!e.alive||e.drop||e.cd[i]>0||e.stun>0||e.emote||e.slip>0||e.dance>0||e.eatT>0||e.cookT>0||e.use)return false;
   const ab=e.cdef.ab[i];const z=e.cdef.id==='zach';
   if(e.cdef.hero)return this.useHeroAbility(e,i,ab);
   const net=this.role==='client'&&e.local;
   e.cd[i]=ab.cd;e.sliding=false;
-  if(!z){
+  if(e.cdef.id==='doran')this.doranUse(e,i,net);     // v41: Doran's kit (Honk Blast, Snack Break, Scoot)
+  else if(e.cdef.id==='cal')this.calUse(e,i,net);    // v41: Cal's kit (Brace, Stomp Shock, Rage)
+  else if(!z){
    if(i===0){e.vel.set(e.vel.x*.3,15,e.vel.z*.3);e.grounded=false;e.slamming=true;e.slamWait=.35;e.pos.y+=.1;if(e.local){this.audio.play('ab');this.view.shake=.3}this.fx.ring(e.pos,3,'#6ec6ff',.4)}
    if(i===1){e.auraT=3;if(e.local)this.audio.play('ab');this.fx.burst(e.pos.x,e.pos.y+1,e.pos.z,30,5,'#5ab8ff',.6)}
    if(i===2){const bx=Math.sin(e.yaw),bz=Math.cos(e.yaw);e.dash={vx:bx*26,vz:bz*26,t:.22,kind:'dodge'};e.vel.y=Math.max(e.vel.y,3);e.grounded=false;if(e.local)this.audio.play('ab');
@@ -233,6 +260,23 @@ export const combatMethods={
  // host-side authoritative effects
  abilityEffect(e,i,x,y,z,yaw,extra){
   const cid=e.cdef.id;if(e.cdef.hero){this.heroEffect(e,i,x,y,z,yaw,extra);return}
+  if(cid==='doran'){
+   if(i===0){ // Honk Blast: a burst that pushes back everyone close by and does 8 damage
+    this.emit({k:'burst',x,y,z});this.emit({k:'snd',n:'ab',p:[x,y,z]});
+    for(const t of this.list){if(t===e||!t.alive||t.drop==='bus'||this.isAlly(e,t))continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d<7&&Math.abs(t.pos.y-y)<3){this.damage(t,8,e,-28,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*12,vy:4,vz:dz/l*12},t.id)}}}
+   else if(i===1){ // Snack Break: heal 15 HP
+    const h=Math.min(15,e.maxHp-e.hp);if(h>0)this.healEnt(e,h,0);this.fx.burst(x,y+1.2,z,20,3,'#6cff8a',.8,-3)}
+   // Scoot (i===2) is only a dash, which the owner's machine already started
+   return;
+  }
+  if(cid==='cal'){
+   if(i===0){e.ts=30;e.tsT=4;this.fx.burst(x,y+1,z,20,3,'#c9d4ff',.6);this.emit({k:'snd',n:'ab',p:[x,y,z]})}
+   else if(i===1){ // Stomp Shock: 16 damage and a knock back within 5 m
+    this.emit({k:'burst',x,y,z});this.emit({k:'snd',n:'ab',p:[x,y,z]});
+    for(const t of this.list){if(t===e||!t.alive||t.drop==='bus'||this.isAlly(e,t))continue;const dx=t.pos.x-x,dz=t.pos.z-z,d=Math.hypot(dx,dz);if(d<5&&Math.abs(t.pos.y-y)<3){this.damage(t,16,e,-29,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*12,vy:5,vz:dz/l*12},t.id)}}}
+   else{e.rageT=5;this.fx.burst(x,y+1,z,24,4,'#ff5a4a',.6);this.emit({k:'snd',n:'ab',p:[x,y,z]})} // Rage: +50% damage for 5 s
+   return;
+  }
   if(cid==='coolguy15'&&i===2){
    const bx=x,bz=z;this.emit({k:'burst',x:bx,y,z:bz});
    for(const t of this.list){if(t===e||!t.alive||t.drop==='bus'||this.isAlly(e,t))continue;const dx=t.pos.x-bx,dz=t.pos.z-bz,d=Math.hypot(dx,dz);if(d<4.5&&Math.abs(t.pos.y-y)<3){this.damage(t,14,e,-2,false);const l=d||1;this.emit({k:'st',i:t.id,s:'kb',vx:dx/l*16,vy:5,vz:dz/l*16},t.id)}}}
@@ -256,6 +300,7 @@ export const combatMethods={
  // timers on abilities run for every shooter (host side) – eat heal / bite resolution
  abilityTick(e,dt){
   this.heroTick(e,dt);
+  if(e.rageT>0)e.rageT=Math.max(0,e.rageT-dt);     // Cal's Rage timer
   if(e.eatHeal&&e.eatT<=0){e.eatHeal=false;const h=e.maxHp*.2;this.healEnt(e,Math.min(h,e.maxHp-e.hp),0);this.fx.burst(e.pos.x,e.pos.y+1.2,e.pos.z,20,3,'#6cff8a',.8,-3);if(e.local)this.hud.toast('+'+Math.round(h)+' HP','#8cff9a')}
   if(e.biteTarget!==undefined&&e.biteTarget!==null&&this.t>=e.biteAt&&this.role!=='client'){const t=this.ents.get(e.biteTarget);e.biteTarget=null;if(t&&t.alive){this.damage(t,t.maxHp*.2,e,-4,false);this.emit({k:'bite',t:t.id})}}},
  // ================= projectiles

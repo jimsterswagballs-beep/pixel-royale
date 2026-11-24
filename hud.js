@@ -8,7 +8,7 @@ import {REVIVE_T,REVIVE_RANGE,KNOCK_HP,CARD_T,VAN_T,VAN_READY,VAN_ACTIVE} from '
 
 // one glyph per weapon type and per ability, used in the loadout and ability cards
 const WICON={melee:'⛏',ar:'🔫',smg:'🔫',sg:'💥',sn:'🎯',pi:'🔫',ex:'🚀'};
-const ABIL_ICON={'Ground Slam':'💥','Overdrive Aura':'⚡','Energy Dodge':'💨','Burger Break':'🍔','Chomp Lunge':'🦷','Sugar Rush':'🍬'};
+const ABIL_ICON={'Ground Slam':'💥','Overdrive Aura':'⚡','Energy Dodge':'💨','Burger Break':'🍔','Chomp Lunge':'🦷','Sugar Rush':'🍬','Honk Blast':'📣','Snack Break':'🥪','Scoot':'🛴','Brace':'🛡️','Stomp Shock':'🦶','Rage':'😤'};
 const $=id=>document.getElementById(id);
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!==undefined)e.innerHTML=h;return e};
 export const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -160,14 +160,19 @@ export class HUD{
    const k=b.map(x=>x[0]).join('|');const bf=this.q('#buffs');if(bf.dataset.k!==k||me.cloakT>0||me.coldT>0){bf.dataset.k=k;bf.innerHTML=b.map(x=>`<span class="bf" style="color:${x[1]}">${x[0]}</span>`).join('')}this.q('#stealth').classList.toggle('on',me.cloakT>0&&me.alive)}
   // crosshair
   const wd=g.curWeapon(me);const c=this.q('#cross');const sp=Math.hypot(me.vel.x,me.vel.z);
-  let gap=6+(wd?wd.sp*600:0)*(me.aiming?.4:1)+sp*.7+me.bloom*250+(g.view.recoilP*220);c.style.setProperty('--g',gap+'px');c.classList.toggle('ads',g.view.adsK>.5&&!!wd);c.style.opacity=(me.alive&&me.drop===null&&!(wd&&wd.zoom>=3&&g.view.adsK>.3)&&cur&&!(cur.k==='i'))?'1':(cur&&cur.k==='i'&&me.drop===null?'.8':'0');
+  // crosshair bloom (v40): the cross opens to the real spread of your next shot (moving, in the air, firing bloom, recoil),
+  // then springs shut. Same spread formula as combat.js fireWeapon, so what you see is what the bullet does.
+  const spread=wd?wd.sp*(me.aiming?.3:1)*(1+Math.min(sp,9)*.05)*(me.grounded?1:2)*(me.crouch?.75:1)+me.bloom*.5:0;
+  const target=6+spread*600+(me.grounded?0:5)+g.view.recoilP*220;
+  this.xg=this.xg==null?target:this.xg+(target-this.xg)*Math.min(1,dt*(target>this.xg?20:7));
+  const gap=this.xg;c.style.setProperty('--g',gap+'px');c.classList.toggle('ads',g.view.adsK>.5&&!!wd);c.style.opacity=(me.alive&&me.drop===null&&!(wd&&wd.zoom>=3&&g.view.adsK>.3)&&cur&&!(cur.k==='i'))?'1':(cur&&cur.k==='i'&&me.drop===null?'.8':'0');
   this.q('#scope').style.display=this.scope?'block':'none';
   // vignette storm
   const inS=g.insideStorm(tgt.pos.x,tgt.pos.z);this.q('#vig').classList.toggle('storm',!inS);
   this.carHud(g,me,B);
   this.chaosHud(g);
   // bus hint
-  const bh=this.q('#busHint');if(me.drop==='bus'&&me.alive){bh.style.display='block';bh.innerHTML=`Press <b>${keyLabel(B.jump)}</b> to jump from the Battle Bus`}else if(me.drop==='free'||me.drop==='glide'){bh.style.display='block';bh.innerHTML=me.drop==='free'?`Dive with <b>${keyLabel(B.fwd)}</b> + look down · glider auto-deploys low`:'Gliding…';if(me.drop==='free'&&performance.now()%1e9<1e12)bh.innerHTML+=` · <b>${keyLabel(B.jump)}</b> deploys early`}else bh.style.display='none';
+  const bh=this.q('#busHint');const alt=g.dropAlt|0,J=keyLabel(B.jump),C=keyLabel(B.crouch);if(me.drop==='bus'&&me.alive){bh.style.display='block';bh.innerHTML=`Press <b>${J}</b> to jump from the Battle Bus · the gold ring is where you land`}else if(me.drop==='free'||me.drop==='glide'){bh.style.display='block';bh.innerHTML=me.drop==='free'?`Altitude <b>${alt} m</b> · <b>${J}</b> opens your glider early · it opens by itself below 95 m`:me.dive?`Diving <b>${alt} m</b> · press <b>${J}</b> to redeploy the glider`:`Gliding <b>${alt} m</b> · <b>${C}</b> to dive · <b>${J}</b> to redeploy after a dive`;if(me.drop==='free'&&performance.now()%1e9<1e12)bh.innerHTML+=` · <b>${keyLabel(B.jump)}</b> deploys early`}else bh.style.display='none';
   if(!me.alive&&!g.over){bh.style.display='block';bh.innerHTML=`Spectating <b>${tgt.name}</b> · <b>${keyLabel(B.spec)}</b> next player`}
   // damage numbers
   const cam=g.camera;for(const d of this.dmgNums){d.t+=dt;const v=d.p.clone().project(cam);if(v.z>1){d.n.style.display='none';continue}d.n.style.display='block';const S=this.scale;d.n.style.left=((v.x*.5+.5)*innerWidth+d.dx*d.t)/S+'px';d.n.style.top=((-v.y*.5+.5)*innerHeight-d.t*60)/S+'px';d.n.style.opacity=Math.max(0,1-d.t/.9)}

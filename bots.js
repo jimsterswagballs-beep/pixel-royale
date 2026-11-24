@@ -64,6 +64,7 @@ export const botMethods={
   else{let tot=0;const ws=W.POIS.map(po=>{const w=dw?(dw[po.type]||1):1;tot+=w;return w});let r=Math.random()*tot,pi=0;for(let i=0;i<ws.length;i++){r-=ws[i];if(r<=0){pi=i;break}}
    const po=W.POIS[pi],a=Math.random()*6.283,rad=Math.random()*po.r*.6;tgt={x:po.x+Math.cos(a)*rad,z:po.z+Math.sin(a)*rad}}
   e.ai.dropTgt=tgt;e.ai.dropAt=Math.random()*.4+.05;
+  e.ai.exitS=this.busExitFor(tgt,60);   // v42: jump at the point on the bus route whose fall lands near the target
   e.persona=key},
  botCfg(){return DIFF[this.diff]||DIFF.Normal},
  inZoneAt(x,z,m=0){const s=this.storm;if(Math.hypot(x-s.cx,z-s.cz)>s.r-m)return false;const nz=this.nextZone();if(nz&&Math.hypot(x-nz.x,z-nz.z)>nz.r-m)return false;return true},
@@ -168,14 +169,20 @@ export const botMethods={
   else if(ai.stuck===3){const a=Math.random()*6.283,r=rr(7,14);const x=P.x+Math.cos(a)*r,z=P.z+Math.sin(a)*r;if(NAV.walkable(x,z)){this.setGoal(e,x,z,1.5,'unstick');ai.unstickUntil=this.t+4}}
   else{if(ai.lootT){ai.lootFail.set(ai.lootT.id,this.t);ai.lootT=null}this.clearGoal(e);ai.forceJump=true;ai.think=0}},
  // ------------------------------------------------------------------ per-frame body
+ // where along the bus route (distance from the start) to jump so the fall lands closest to tgt. It uses the same
+ // fall as the player's drop (predictLanding), and spread adds a little random so bots don't all land on one spot.
+ busExitFor(tgt,spread){
+  const b=this.bus;let best=60,bd=1e9;
+  for(let s=60;s<=b.len-30;s+=15){
+   const land=this.predictLanding(new THREE.Vector3(b.sx+b.dx*s,b.y,b.sz+b.dz*s),new THREE.Vector3(b.dx*b.speed*.6,-2,b.dz*b.speed*.6),false);
+   const d=Math.hypot(land.x-tgt.x,land.z-tgt.z);if(d<bd){bd=d;best=s}}
+  return Math.max(60,best+(Math.random()-.5)*spread)},
  botTick(e,dt){
   const ai=e.ai,cfg=this.botCfg(),pe=ai.p,P=e.pos,t=this.t;
   const inp={f:0,s:0,jump:false,jumpP:false,sprint:false,crouch:false,crouchP:false};
   const c={fire:false,firePressed:false,reload:false,aim:false,cancel:false,aimErr:cfg.err*pe.aim};
   if(e.drop==='bus'){
-   const d=Math.hypot(this.bus.pos.x-ai.dropTgt.x,this.bus.pos.z-ai.dropTgt.z);
-   const passed=this.bus.t*this.bus.speed>60;
-   if(passed&&(d<ai.dropAt*220+60||this.bus.t*this.bus.speed>this.bus.len-30)){this.leaveBus(e);e.vel.x*=.4;e.vel.z*=.4}
+   if(this.bus.t*this.bus.speed>=ai.exitS||this.bus.t*this.bus.speed>this.bus.len-30){this.leaveBus(e);e.vel.x*=.4;e.vel.z*=.4}
    e.pos.copy(this.bus.pos);e.flags=this.packFlags(e);return}
   if(e.drop){
    const dx=ai.dropTgt.x-e.pos.x,dz=ai.dropTgt.z-e.pos.z;e.yaw=Math.atan2(-dx,-dz);e.pitch=-.9;inp.f=1;
@@ -304,6 +311,8 @@ export const botMethods={
     if(id==='coolguy15'){if(look.d<11&&e.cd[0]<=0&&e.grounded)this.useAbility(e,0);else if(look.d<45&&e.cd[1]<=0&&e.fireCd<.3)this.useAbility(e,1);else if(look.d<12&&e.cd[2]<=0&&(e.hp<e.maxHp*.5||mode==='flee'))this.useAbility(e,2)}
     else if(id==='chillguy')this.botChill(e,look.d);
     else if(id==='jay')this.botJay(e,look.d);
+    else if(id==='cal'){if(look.d<5&&e.cd[1]<=0&&e.grounded)this.useAbility(e,1);else if(look.d<20&&e.cd[2]<=0&&!ai.fight)this.useAbility(e,2);else if(e.hp<e.maxHp*.5&&e.cd[0]<=0)this.useAbility(e,0)}
+    else if(id==='doran'){if(look.d<7&&e.cd[0]<=0)this.useAbility(e,0);else if(e.hp<e.maxHp*.5&&e.cd[1]<=0&&!ai.fight)this.useAbility(e,1);else if(look.d>6&&look.d<16&&e.cd[2]<=0&&e.grounded)this.useAbility(e,2)}
     else{if(look.d<7.5&&e.cd[1]<=0&&e.grounded)this.useAbility(e,1);else if(look.d<40&&e.cd[2]<=0)this.useAbility(e,2);else if(e.hp<e.maxHp*.55&&look.d>25&&e.cd[0]<=0)this.useAbility(e,0)}}
   }else{
    const slot=e.inv[e.cur];if(slot&&slot.k==='w'){const wd=wstat(slot.w,slot.r);if(!wd.melee&&slot.mag<wd.mag*.6&&e.ammo[wd.ammo]>0)c.reload=true}
@@ -323,7 +332,7 @@ export const botMethods={
   for(const o of this.list){
    if(o===e||this.isAlly(e,o)||!o.alive||o.drop==='bus'||(o.drop&&o.pos.y>P.y+30))continue;
    const dx=o.pos.x-P.x,dz=o.pos.z-P.z,d=Math.hypot(dx,dz);
-   let vis=cfg.vis*(o.sprinting?1.2:1)*(o.crouch?.7:1)*(o.char==='chillguy'?BAL.chill.quiet.botVisMul:1);if(o.cloakT>0)vis=Math.min(vis,BAL.chill.disappear.botSeeRange);
+   let vis=cfg.vis*(this.wx?this.wx.see:1)*(o.sprinting?1.2:1)*(o.crouch?.7:1)*(o.char==='chillguy'?BAL.chill.quiet.botVisMul:1);if(o.cloakT>0)vis=Math.min(vis,BAL.chill.disappear.botSeeRange);
    let seen=false;
    if(d<=vis){const dot=d<.01?1:(dx*fx+dz*fz)/d;if((d<10||dot>half||t-(o.lastShotAt||-99)<1.2)&&d<bd&&W.losClear(P.x,eye,P.z,o.pos.x,o.pos.y+1.2,o.pos.z)){bd=d;best=o;seen=true}}
    if(!seen){const loud=(t-(o.lastShotAt||-99)<2.5)?55:(o.sprinting?1:o.crouch?.2:.5)*cfg.hear;const hr=loud*pe.hear;

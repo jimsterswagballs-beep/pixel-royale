@@ -112,8 +112,17 @@ export const CHARS=[
   ab:[{n:'Pan Boomerang',cd:BAL.jay.pan.cd,ic:'pan',d:'Throw your pan. It hits enemies on the way out ('+BAL.jay.pan.dmgOut+') and back ('+BAL.jay.pan.dmgBack+') before returning to you.'},
       {n:'Food Fight',cd:BAL.jay.food.cd,ic:'food',d:'Lob a random food: Burger heals a teammate '+BAL.jay.food.burger.heal+', Pizza makes a healing area, Chilli explodes, Banana makes a slippery patch.'},
       {n:'Kitchen Special',cd:BAL.jay.kitchen.cd,ic:'kitchen',d:'Cook up a healing station that restores teammates nearby for '+BAL.jay.kitchen.dur+' seconds.'}]},
+ {id:'doran',name:'Doran',role:'Scout / Support',hp:100,color:'#6fd46a',
+  ab:[{n:'Honk Blast',cd:11,d:'Honk so loud that enemies close to you are blown back and take 8 damage.'},
+      {n:'Snack Break',cd:16,d:'Stop for a snack and heal 15 HP.'},
+      {n:'Scoot',cd:9,d:'A quick scoot forward in a burst of speed.'}]},
+ {id:'cal',name:'Cal',role:'Offence / Tank',hp:130,color:'#e8473a',
+  passive:{n:'Thick Skin',ic:'tough',d:'Takes 10% less damage from every attack.'},
+  ab:[{n:'Brace',cd:14,d:'Brace for 4 seconds: gain a 30 point shield that soaks up damage.'},
+      {n:'Stomp Shock',cd:10,d:'Stomp the ground. Enemies within 5 m take 16 damage and are knocked back.'},
+      {n:'Rage',cd:16,d:'Roar for 5 seconds: your attacks deal 50% more damage.'}]},
 ];
-export const KILL_NAMES={'-26':'Spore Trap','-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor','-25':'Building Collapse'};
+export const KILL_NAMES={'-29':'Stomp Shock','-28':'Honk Blast','-27':'Fall Damage','-26':'Spore Trap','-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor','-25':'Building Collapse'};
 export const ACTIONS=[
  ['fwd','Move Forward','KeyW'],['back','Move Back','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
  ['jump','Jump / Leave Bus','Space'],['sprint','Sprint','ShiftLeft'],['crouch','Crouch / Slide','KeyC'],

@@ -69,7 +69,7 @@ export const movementMethods={
   me.flags=this.packFlags(me);
   // sprint trail
   if(me.spicyT>0&&Math.random()<.8)this.fx.emit(me.pos.x+(Math.random()-.5)*.4,me.pos.y+1+Math.random()*.4,me.pos.z+(Math.random()-.5)*.4,(Math.random()-.5)*1.2,1.8+Math.random()*1.5,(Math.random()-.5)*1.2,'#ff7a1a',.45,0);
-  if(me.sprinting&&me.cos.trail){if(String(me.cos.trail).startsWith('bp:')){if(Math.random()<.7)trailEmit(this.fx,me.pos,me.cos.trail)}else if(Math.random()<.6)this.fx.emit(me.pos.x,me.pos.y+.2,me.pos.z,(Math.random()-.5)*.6,.5,(Math.random()-.5)*.6,me.cos.trail,.6,0)}
+  if(me.sprinting&&me.cos.trail){if(/^(bp|sh):/.test(String(me.cos.trail))){if(Math.random()<.7)trailEmit(this.fx,me.pos,me.cos.trail)}else if(Math.random()<.6)this.fx.emit(me.pos.x,me.pos.y+.2,me.pos.z,(Math.random()-.5)*.6,.5,(Math.random()-.5)*.6,me.cos.trail,.6,0)}
  },
  leaveBus(e){if(e.drop!=='bus')return;e.drop='free';e.pos.copy(this.bus.pos);e.vel.set(this.bus.dx*this.bus.speed*.6,-2,this.bus.dz*this.bus.speed*.6);e.grounded=false;e.spawnT=this.t},
  move(e,inp,dt){
@@ -139,19 +139,35 @@ export const movementMethods={
   if(!e.local)e.crouchState=e.crouch;
  },
  onLand(e,imp){e.landT=.18;if(e.local){this.view.kick=Math.min(1,imp/20);if(imp>10)this.view.shake=Math.min(.5,this.view.shake+.2)}
+  // fall damage (v40): a hard landing hurts. Under 13 m/s is free (about a 9 m drop); each m/s over costs 4 hp, up to 90.
+  // Water and your own ground slam are safe. Glider landings never reach here, they are slow.
+  if(!e.slamming&&!e.swim&&imp>13)this.damage(e,Math.min(90,(imp-13)*4),null,-27,false,[e.pos.x,e.pos.y+1,e.pos.z]);
   if(e.slamming){e.slamming=false;this.slamLand(e)}else if(imp>7){const dd=e.pos.distanceTo(this.camera.position),q=e.char==='chillguy';if(dd<(q?BAL.chill.quiet.stepRange:40))this.audio.play('step',e.pos,q?.9*BAL.chill.quiet.stepVol:.9)}},
  moveDrop(e,inp,dt){
   const P=e.pos,V=e.vel;const gnd=W.groundAt(P.x,P.z,P.y,R);const alt=P.y-gnd;
   const sy=Math.sin(e.yaw),cy=Math.cos(e.yaw);let wx=-sy*inp.f+cy*inp.s,wz=-cy*inp.f-sy*inp.s;const wl=Math.hypot(wx,wz);if(wl>1){wx/=wl;wz/=wl}
+  const wind=this.windV||{x:0,z:0};                 // the weather pushes falling and gliding players (weather.js)
   if(e.drop==='free'){
-   const dive=inp.f>0&&e.pitch<-.3;const vyT=dive?-62:-40,hsT=(dive?24:15);
-   V.y+=(vyT-V.y)*Math.min(1,dt*1.8);V.x+=(wx*hsT-V.x)*Math.min(1,dt*1.5);V.z+=(wz*hsT-V.z)*Math.min(1,dt*1.5);
-   if(alt<95||(inp.jumpP&&alt<170&&e.spawnT+1<this.t)){e.drop='glide';if(e.local)this.audio.play('ab',null,.4)}
+   // freefall: dive by looking down and moving forward. The glider opens by itself below 95 m, or early with Jump.
+   const dive=inp.f>0&&e.pitch<-.3;const vyT=dive?-62:-40,hsT=dive?24:15;
+   V.y+=(vyT-V.y)*Math.min(1,dt*1.8);
+   V.x+=(wx*hsT+wind.x*.4-V.x)*Math.min(1,dt*1.5);V.z+=(wz*hsT+wind.z*.4-V.z)*Math.min(1,dt*1.5);
+   if(alt<95||(inp.jumpP&&alt<170&&e.spawnT+1<this.t)){e.drop='glide';e.dive=false;e.diveT=0;if(e.local)this.audio.play('ab',null,.4)}
   }else{
-   V.y+=(-7.5-V.y)*Math.min(1,dt*2.5);const hsT=inp.f>0?14:9;V.x+=(wx*hsT-V.x)*Math.min(1,dt*2);V.z+=(wz*hsT-V.z)*Math.min(1,dt*2)}
+   // gliding. Crouch dives: the canopy folds and you fall fast and forward. Jump redeploys it (it opens and slows you).
+   // Near the ground a dive always redeploys, so you can't fall into the ground by accident.
+   if(e.dive){
+    e.diveT=(e.diveT||0)+dt;
+    if(alt<22||(inp.jumpP&&e.diveT>.35)){e.dive=false;e.diveT=0;V.y=Math.max(V.y,-4);if(e.local){this.audio.play('ab',null,.4);this.view.kick=.4}}
+   }else if(inp.crouchP&&alt>26){e.dive=true;e.diveT=0;if(e.local)this.audio.play('step',null,.6)}
+   if(e.dive){
+    V.y+=(-30-V.y)*Math.min(1,dt*2.5);const hsT=20;V.x+=(wx*hsT+wind.x*.3-V.x)*Math.min(1,dt*2);V.z+=(wz*hsT+wind.z*.3-V.z)*Math.min(1,dt*2)
+   }else{
+    V.y+=(-7.5-V.y)*Math.min(1,dt*2.5);const hsT=inp.f>0?14:9;V.x+=(wx*hsT+wind.x-V.x)*Math.min(1,dt*2);V.z+=(wz*hsT+wind.z-V.z)*Math.min(1,dt*2)}
+  }
   P.x+=V.x*dt;P.z+=V.z*dt;P.y+=V.y*dt;
   const rr=Math.hypot(P.x,P.z);if(rr>W.HALF-8){const k=(W.HALF-8)/rr;P.x*=k;P.z*=k}
-  const g2=W.groundAt(P.x,P.z,P.y,R);if(P.y<=g2+.02){P.y=g2;V.set(V.x*.2,0,V.z*.2);e.drop=null;e.grounded=true;e.landT=.25;e.airCap=0;if(e.local){this.view.kick=.8;this.audio.play('step',null,1)}}
+  const g2=W.groundAt(P.x,P.z,P.y,R);if(P.y<=g2+.02){P.y=g2;V.set(V.x*.2,0,V.z*.2);e.drop=null;e.dive=false;e.grounded=true;e.landT=.25;e.airCap=0;if(e.local){this.view.kick=.8;this.audio.play('step',null,1)}}
  },
  applyStatusLocal(e,st){
   switch(st.s){

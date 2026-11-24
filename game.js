@@ -22,7 +22,11 @@ import {infectMethods} from './infect.js';
 import {trapMethods,buildSporeTrapVis} from './traps.js';
 import {TRAP} from './season2.js';
 import {ambienceMethods} from './ambience.js';
+import {makeGlider,updateGlider} from './glider.js';
+import {dropMethods} from './drop.js';
 import {cosGameMethods,fungalGlider,finishWeapon,drawNameplate,fxOf} from './cosmetics.js';
+// death replay (v45): how long the positions are kept, how much of the match replays, how fast, and the total time on screen
+const REPLAY_KEEP=2.6,REPLAY_S=2,REPLAY_SPEED=.5,REPLAY_REAL=4;
 
 export const PHASES=[{wait:35,shrink:30,r:235,dmg:1},{wait:28,shrink:26,r:155,dmg:2},{wait:24,shrink:22,r:95,dmg:4},{wait:20,shrink:18,r:52,dmg:6},{wait:15,shrink:15,r:22,dmg:8},{wait:10,shrink:14,r:0,dmg:10}];
 
@@ -38,21 +42,6 @@ function updateSun(g,cam){
  const pr=tx*Rx+tz*Rz,pu=tx*Ux+ty*Uy+tz*Uz,dr=Math.round(pr/ts)*ts-pr,du=Math.round(pu/ts)*ts-pu;
  tx+=Rx*dr+Ux*du;ty+=Uy*du;tz+=Rz*dr+Uz*du;
  sun.target.position.set(tx,ty,tz);sun.position.set(tx+L.x*300,ty+L.y*300,tz+L.z*300);sun.target.updateMatrixWorld()}
-// Glider canopy with strings to the hero's shoulders. Shown while gliding (drop === 'glide').
-function makeGliderModel(col){
- const g=new THREE.Group();
- const shape=new THREE.Shape();shape.moveTo(-2.3,0);shape.absarc(0,0,2.3,Math.PI,0,true);shape.lineTo(-2.3,0);
- const canopyGeo=new THREE.ExtrudeGeometry(shape,{depth:.12,bevelEnabled:false,curveSegments:24});canopyGeo.translate(0,0,-.06);
- const canopy=new THREE.Mesh(canopyGeo,new THREE.MeshLambertMaterial({color:col,side:THREE.DoubleSide}));canopy.castShadow=true;g.add(canopy);
- const stripeMat=new THREE.MeshLambertMaterial({color:'#ffffff',transparent:true,opacity:.55});
- for(const a of[-.9,-.3,.3,.9]){const st=new THREE.Mesh(new THREE.BoxGeometry(.07,2.2,.16),stripeMat);st.position.y=1.1;const piv=new THREE.Group();piv.rotation.z=a;piv.add(st);g.add(piv)}
- const pts=[[-2.3,0],[2.3,0],[-1.63,1.63],[1.63,1.63]],v=[];
- for(const[x,y]of pts)v.push(x,y,0,x>0?.2:-.2,-1.4,0);
- const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(v,3));
- g.add(new THREE.LineSegments(sg,new THREE.LineBasicMaterial({color:'#222222'})));
- g.position.y=3.1;
- return g}
-
 export class Game{
  constructor(app){
   this.app=app;this.renderer=app.renderer;this.input=app.input;this.audio=app.audio;this.hud=app.hud;
@@ -102,7 +91,7 @@ export class Game{
   this.busPos(0);
   {const bm=makeBusModel();this.busMesh=bm.group;this.busProp=bm.prop;this.dynamic.add(this.busMesh)}
   for(const info of cfg.ents)this.makeEnt(info);
-  this.t=0;this.tokensPaid=false;this.deathT=0;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
+  this.t=0;this.tokensPaid=false;this.deathT=0;this.recBuf=[];this.replay=null;this.state='bus';this.winnerId=null;this.spectateId=-1;this.over=false;this.kills=[];this.nextLootId=1000000;this.nextProjId=1;this.nextTrapId=1;
   this.storm={phase:-1,state:'idle',t:25,cx:0,cz:0,r:480,ocx:0,ocz:0,or:480,tcx:0,tcz:0,tr:480,dmg:0};
   this.supplyT=45;this.supplies=[];
   this.genLoot(mulberry32(this.seed+99));this.setupFields();this.resetSporeTraps();this.fungusReset&&this.fungusReset();
@@ -145,12 +134,12 @@ export class Game{
   const aura=new THREE.Mesh(new THREE.SphereGeometry(1.25,16,12),new THREE.MeshBasicMaterial({color:'#6ec6ff',transparent:true,opacity:.28,blending:THREE.AdditiveBlending,depthWrite:false}));aura.position.y=1;aura.visible=false;g.add(aura);
   const cv=document.createElement('canvas');cv.width=256;cv.height=64;const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
   const nmat=crispMat(tex);const name=new THREE.Mesh(new THREE.PlaneGeometry(1,1),nmat);name.scale.set(2.8,.7,1);name.position.y=2.45;name.layers.set(1);bb.add(name);
-  const fxg=fxOf(e.cos).gl;const glider=(fxg&&fungalGlider(fxg))||makeGliderModel((CHARS.find(c=>c.id===e.char)||{}).color||'#6ec6ff');glider.visible=false;g.add(glider);
+  const fxg=fxOf(e.cos).gl;const glider=makeGlider((CHARS.find(c=>c.id===e.char)||{}).color||'#6ec6ff',fxg||'default');glider.visible=false;g.add(glider);
   e.spr={group:g,bb,pivot,plane,mat:m,nmat,shadow:sh,wg,aura,name,cv,tex,hat,glider,gK:0,cloakK:0,view:'front',wKey:-1,wModel:null,hpKey:-1,flip:1};
   this.dynamic.add(g);this.attachCosSprite(e);this.drawName(e,true)}
  drawName(e,force){
   const s=e.spr;const key=Math.round(e.hp/5)*1000+Math.round(e.sh/5)+(e.ts>0?7:0);if(!force&&key===s.hpKey)return;s.hpKey=key;
-  const c=s.cv.getContext('2d');c.clearRect(0,0,256,64);if(fxOf(e.cos).fr)drawNameplate(c);c.font='bold 24px Arial Black, Arial';c.textAlign='center';c.lineWidth=5;c.strokeStyle='rgba(0,0,0,.8)';c.strokeText(e.name,128,24);c.fillStyle=e.cos.nameColor||'#fff';c.fillText(e.name,128,24);
+  const c=s.cv.getContext('2d');c.clearRect(0,0,256,64);if(fxOf(e.cos).fr)drawNameplate(c,fxOf(e.cos).fr);c.font='bold 24px Arial Black, Arial';c.textAlign='center';c.lineWidth=5;c.strokeStyle='rgba(0,0,0,.8)';c.strokeText(e.name,128,24);c.fillStyle=e.cos.nameColor||'#fff';c.fillText(e.name,128,24);
   c.fillStyle='rgba(0,0,0,.65)';c.fillRect(40,34,176,10);c.fillStyle='#4cd964';c.fillRect(41,35,174*clamp(e.hp/e.maxHp,0,1),8);
   if(e.sh>0||e.ts>0){c.fillStyle='#3db8ff';c.fillRect(41,46,174*clamp((e.sh+e.ts)/100,0,1),5)}
   s.tex.needsUpdate=true}
@@ -161,7 +150,8 @@ export class Game{
   s.group.visible=vis;if(!vis)return;
   const P=e.rpos;s.group.position.copy(P);
   {const gl=s.glider,gliding=e.drop==='glide';s.gK=gliding?Math.min(1,(s.gK||0)+dt*4):0;gl.visible=gliding;
-   if(gliding){const k=Math.max(.05,s.gK);gl.scale.set(k,k,k);gl.rotation.y=e.yaw;gl.rotation.z=Math.sin(this.t*2.2+e.id)*.06}}
+   if(gliding){const k=Math.max(.05,s.gK);gl.scale.set(k,k,k);gl.rotation.y=e.yaw;
+    const cs=Math.cos(e.yaw),sn=Math.sin(e.yaw);updateGlider(gl,dt,{dive:!!e.dive,lat:e.vel.x*cs-e.vel.z*sn,t:this.t+e.id})}}
   const dx=cam.x-P.x,dz=cam.z-P.z,dl=Math.hypot(dx,dz)||1;const nx=dx/dl,nz=dz/dl;
   s.bb.rotation.y=Math.atan2(dx,dz);
   const fx=-Math.sin(e.yaw),fz=-Math.cos(e.yaw);const dot=fx*nx+fz*nz;
@@ -302,21 +292,66 @@ export class Game{
  onMeRebooted(ev){
   const me=this.me;me.alive=true;me.knocked=false;me.deadT=0;
   if(this.role==='client'){me.pos.set(ev.x,ev.y,ev.z);me.rpos.copy(me.pos);me.vel.set(0,0,0)}
-  this.spectateId=-1;this.hud.hideElim();this.app.showCursor(false);this.app.lock();
+  this.endReplay();this.spectateId=-1;this.hud.hideElim();this.app.showCursor(false);this.app.lock();
  }
  onMeDead(ev){
   const me=this.me;me.alive=false;const killer=this.ents.get(ev.by);this.spectateId=killer&&killer.alive?killer.id:-1;this.audio.play('lose');
-  const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(KILL_NAMES[ev.w]||ev.w||'the storm'),me.kills,this);this.deathT=this.t;this.awardTokens(false)}
+  const place=ev.p||me.place;me.place=place;this.hud.showElim(place,killer?killer.name:(KILL_NAMES[ev.w]||ev.w||'the storm'),me.kills,this);this.deathT=this.t;this.awardTokens(false);this.startReplay(killer,me)}
  onEnd(ev){
   if(this.over)return;this.over=true;this.winnerId=ev.win;const w=this.ents.get(ev.win);this.overT=this.t;
   this.awardTokens(this.me.team===ev.tm);if(this.me.team===ev.tm){this.audio.play('win');this.hud.showVictory(this)}
   else this.hud.announce((w?w.name:'Nobody')+' wins!','#ffd23d');
   this.hud.onEnd(this,ev)}
+ // ---------- death replay (v45): the last REPLAY_S seconds replay in slow motion, and the camera eases from where you
+ // died to your killer. The live match keeps running underneath, so multiplayer sync is unaffected.
+ recordReplay(){
+  if(!this.recBuf)return;
+  this.recBuf.push({t:this.t,p:this.list.map(e=>[e,e.pos.x,e.pos.y,e.pos.z])});
+  if(!this.replay){const cut=this.t-REPLAY_KEEP;while(this.recBuf.length&&this.recBuf[0].t<cut)this.recBuf.shift()}
+ }
+ startReplay(killer,me){
+  if(!this.recBuf||!this.recBuf.length)return;
+  this.replay={w0:performance.now(),tEnd:this.t,killer:killer&&killer!==me?killer:null,victim:me,cam0:this.camera.position.clone()};
+  if(this.hud.pendingElim)this.hud.pendingElim.at=performance.now()+REPLAY_REAL*1000-1500;   // the elimination card waits for the replay
+  this.replayBars(true);
+ }
+ endReplay(){if(!this.replay)return;this.replay=null;this.replayBars(false)}
+ // letterbox bars with a REPLAY label, slid in and out
+ replayBars(on){
+  if(!this.barsEl){
+   const mk=(side,txt)=>{const d=document.createElement('div');
+    d.style.cssText=`position:fixed;left:0;right:0;${side}:0;height:0;background:#000;z-index:15;pointer-events:none;transition:height .45s ease;color:#ffd23d;font:700 13px Arial,sans-serif;letter-spacing:3px;display:flex;align-items:center;justify-content:center`;
+    d.textContent=txt;document.body.appendChild(d);return d};
+   this.barsEl=[mk('top','REPLAY · SLOW MOTION'),mk('bottom','')];
+  }
+  for(const b of this.barsEl)b.style.height=on?'9vh':'0';
+ }
+ // the world positions at time tau (interpolated between recorded frames), written into rpos for drawing
+ applyReplayFrame(tau){
+  const fr=this.recBuf;if(!fr.length)return;
+  let i=0;for(let k=fr.length-1;k>=0;k--){if(fr[k].t<=tau){i=k;break}}
+  const a=fr[i],b=fr[i+1]||a;const u=b.t>a.t?clamp((tau-a.t)/(b.t-a.t),0,1):0;
+  for(const[e,x,y,z]of a.p){const q=b.p.find(r=>r[0]===e)||[e,x,y,z];e.rpos.set(x+(q[1]-x)*u,y+(q[2]-y)*u,z+(q[3]-z)*u)}
+ }
+ // the replay camera: starts where you died, then eases in front of your killer
+ replayCam(cam){
+  const R=this.replay;const el=(performance.now()-R.w0)/1000;   // wall-clock seconds, so the card and the replay line up
+  if(el>=REPLAY_REAL||(this.app.input&&this.app.input.pressed&&this.app.input.pressed('jump'))){this.endReplay();return}
+  this.applyReplayFrame(R.tEnd-REPLAY_S+el*REPLAY_SPEED);
+  const vp=R.victim.rpos,kp=R.killer?R.killer.rpos:null;
+  let tgt,look;
+  if(kp){let dx=vp.x-kp.x,dz=vp.z-kp.z;const d=Math.hypot(dx,dz)||1;dx/=d;dz/=d;
+   tgt=new THREE.Vector3(kp.x+dx*4.5,kp.y+1.7,kp.z+dz*4.5);look=new THREE.Vector3(kp.x,kp.y+1.2,kp.z)}
+  else{tgt=new THREE.Vector3(vp.x,vp.y+4,vp.z+6);look=new THREE.Vector3(vp.x,vp.y+1.2,vp.z)}
+  const u=clamp((el-.6)/2.4,0,1),k=u*u*(3-2*u);
+  cam.position.lerpVectors(R.cam0,tgt,k);
+  cam.lookAt(new THREE.Vector3(vp.x,vp.y+1.2,vp.z).lerp(look,k));
+ }
  // ---------- main update
  update(dt){
   if(!this.running)return;dt=Math.min(dt,.05);this.t+=dt;this.emoteInput();this.rollInput();
   const me=this.me;
-  this.updateBus(dt);if(this.decor)this.decor.update(this.t);if(this.scenery)this.scenery.update(dt,this.t);if(this.fungus)this.fungus.update(dt,this.t,this.camera.position,this.fx);
+  this.updateBus(dt);this.updateDropPreview(dt);if(this.decor)this.decor.update(this.t);if(this.scenery)this.scenery.update(dt,this.t);if(this.fungus)this.fungus.update(dt,this.t,this.camera.position,this.fx);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
    this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateInfection(dt);this.updateSporeTraps(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
@@ -328,6 +363,7 @@ export class Game{
   this.finaleUpdate(dt);
   this.structUpdateUI(dt);this.bldUpdate(dt);
   this.netTick(dt);
+  this.recordReplay();
  }
  updateBus(dt){
   const b=this.bus;if(b.t*b.speed>b.len+60){this.busMesh.visible=false}else{b.t+=dt;this.busPos(b.t);this.busMesh.position.copy(b.pos);this.busMesh.rotation.y=Math.atan2(-b.dx,-b.dz)+Math.PI;
@@ -386,6 +422,7 @@ export class Game{
    cam.position.set(cx,Math.max(cyy,W.H(cx,cz)+.5),cz);cam.lookAt(tgt.rpos.x,tgt.rpos.y+1.2,tgt.rpos.z);
    if(this.over&&this.winnerId===tgt.id){const a=this.t*.5;cam.position.set(tgt.rpos.x+Math.sin(a)*5,tgt.rpos.y+2,tgt.rpos.z+Math.cos(a)*5);cam.lookAt(tgt.rpos.x,tgt.rpos.y+1.1,tgt.rpos.z)}
    cam.fov=lerp(cam.fov,s.fov,.1);cam.rotation.z=0}
+  if(this.replay)this.replayCam(cam);
   // finale: the camera bounces on every beat (the pulse is set by the beat detector in finale.js)
   if(this.finState&&this.finState.on)cam.position.y+=this.finState.beat.pulse*.16;
   cam.updateProjectionMatrix();
@@ -414,4 +451,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,finaleMethods,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods,infectMethods,trapMethods,ambienceMethods,cosGameMethods);
+Object.assign(Game.prototype,finaleMethods,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods,infectMethods,trapMethods,ambienceMethods,cosGameMethods,dropMethods);

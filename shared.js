@@ -6,10 +6,12 @@ import kf from './chill_guy_front.png';import ks from './chill_guy_side.png';imp
 import jf from './jay_front.png';import js from './jay_side.png';import jb from './jay_back.png';
 import jyf from './jay_fungus_front.png';import jys from './jay_fungus_side.png';import jyb from './jay_fungus_back.png';
 import zmf from './zach_mycelium_front.png';import zms from './zach_mycelium_side.png';import zmb from './zach_mycelium_back.png';
+import df from './doran_front.png';import ds from './doran_side.png';import db from './doran_back.png';
+import calf from './cal_front.png';import cals from './cal_side.png';import calb from './cal_back.png';
 import {SKINS} from './season2.js';
 // every character needs front / side / back art: updateSprite() picks the view from the camera angle and mirrors the side view
 export const IMG={zach:{front:zf,side:zs,back:zb},coolguy15:{front:cf,side:cs,back:cb},chillguy:{front:kf,side:ks,back:kb},jay:{front:jf,side:js,back:jb},
- jay_fungus:{front:jyf,side:jys,back:jyb},zach_mycelium:{front:zmf,side:zms,back:zmb}};
+ jay_fungus:{front:jyf,side:jys,back:jyb},zach_mycelium:{front:zmf,side:zms,back:zmb},doran:{front:df,side:ds,back:db},cal:{front:calf,side:cals,back:calb}};
 // the art to draw for a character: the equipped skin when it belongs to that character, otherwise the character itself
 export function artKey(ch,cos){const s=cos&&cos.skin,d=s&&SKINS[s];return d&&d.char===ch&&IMG[s]?s:ch}
 export const R=.42,HSTAND=1.8,HCROUCH=1.3,EYE=1.65,EYEC=1.1,EYES=.85,GRAV=23,JUMP=7.8,WALK=5.8,SPRINT=9.4,CROUCH=3;

@@ -31,7 +31,12 @@ export const SKINS={
 export const TRAILS={
  'bp:spore':{id:'bp:spore',name:'Spore Trail',c1:'#b6ff6a',c2:'#5fe0a0',lvl:2},
  'bp:root':{id:'bp:root',name:'Root Trail',c1:'#b07a3c',c2:'#5a8a3a',lvl:11},
- 'bp:cloud':{id:'bp:cloud',name:'Spore Cloud Trail',c1:'#e6ffb8',c2:'#9be8ff',lvl:17}
+ 'bp:cloud':{id:'bp:cloud',name:'Spore Cloud Trail',c1:'#e6ffb8',c2:'#9be8ff',lvl:17},
+ // Item Shop trails (v39)
+ 'sh:rainbow':{id:'sh:rainbow',name:'Rainbow Trail',c1:'#ff4a6a',c2:'#4a9aff',price:400,desc:'A trail that cycles through every colour.'},
+ 'sh:star':{id:'sh:star',name:'Star Trail',c1:'#ffe27a',c2:'#ffffff',price:500,desc:'Twinkling stars drift up behind you.'},
+ 'sh:ember':{id:'sh:ember',name:'Ember Trail',c1:'#ff9a1a',c2:'#ff3a00',price:500,desc:'Glowing embers rise from your footsteps.'},
+ 'sh:bubble':{id:'sh:bubble',name:'Bubble Trail',c1:'#bfeaff',c2:'#6ac8ff',price:400,desc:'Soft bubbles float up as you sprint.'}
 };
 // one burst of a trail behind a sprinting player; `fx` is the game's particle system (fx.js)
 export function trailEmit(fx,pos,id){
@@ -42,6 +47,15 @@ export function trailEmit(fx,pos,id){
  }else if(id==='bp:root'){
   const c=r()<.6?'#8a5a2a':'#4f8a3a';
   fx.emit(pos.x+(r()-.5)*.35,pos.y+.12,pos.z+(r()-.5)*.35,(r()-.5)*1.1,.2+r()*.5,(r()-.5)*1.1,c,.55,2.4,.2,0,0)
+ }else if(id==='sh:rainbow'){
+  const c=['#ff4a6a','#ff9a3a','#ffd23d','#4adf7a','#4a9aff','#a05aff'][(Math.random()*6)|0];
+  fx.emit(pos.x+(r()-.5)*.4,pos.y+.25+r()*.4,pos.z+(r()-.5)*.4,(r()-.5)*.4,.3+r()*.4,(r()-.5)*.4,c,.8,0,.28,.3,.4,.9)
+ }else if(id==='sh:star'){
+  fx.emit(pos.x+(r()-.5)*.5,pos.y+.3+r()*.7,pos.z+(r()-.5)*.5,(r()-.5)*.3,.6+r()*.6,(r()-.5)*.3,r()<.5?'#ffe27a':'#ffffff',.9,-.1,.2,0,.3,1)
+ }else if(id==='sh:ember'){
+  fx.emit(pos.x+(r()-.5)*.4,pos.y+.15,pos.z+(r()-.5)*.4,(r()-.5)*.6,.7+r()*.8,(r()-.5)*.6,r()<.5?'#ff9a1a':'#ff3a00',.7,-.4,.18,-.1,.3,1)
+ }else if(id==='sh:bubble'){
+  fx.puff(pos.x+(r()-.5)*.4,pos.y+.25,pos.z+(r()-.5)*.4,(r()-.5)*.3,.5+r()*.4,(r()-.5)*.3,r()<.5?'#bfeaff':'#ffffff',1.1,.3,.5,.45,-.1,.6)
  }else if(id==='bp:cloud'){
   fx.puff(pos.x+(r()-.5)*.4,pos.y+.25,pos.z+(r()-.5)*.4,(r()-.5)*.5,.35+r()*.4,(r()-.5)*.5,r()<.5?'#e6ffb8':'#bff0ff',.9,.9,1.5,.5,0,1.1)
  }

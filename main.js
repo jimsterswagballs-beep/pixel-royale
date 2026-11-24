@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {shopMethods} from './shop.js';
 import {passMethods} from './pass.js';
-import {cosAppMethods} from './cosmetics.js';
+import {cosAppMethods,npClass,FX_SLOT} from './cosmetics.js';
+import {lockerMethods,LOCKER_TABS} from './locker.js';
 import {CHAR_PRICES} from './emote.js';
 import {CHARS,ACTIONS,DEFAULT_SETTINGS,keyLabel,clamp,WEAPONS,RARITY} from './data.js';
 import {Game} from './game.js';
@@ -205,22 +206,15 @@ buildTitle(){
   <div class="lk-body"><div class="lk-prev"><div class="cart" id="lkArt"></div><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div></div>
   <div class="lk-side"><div class="lk-cats" id="lkCats"></div><div id="lkGrid"></div><div class="tip">Cosmetics are saved on this device and visible to other players in multiplayer.</div></div></div></div>`;
   $('lkBack').appendChild(this.back());this.lkTab=this.lkTab||'Outfit';
-  for(const c of ['Outfit','Name Color','Sprint Trail','Emote','Cosmetics']){const b=h(`<button class="cat">${c}</button>`);b.onclick=()=>{this.lkTab=c;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
+  for(const c of LOCKER_TABS){const b=h(`<button class="cat">${c}</button>`);b.onclick=()=>{this.lkTab=c;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
  }
  enter_locker(){
   const P=this.profile,g=$('lkGrid');for(const b of $('lkCats').children)b.classList.toggle('on',b.textContent===this.lkTab);
-  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;n.classList.toggle('np-spore',this.nameplateOn());$('lkRole').textContent=cd.name+' · '+cd.role;
+  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;n.className=npClass(this.cosFx().fr);$('lkRole').textContent=cd.name+' · '+cd.role;
   $('lkInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div>`+(cd.passive?`<div class="abl pass"><img src="${ICON[cd.passive.ic]}" alt=""><div><b>${cd.passive.n}</b> <small>(passive)</small><br>${cd.passive.d}</div></div>`:'')+cd.ab.map(a=>`<div class="abl">${a.ic?`<img src="${abilityIcon(a)}" alt="">`:''}<div><b>${a.n}</b> <small>(${a.cd}s cooldown)</small><br>${a.d}</div></div>`).join('');
-  g.innerHTML='';const tab=this.lkTab;
-  const NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];const rc=i=>RARITY[Math.min(5,i%6)].c;
-  const set=(k,v)=>{P[k]=v;this.saveProfile();this.enter_locker()};
-  if(tab==='Emote'){g.appendChild(this.emotePicker());return}
-  if(tab==='Cosmetics'){g.appendChild(this.cosmeticsPicker());return}
-  if(tab==='Outfit'){g.appendChild(this.charPicker(()=>P.char,id=>{P.char=id;this.saveProfile();this.enter_locker()}));g.appendChild(this.skinPicker());return}
-  const box=h(`<div class="tiles"></div>`);
-  if(tab==='Name Color')COLORS.forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i),pic:`<span class="swb" style="background:${c}"></span>`,label:NAMES[i],sel:P.nameColor===c,fn:()=>set('nameColor',c)})));
-  if(tab==='Sprint Trail'){box.appendChild(this.mkTile({rc:rc(0),pic:`<span class="swb none">&#8709;</span>`,label:'None',sel:!P.trail,fn:()=>set('trail','')}));COLORS.slice(1).forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i+1),pic:`<span class="trl" style="--tc:${c}"></span>`,label:NAMES[i+1],sel:P.trail===c,fn:()=>set('trail',c)})));this.trailTiles(box)}
-  g.appendChild(box)}
+  g.innerHTML='';if(!LOCKER_TABS.includes(this.lkTab))this.lkTab='Outfit';const tab=this.lkTab;
+  for(const b of $('lkCats').children)b.classList.toggle('on',b.textContent===tab);
+  g.appendChild(this.lockerContent(tab,COLORS));this.pvMount(g)}
  buildUpdateLog(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
@@ -228,8 +222,15 @@ buildTitle(){
     <section class="update-entry"><div class="date">NOVEMBER 23, 2026 · VERSION 2.0</div><h3>Season 2: The Fungus</h3><ul>
      <li><b>Battle Pass</b>: a free 20-level pass in its own lobby tab. You earn Battle Pass XP from the same things that earn Swag Tokens: playing a match, eliminations, time survived, the top 10 and wins.</li>
      <li><b>Fungus skins</b>: Fungus Jay at level 10 and Mycelium Zach at level 20. Skins change how a character looks, never their abilities or stats. Equip them in the Locker.</li>
+     <li><b>Gliders rebuilt</b>: real dome canopies with coloured panels that inflate when you deploy and fold when you dive. Every glider style uses the new shape.</li>
+     <li><b>Dive and redeploy</b>: crouch while gliding to dive fast and forward, then jump to redeploy and slow down. The glider opens by itself just above the ground.</li>
+     <li><b>Bus drop</b>: a gold ring on the ground shows where you would land if you jumped now, and the hint shows your height.</li>
+     <li><b>Weather that matters</b>: wind with gusts pushes gliders and falling players. Bad weather hides you from bots. A forecast line shows the current weather, the wind and what comes next.</li>
+     <li><b>Bots wear skins</b>: about 45% of bots with Jay or Zach wear Fungus Jay or Mycelium Zach.</li>
      <li><b>Spore trails</b>: Spore Trail, Root Trail and Spore Cloud Trail for your sprint, at levels 2, 11 and 17.</li>
      <li><b>Fungal weapons</b>: Fungal Blaster, Root Shooter, Spore Launcher and Cap Shotgun have infinite ammo. Each hit adds an infection stack (up to 4) that deals damage over time, and the infected player\'s screen fills with fungus. They are found only in <b>Spore Pods</b>, which grow in Old Keep, Lonely Lodge, Sawmill Creek, Tomato Town and Camp Pinecone.</li>
+     <li><b>New character: Cal</b> a red-shirted offence and tank with Brace, Stomp Shock and Rage, and the Thick Skin passive (takes 10% less damage). Costs 1200 Swag Tokens.</li>
+     <li><b>New character: Doran</b> a green-shirted scout with three abilities (Honk Blast, Snack Break, Scoot). Free to play, and he is in the bot mix.</li>
      <li><b>Lobby banner</b> and a one-time Season 2 summary show what is new. Every reward on the pass can now be claimed: nameplate, hat, backpacks, gliders, landing and elimination effects, weapon finishes and two emotes. Equip them in the Locker (Cosmetics and Emote tabs).</li>
      <li><b>Map corruption</b>: the fungus has overgrown twelve places. Old Keep, Lonely Lodge and Quarry Rock are overrun, Sawmill Creek, Tomato Town, Camp Pinecone, Misty Mill and Harbor Heights are partly taken, and Mc Dongal's, Farmer's Folly, Radar Ridge and Fuel Stop 9 have the first signs. Expect giant mushrooms, roots, glowing patches, drifting spores and mushroom rings round the loot. Everything is for looks only and does not change how you move or fight.</li>
      <li><b>Spore traps</b>: hidden pods in corrupted places (about 10 per heavy site, 5 per medium, 2 per light). Get within 4 m and one bursts into a 6 m spore cloud for 5 seconds that gives anyone inside one infection stack. Only caught players see the fungus overlay. Traps re-arm after 20 seconds.</li>
@@ -530,7 +531,7 @@ lobbyUpdate(noBroadcast,full){
   $('lbCount').textContent=L.players.length+' / 8';
   const n=L.players.length+(L.bots?1:0);
   let html=L.players.map(p=>{const host=p.pid==='host',col=(p.cos&&p.cos.nameColor)||'#fff';
-   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn${p.cos&&p.cos.fx&&p.cos.fx.fr?' np-spore':''}" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
+   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn${p.cos&&p.cos.fx&&FX_SLOT[p.cos.fx.fr]==='fr'?' '+npClass(p.cos.fx.fr):''}" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
   if(L.bots)html+=`<div class="pl-slot"><span class="bi">&#129302;</span><div class="pl-who"><div class="pn">${L.bots} bot${L.bots>1?'s':''}</div><div class="ps">${esc(L.diff)} bots</div></div></div>`;
   for(let i=n;i<4;i++)html+=`<div class="pl-slot empty"><span class="bi">+</span><div class="pl-who"><div class="pn">Open slot</div><div class="ps">Invite a friend</div></div></div>`;
   $('lbPlayers').innerHTML=html;
@@ -595,5 +596,5 @@ lobbyUpdate(noBroadcast,full){
   this.input.endFrame();
  }
 }
-Object.assign(App.prototype,shopMethods,passMethods,cosAppMethods);
+Object.assign(App.prototype,shopMethods,passMethods,cosAppMethods,lockerMethods);
 window.__W=W;window.app=new App();
