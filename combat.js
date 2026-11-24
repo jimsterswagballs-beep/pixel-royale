@@ -498,12 +498,11 @@ export const combatMethods={
  // next safe zone (target)
  nextZone(){const s=this.storm;if(s.state==='shrink')return{x:s.tcx,z:s.tcz,r:s.tr};return null},
  initStormMesh(){
-  const g=new THREE.CylinderGeometry(1,1,700,64,1,true);const m=new THREE.MeshBasicMaterial({color:'#9b4dff',transparent:true,opacity:.28,side:THREE.DoubleSide,depthWrite:false,fog:false});
-  this.stormMesh=new THREE.Mesh(g,m);this.stormMesh.position.y=250;this.stormMesh.renderOrder=3;this.dynamic.add(this.stormMesh);
+  this.initStormWall(); // v48: animated shader wall (stormfx.js)
   const g2=new THREE.RingGeometry(.995,1,64);const m2=new THREE.MeshBasicMaterial({color:'#ffffff',transparent:true,opacity:.5,side:THREE.DoubleSide,depthWrite:false,fog:false});this.zoneRing=new THREE.Mesh(g2,m2);this.zoneRing.rotation.x=-Math.PI/2;this.zoneRing.position.y=1;this.dynamic.add(this.zoneRing);this.zoneRing.visible=false},
  updateStormVis(dt){
   const s=this.storm;this.stormMesh.visible=s.r<440;this.stormMesh.scale.set(s.r,1,s.r);this.stormMesh.position.x=s.cx;this.stormMesh.position.z=s.cz;
-  this.stormMesh.material.opacity=.22+Math.sin(this.t*2)*.05;this.stormMesh.material.map=null;
+  this.updateStormWall(dt);this.updateStormFeel(dt);
   const z=this.nextZone();if(z){this.zoneRing.visible=true;this.zoneRing.scale.set(z.r,z.r,1);this.zoneRing.position.set(z.x,60,z.z);this.zoneRing.geometry.dispose&&0}else this.zoneRing.visible=false;
   const wg=this.world&&this.world.water;if(wg){wg.position.y=Math.sin(this.t*.8)*.08}
  },

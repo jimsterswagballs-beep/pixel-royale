@@ -272,7 +272,7 @@ export const lootMethods={
    if(e.local){this.audio.play('pick');if(it.r>=4)this.hud.toast(RARITY[it.r].n+' '+WEAPONS[it.w].n+'!',RARITY[it.r].c)}}
  },
  dropSlot(e,i){const s=e.inv[i];if(!s)return;e.inv[i]=null;if(s.k==='w'&&s.w===0){e.inv[i]=s;return}
-  this.dropItem(e,s.k==='w'?{k:'w',w:s.w,r:s.r,mag:s.mag,d:1}:{k:'i',id:s.id,n:s.n});if(e.cur===i){e.cur=this.firstWeaponSlot(e);e.equipT=.3}},
+  this.dropItem(e,s.k==='w'?{k:'w',w:s.w,r:s.r,mag:s.mag,d:1,by:e.id}:{k:'i',id:s.id,n:s.n,by:e.id});if(e.cur===i){e.cur=this.firstWeaponSlot(e);e.equipT=.3}},
  dropCurrent(e){if(e.cur>0&&e.inv[e.cur])this.dropSlot(e,e.cur)},
  dropItem(e,item){const x=e.pos.x-Math.sin(e.yaw)*1.8,z=e.pos.z-Math.cos(e.yaw)*1.8;const y=W.groundAt(x,z,e.pos.y+1,.3,2)+.1;
   if(this.role==='client'&&e.local)this.net.toHost({t:'drop',item,x,y,z});else this.spawnLoot(item,x,z,y)},

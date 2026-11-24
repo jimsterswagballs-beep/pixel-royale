@@ -18,6 +18,7 @@ import {makeBotRoster} from './botnames.js';
 import {askPlatform,savedPlatform,storePlatform,TouchUI} from './touch.js';
 const INTER_SECS=10; // seconds everyone waits on the starter island before the bus leaves
 import {buildEntrants,MODES,MODE_KEYS,GM,GM_KEYS} from './teams.js';
+import {historyMethods} from './history.js';
 const $=id=>document.getElementById(id);
 const BOTNAMES=['Noodle','Sir Quacks','Turbo Toast','Pixel Pete','Captain Crunch','Waffle','Sneaky Sam','Big Chungus','Lil Bandit','Dr. Pickle','Banana Joe','Zoomer','Gizmo','Cheese Wiz','Ninja Nan','Boop','Chad','Meatball','Fuzzy','Rocket Raccoon','Grumpy','Sassy','Taco Tim','Doodle','Blip','Moonpie','Toaster','Yeet','Mr. Bean','Gremlin','Skibidi','Potato','Wobbly','Kevin','Bongo','Pancake'];
 const COLORS=['#ffffff','#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a'];
@@ -100,7 +101,7 @@ class App{
  sfx(n){this.audio.play(n)} buildNav(){
   const n=h(`<div id="nav"><div class="nav-logo">PIXEL<span>ROYALE</span></div><div class="nav-tabs" id="navTabs"></div><div class="nav-right"><div class="tok" id="navTok"><i>&#9670;</i><b>0</b></div><div class="nav-me" id="navMe"><img alt=""><span></span></div><button class="nav-ico" id="navInfo" title="Credits">i</button><button class="nav-ico" id="navQuit" title="Quit game">&#x23FB;</button></div></div>`);
   $('ui').appendChild(n);
-  for(const[k,l]of[['shop','Shop'],['title','Lobby'],['pass','Battle Pass'],['online','Online'],['locker','Locker'],['updates','News'],['settings','Settings']]){const b=h(`<button data-go="${k}">${l}</button>`);b.onclick=()=>{this.sfx('ui');this.go(k)};b.onmouseenter=()=>this.sfx('click');$('navTabs').appendChild(b)}
+  for(const[k,l]of[['shop','Shop'],['title','Lobby'],['pass','Battle Pass'],['online','Online'],['locker','Locker'],['history','Stats'],['updates','News'],['settings','Settings']]){const b=h(`<button data-go="${k}">${l}</button>`);b.onclick=()=>{this.sfx('ui');this.go(k)};b.onmouseenter=()=>this.sfx('click');$('navTabs').appendChild(b)}
   $('navInfo').onclick=()=>{this.sfx('ui');this.go('credits')};$('navQuit').onclick=()=>{this.sfx('ui');this.exit()};
  }
  updateNav(name){
@@ -596,5 +597,5 @@ lobbyUpdate(noBroadcast,full){
   this.input.endFrame();
  }
 }
-Object.assign(App.prototype,shopMethods,passMethods,cosAppMethods,lockerMethods);
+Object.assign(App.prototype,shopMethods,passMethods,cosAppMethods,lockerMethods,historyMethods);
 window.__W=W;window.app=new App();

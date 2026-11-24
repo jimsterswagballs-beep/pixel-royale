@@ -14,6 +14,8 @@ import {netMethods} from './netsync.js';
 import {structMethods} from './structures.js';
 import {carMethods} from './cars.js';
 import {chaosMethods} from './chaos.js';
+import {stormFxMethods} from './stormfx.js';
+import {twisterMethods} from './twister.js';
 import {weatherMethods,makeWeatherSky} from './weather.js';
 import {finaleMethods} from './finale.js';
 import {buildScenery} from './scenery.js';
@@ -237,7 +239,7 @@ export class Game{
    case'hit':{const t=this.ents.get(ev.t);if(!t)break;t.hitT=.16;t.punch=1;
     {const c=ev.h?'#ffd23d':ev.sh&&!ev.hp?'#5ac8ff':'#ff5a4a';fx.burst(ev.x,ev.y,ev.z,ev.h?16:10,ev.h?7:5,c,.35,10);fx.burst(ev.x,ev.y,ev.z,6,4,'#ffffff',.2,6);
      if(ev.h)fx.ring(new THREE.Vector3(ev.x,ev.y-.05,ev.z),1.1,'#ffd23d',.3);if(ev.sh&&ev.hp)fx.burst(ev.x,ev.y,ev.z,10,6,'#5ac8ff',.4,6)}
-    if(ev.by===this.myId&&ev.t!==this.myId){this.hud.hitmarker(false,!!ev.h,ev.sh&&!ev.hp);if(ev.h){this.hud.critPop();this.view.shake=Math.min(1,this.view.shake+.16)}else this.view.shake=Math.min(1,this.view.shake+.07);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
+    if(ev.by===this.myId&&ev.t!==this.myId){this.me.dmgDealt=(this.me.dmgDealt||0)+(ev.d||0);this.hud.hitmarker(false,!!ev.h,ev.sh&&!ev.hp);if(ev.h){this.hud.critPop();this.view.shake=Math.min(1,this.view.shake+.16)}else this.view.shake=Math.min(1,this.view.shake+.07);au.play(ev.h?'head':'hit');if(this.settings.dmgNumbers)this.hud.dmgNumber(new THREE.Vector3(ev.x,ev.y,ev.z),ev.d,!!ev.h,this)}
     if(ev.t===this.myId){this.hud.flashDamage(ev.by>=0&&this.ents.get(ev.by)?this.ents.get(ev.by).pos:null,this);au.play('hurt');this.view.shake=Math.min(1,this.view.shake+Math.min(.6,ev.d/60));if(me.use){me.use=null;this.hud.toast('Interrupted',"#ff7a7a")}}
     break}
    case'kill':{const v=this.ents.get(ev.v),b=ev.by>=0?this.ents.get(ev.by):null;
@@ -354,7 +356,7 @@ export class Game{
   this.updateBus(dt);this.updateDropPreview(dt);if(this.decor)this.decor.update(this.t);if(this.scenery)this.scenery.update(dt,this.t);if(this.fungus)this.fungus.update(dt,this.t,this.camera.position,this.fx);
   if(me.alive)this.updateLocal(dt);else this.updateSpectate(dt);
   if(this.role!=='client'){
-   this.updateCars(dt);this.updateChaos(dt);this.updateBots(dt);this.updateProjs(dt);this.updateInfection(dt);this.updateSporeTraps(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
+   this.updateCars(dt);this.updateChaos(dt);this.updateTwisters(dt);this.updateBots(dt);this.updateProjs(dt);this.updateInfection(dt);this.updateSporeTraps(dt);this.updateHero(dt);this.updateTraps(dt);this.updateStorm(dt);this.updateSupplies(dt);this.updateEntTimers(dt);this.tickKnock(dt);this.updateEmotes();this.checkWin()}
   else{this.updateClientSim(dt);this.updateSporeTraps(dt)}
   for(const e of this.list){if(e===me)continue;this.updateRemoteMotion(e,dt)}
   this.updateCarVis(dt);this.updateUseFx(dt);this.updateWeatherVis(dt);this.updateFungusAmbience(dt);this.updateChaosVis(dt);
@@ -451,4 +453,4 @@ export class Game{
  }
  resize(w,h){this.camera.aspect=w/h;this.vmCam.aspect=w/h;this.camera.updateProjectionMatrix();this.vmCam.updateProjectionMatrix()}
 }
-Object.assign(Game.prototype,finaleMethods,weatherMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods,infectMethods,trapMethods,ambienceMethods,cosGameMethods,dropMethods);
+Object.assign(Game.prototype,finaleMethods,weatherMethods,stormFxMethods,twisterMethods,emoteMethods,knockMethods,movementMethods,combatMethods,lootMethods,botMethods,netMethods,structMethods,heroMethods,carMethods,chaosMethods,infectMethods,trapMethods,ambienceMethods,cosGameMethods,dropMethods);

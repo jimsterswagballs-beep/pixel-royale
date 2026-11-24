@@ -7,8 +7,9 @@
 import * as THREE from 'three';
 import * as W from './world.js';
 import {mulberry32,clamp,lerp} from './data.js';
+import {twisterPlan} from './twister.js';
 
-export const WEATHER_NAMES={clear:'Clear',cloudy:'Overcast',drizzle:'Drizzle',storm:'Thunderstorm',fog:'Coastal fog',night:'Night',sandstorm:'Sandstorm'};
+export const WEATHER_NAMES={clear:'Clear',cloudy:'Overcast',drizzle:'Drizzle',storm:'Thunderstorm',fog:'Coastal fog',night:'Night',sandstorm:'Sandstorm',hurricane:'Hurricane'};
 export const WEATHER_NAME_NOW=k=>WEATHER_NAMES[k]||'';
 export const TRANS=14;             // seconds to blend from one weather period into the next             // seconds to blend from one weather period into the next
 const MATCH_SECS=1800;             // the schedule covers a long match
@@ -28,6 +29,7 @@ const PROFILE={
  fog:{top:'#8e9ba6',mid:'#b7c0c8',hz:'#ccd3d9',bot:'#c0c8cf',fog:'#ccd3d9',cloudCol:'#dfe5ea',fogFar:520,coast:1,sun:.7,hemi:1.1,cloud:.4,stars:0,sand:0,wet:.1,rain:0,wind:.8,see:0.42},
  night:{top:'#050a1c',mid:'#0c1530',hz:'#15203f',bot:'#0a0f22',fog:'#101a36',cloudCol:'#1a2442',fogFar:620,coast:0,sun:.3,hemi:.55,cloud:.2,stars:1,sand:0,wet:0,rain:0,wind:.7,see:0.5},
  sandstorm:{top:'#9a7f4c',mid:'#c4a46a',hz:'#d9bd85',bot:'#b8975e',fog:'#d2b57c',cloudCol:'#d9bd85',fogFar:230,coast:0,sun:.55,hemi:1,cloud:.3,stars:0,sand:1,wet:0,rain:0,wind:4,see:0.45},
+ hurricane:{top:'#2c3440',mid:'#4a5462',hz:'#6e7887',bot:'#3a4350',fog:'#5a6470',cloudCol:'#3a4350',fogFar:380,coast:0,sun:.25,hemi:.8,cloud:1,stars:0,sand:0,wet:1,rain:1.3,wind:6,see:0.4},
 };
 // the period look as blendable values (colours become [r,g,b] arrays)
 function profileOf(k){const p=PROFILE[k],o={};for(const key in p)o[key]=typeof p[key]==='string'?hex(p[key]):p[key];return o}
@@ -35,7 +37,7 @@ function mixP(a,b,k){const o={};for(const key in a){const x=a[key],y=b[key];o[ke
 function smooth(t){return t*t*(3-2*t)}
 
 // weather schedule: the first period is clear, then a random run of periods (never the same one twice in a row)
-const POOL=[['clear',3],['cloudy',3],['drizzle',2],['storm',1.6],['fog',1.6],['night',1.2],['sandstorm',1]];
+const POOL=[['clear',3],['cloudy',3],['drizzle',2],['storm',1.6],['fog',1.6],['night',1.2],['sandstorm',1],['hurricane',.6]];
 export function weatherSchedule(seed){
  const r=mulberry32((seed|0)+777);
  const segs=[{k:'clear',t0:0,t1:FIRST_SECS}];
@@ -87,6 +89,8 @@ export const weatherMethods={
   this.wxSegs=sch.segs;this.wxWind=[Math.cos(sch.windA),Math.sin(sch.windA)];this.wxWindPh=sch.windA;this.windV={x:0,z:0};this.wxTagT=0;this.wxSpd=0;
   this.wxIdx=-1;this.weather='clear';this.wx=profileOf('clear');this.wxFrom=this.wx;this.wxTo=this.wx;this.wxK=1;
   this.wxFlash=0;this.wxBolts=[];this.wxStrikeT=STRIKE_MIN;this.inStormTint=false;this.fogFar=800;
+  // v49: the tornadoes and hurricane of this match, planned from the same seed and weather periods
+  this.twisters=twisterPlan(this.seed||0,sch.segs);this.twisterReset();
  },
  wxSegAt(t){for(let i=0;i<this.wxSegs.length;i++)if(t<this.wxSegs[i].t1)return i;return this.wxSegs.length-1},
  // every frame, everyone: move to the scheduled period, blend the look, drop particles and bolts
@@ -118,14 +122,18 @@ export const weatherMethods={
   const s=this.app&&this.app.settings||{};
   far*=({Low:350,Medium:550,High:800}[s.quality]||800)/800*({Near:.55,Medium:.8,Far:1}[s.dist]||1);
   if(this.state==='bus')far=Math.max(far,1000);
+  // v48: outside the storm the air turns to a purple murk; a chaos fog bank shuts the view right in
+  if(this.inStormTint)far=Math.min(far,300);
+  if(this.chaosFogT>0)far=Math.min(far,70);
   this.fogFar=(this.fogFar||800)+(far-(this.fogFar||800))*Math.min(1,dt*2);
   this.scene.fog.far=this.fogFar;
-  this.scene.fog.color.set(this.inStormTint?'#7a4ab0':toHex(p.fog));
+  this.scene.fog.color.set(this.chaosFogT>0?'#dfe6ec':this.inStormTint?'#6a3aa6':toHex(p.fog));
   // wind: speed from the period, with slow gusts. Nothing blows while you are on the bus.
   const gust=1+.35*Math.sin(this.t*.7+this.wxWindPh)+.2*Math.sin(this.t*1.9+1.3);
   const spd=p.wind*2.2*gust*(this.state==='bus'?0:1);
   this.windV={x:this.wxWind[0]*spd,z:this.wxWind[1]*spd};this.wxSpd=spd;
   this.updateWeatherTag(dt,i);
+  this.updateTwisterVis(dt);
   // rain and sand, falling around the camera and driven by the wind
   const wx=this.wxWind[0],wz=this.wxWind[1];
   if(p.rain>.02){const n=Math.round(p.rain*10);for(let j=0;j<n;j++){const a=Math.random()*6.283,d=Math.random()*26;

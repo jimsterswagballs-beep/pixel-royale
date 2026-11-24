@@ -86,8 +86,26 @@ select{background:#0a0e24;border:2px solid #34407f;color:#fff;border-radius:8px;
 /* HUD */
 #vig{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 rgba(255,0,0,0);transition:box-shadow .3s}
 #vig.hurt{animation:hurt .4s}
-#vig.storm{box-shadow:inset 0 0 180px rgba(150,60,255,.55)}
+/* v48: outside the storm the edges of the screen pulse purple and a slow haze turns over the view */
+#vig.storm{overflow:hidden;animation:stormPulse 1.6s ease-in-out infinite}
+#vig.storm::after{content:"";position:absolute;left:-50%;top:-50%;width:200%;height:200%;mix-blend-mode:screen;opacity:.9;animation:stormSpin 12s linear infinite;
+ background:conic-gradient(from 0deg,transparent 0deg,rgba(170,90,255,.28) 40deg,transparent 95deg,rgba(120,60,230,.22) 170deg,transparent 230deg,rgba(190,120,255,.25) 300deg,transparent 360deg)}
+#vig.storm.hurt{animation:stormPulse 1.6s ease-in-out infinite,hurt .4s}
+@keyframes stormPulse{0%,100%{box-shadow:inset 0 0 150px rgba(150,60,255,.5)}50%{box-shadow:inset 0 0 280px rgba(200,110,255,.85)}}
+@keyframes stormSpin{to{transform:rotate(360deg)}}
 @keyframes hurt{0%{box-shadow:inset 0 0 160px rgba(255,0,0,.8)}100%{box-shadow:inset 0 0 0 rgba(255,0,0,0)}}
+/* v49: match history (the Stats tab) */
+.hist-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:14px 0}
+.hist-card{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:12px;text-align:center}
+.hist-card b{display:block;font-size:22px;color:#fff}
+.hist-card span{font-size:12px;opacity:.7;text-transform:uppercase;letter-spacing:.06em}
+.hist-wrap{overflow-x:auto}
+table.hist{width:100%;border-collapse:collapse;font-size:14px}
+table.hist th,table.hist td{padding:8px 10px;text-align:left;border-bottom:1px solid rgba(255,255,255,.08);white-space:nowrap}
+table.hist th{opacity:.6;font-weight:600;font-size:12px;text-transform:uppercase}
+table.hist tr.win td{color:#ffd23d}
+table.hist td.pl{font-weight:700}
+.hist-empty{opacity:.7;padding:24px 0;text-align:center}
 #scope{position:absolute;inset:0;display:none;background:radial-gradient(circle at 50% 50%,transparent 28vh,#000 28.3vh);}
 #scope::before,#scope::after{content:'';position:absolute;background:#000}
 #scope::before{left:0;right:0;top:50%;height:2px;margin-top:-1px}#scope::after{top:0;bottom:0;left:50%;width:2px;margin-left:-1px}

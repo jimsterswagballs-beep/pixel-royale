@@ -118,5 +118,7 @@ export const emoteMethods={
   this.app.addTokens(total,parts.filter(p=>p[1]>0).map(p=>p[0]+' +'+p[1]).join(' · '));
   // Battle Pass XP is paid with the tokens, from the same events (season2.js has the rates)
   const xp=matchXp({kills:me.kills,minutes:Math.floor(survived/60),won,place:me.place});this.app.addXp(xp.total);
+  // v49: the match goes into the Stats tab's history (history.js)
+  this.app.recordMatch({won:!!won,place:won?1:(me.place||0),kills:me.kills,secs:Math.floor(survived),dmg:Math.round(me.dmgDealt||0),char:me.cdef.id,mode:this.app.profile.mode,gm:this.gm});
  }
 };

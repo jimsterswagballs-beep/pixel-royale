@@ -122,7 +122,7 @@ export const CHARS=[
       {n:'Stomp Shock',cd:10,d:'Stomp the ground. Enemies within 5 m take 16 damage and are knocked back.'},
       {n:'Rage',cd:16,d:'Roar for 5 seconds: your attacks deal 50% more damage.'}]},
 ];
-export const KILL_NAMES={'-29':'Stomp Shock','-28':'Honk Blast','-27':'Fall Damage','-26':'Spore Trap','-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor','-25':'Building Collapse'};
+export const KILL_NAMES={'-31':'Hurricane','-30':'Tornado','-29':'Stomp Shock','-28':'Honk Blast','-27':'Fall Damage','-26':'Spore Trap','-1':'Ground Slam','-2':'Energy Burst','-3':'Shockwave','-4':'Chomp','-5':'Frag Grenade','-9':'The Storm','-10':'Sneaky Strike','-11':'Pan Boomerang','-12':'Food Fight','-13':'Chilli Blast','-14':'Recon Drone','-15':'Air Strike','-16':'Frost Grenade','-17':'Boogie Bomb','-20':'Run Over','-21':'Car Crash','-22':'Car Explosion','-23':'Lightning','-24':'Meteor','-25':'Building Collapse'};
 export const ACTIONS=[
  ['fwd','Move Forward','KeyW'],['back','Move Back','KeyS'],['left','Move Left','KeyA'],['right','Move Right','KeyD'],
  ['jump','Jump / Leave Bus','Space'],['sprint','Sprint','ShiftLeft'],['crouch','Crouch / Slide','KeyC'],

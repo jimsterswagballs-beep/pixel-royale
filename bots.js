@@ -177,6 +177,46 @@ export const botMethods={
    const land=this.predictLanding(new THREE.Vector3(b.sx+b.dx*s,b.y,b.sz+b.dz*s),new THREE.Vector3(b.dx*b.speed*.6,-2,b.dz*b.speed*.6),false);
    const d=Math.hypot(land.x-tgt.x,land.z-tgt.z);if(d<bd){bd=d;best=s}}
   return Math.max(60,best+(Math.random()-.5)*spread)},
+ // v47: enemies (not allies) within r metres of e
+ foesNear(e,r){let n=0;for(const o of this.list){if(o===e||!o.alive||o.drop==='bus'||this.isAlly(e,o))continue;if(Math.hypot(o.pos.x-e.pos.x,o.pos.z-e.pos.z)<r)n++}return n},
+ // v47: the heal that best fills the missing health: a Medkit for a big gap, a Bandage for a small one, Chug only when far down
+ bestHealSlot(e){
+  const miss=e.maxHp-e.hp;let best=-1,bs=-1e9;
+  for(let i=1;i<6;i++){const s=e.inv[i];if(!s||s.k!=='i')continue;const it=ITEMS[s.id];let sc=-1e9;
+   if(it.kind==='heal'&&e.hp<it.cap-5){const gain=Math.min(it.hp,it.cap-e.hp);sc=gain>=miss*.8?100-(gain-miss)*.5:gain*.6}
+   else if(s.id==='chug'&&miss>=60)sc=40+miss*.3;
+   if(sc>bs){bs=sc;best=i}}
+  return bs>-1e9?best:-1},
+ // v47: the bot uses the rest of its loadout: throwables at an enemy in range and ahead, banana peels where it hides or camps,
+ // Energy and Cloak to get away, Chili before a close fight. Healing is handled in the healing code.
+ botItems(e,mode,dt){
+  const ai=e.ai;ai.itemCd=(ai.itemCd||0)-dt;
+  if(ai.itemCd>0||e.use||ai.healing||e.equipT>0||e.fireCd>0)return;
+  const P=e.pos;
+  const find=(pred)=>{for(let i=1;i<6;i++){const s=e.inv[i];if(s&&s.k==='i'&&pred(ITEMS[s.id],s.id))return i}return -1};
+  // v47: equip the item first; a use is cancelled when the held slot is not the item (combat.js), so buffs never finished before
+  const go=(i)=>{if(i<=0)return false;ai.itemCd=1.2;this.swapTo(e,i);this.startUseItem(e,e.inv[i]);return true};
+  const en=ai.enemy&&ai.enemy.alive&&ai.seen>0?ai.enemy:null;
+  const d=en?Math.hypot(en.pos.x-P.x,en.pos.z-P.z):1e9;
+  const facing=en?Math.abs(angDiff(e.yaw,Math.atan2(-(en.pos.x-P.x),-(en.pos.z-P.z)))):9;
+  if(en&&d>=9&&d<=22&&facing<.25&&Math.random()<dt*2.5){if(go(find(it=>it.kind==='throw')))return}
+  if(!en&&ai.lastSeenPos&&(mode==='camp'||mode==='hide')&&Math.hypot(ai.lastSeenPos.x-P.x,ai.lastSeenPos.z-P.z)<30){
+   const lf=Math.abs(angDiff(e.yaw,Math.atan2(-(ai.lastSeenPos.x-P.x),-(ai.lastSeenPos.z-P.z))));
+   if(lf<.4&&Math.random()<dt*.6){if(go(find((it,id)=>id==='banana')))return}}
+  if(mode==='flee'||mode==='rotate'){if(en&&d>12){if(go(find(it=>it.buff==='cloak')))return}if(go(find(it=>it.buff==='energy')))return}
+  if(en&&ai.fight&&d<24&&facing<.5){if(go(find(it=>it.buff==='spicy')))return}
+ },
+ // v47: a bot that has not got closer to its goal for 5 s gives it up (it is stuck, or dithering between two targets)
+ botWatch(e){
+  const ai=e.ai,g=ai.goal,t=this.t,P=e.pos;
+  if(!g||ai.healing||e.use){ai.gw=null;return}
+  const gd=Math.hypot(g.x-P.x,g.z-P.z);
+  if(gd<=(g.tol||2)+.5){ai.gw=null;return}      // arrived: a camp or hold spot is meant to be stood on
+  const w=ai.gw;
+  if(!w||w.why!==g.why||Math.hypot(w.x-g.x,w.z-g.z)>3){ai.gw={x:g.x,z:g.z,why:g.why,d:gd,t};return}
+  if(gd<w.d-2){w.d=gd;w.t=t;return}
+  if(t-w.t>5){if(ai.lootT){ai.lootFail.set(ai.lootT.id,t);ai.lootT=null}this.clearGoal(e);ai.gw=null;ai.think=0}
+ },
  botTick(e,dt){
   const ai=e.ai,cfg=this.botCfg(),pe=ai.p,P=e.pos,t=this.t;
   const inp={f:0,s:0,jump:false,jumpP:false,sprint:false,crouch:false,crouchP:false};
@@ -306,13 +346,14 @@ export const botMethods={
     if(wd.melee&&look.d<2.8&&ready){c.fire=true;c.firePressed=true}
     c.aim=wd.zoom>1.5&&look.d>25;
     if(slot&&slot.k==='w'&&slot.mag<=0&&!wd.melee)c.reload=true}
-   // abilities
+   // abilities (Cal's Brace is an emergency, so it does not wait for the random roll)
+   if(e.cdef.id==='cal'&&ai.fight&&ai.react<=0&&e.hp<e.maxHp*.4&&e.cd[0]<=0)this.useAbility(e,0);
    if(ai.react<=0&&Math.random()<dt*cfg.ab*1.4*pe.ab){const id=e.cdef.id;
     if(id==='coolguy15'){if(look.d<11&&e.cd[0]<=0&&e.grounded)this.useAbility(e,0);else if(look.d<45&&e.cd[1]<=0&&e.fireCd<.3)this.useAbility(e,1);else if(look.d<12&&e.cd[2]<=0&&(e.hp<e.maxHp*.5||mode==='flee'))this.useAbility(e,2)}
     else if(id==='chillguy')this.botChill(e,look.d);
     else if(id==='jay')this.botJay(e,look.d);
-    else if(id==='cal'){if(look.d<5&&e.cd[1]<=0&&e.grounded)this.useAbility(e,1);else if(look.d<20&&e.cd[2]<=0&&!ai.fight)this.useAbility(e,2);else if(e.hp<e.maxHp*.5&&e.cd[0]<=0)this.useAbility(e,0)}
-    else if(id==='doran'){if(look.d<7&&e.cd[0]<=0)this.useAbility(e,0);else if(e.hp<e.maxHp*.5&&e.cd[1]<=0&&!ai.fight)this.useAbility(e,1);else if(look.d>6&&look.d<16&&e.cd[2]<=0&&e.grounded)this.useAbility(e,2)}
+    else if(id==='cal'){if((this.foesNear(e,5)>=2||ai.fight&&look.d<4)&&e.cd[1]<=0&&e.grounded)this.useAbility(e,1);else if(ai.fight&&look.d<25&&e.cd[2]<=0&&e.hp>e.maxHp*.5)this.useAbility(e,2);else if(ai.fight&&e.hp<e.maxHp*.5&&e.cd[0]<=0)this.useAbility(e,0)}
+    else if(id==='doran'){if((this.foesNear(e,7)>=2||ai.fight&&look.d<6)&&e.cd[0]<=0)this.useAbility(e,0);else if(e.hp<e.maxHp*.5&&e.cd[1]<=0&&!ai.fight)this.useAbility(e,1);else if(look.d>6&&look.d<16&&e.cd[2]<=0&&e.grounded)this.useAbility(e,2)}
     else{if(look.d<7.5&&e.cd[1]<=0&&e.grounded)this.useAbility(e,1);else if(look.d<40&&e.cd[2]<=0)this.useAbility(e,2);else if(e.hp<e.maxHp*.55&&look.d>25&&e.cd[0]<=0)this.useAbility(e,0)}}
   }else{
    const slot=e.inv[e.cur];if(slot&&slot.k==='w'){const wd=wstat(slot.w,slot.r);if(!wd.melee&&slot.mag<wd.mag*.6&&e.ammo[wd.ammo]>0)c.reload=true}
@@ -321,7 +362,9 @@ export const botMethods={
    if(!ai.healing&&(mode==='flee'||mode==='hide')&&e.cdef.id==='zach'){if(e.hp<e.maxHp*.7&&e.cd[0]<=0&&!ai.fight)this.useAbility(e,0);else if(mode==='flee'&&e.cd[2]<=0&&Math.random()<dt*2)this.useAbility(e,2)}
    if(!ai.healing&&mode!=='flee'&&mode!=='hide'&&e.hp<e.maxHp*.7&&e.cdef.id==='zach'&&e.cd[0]<=0&&!ai.fight)this.useAbility(e,0);
    if(e.cdef.id==='jay'&&e.hp<e.maxHp*.65&&e.cd[2]<=0&&e.grounded)this.useAbility(e,2)}
-  if(e.use&&en&&ai.seen>0&&e.use.t>.6){c.cancel=true;ai.healing=false}
+  this.botItems(e,mode,dt);this.botWatch(e);
+  // v47: a use is cancelled only for a close threat, and a cancelled heal waits 4 s before it starts again (it used to restart every tick)
+  if(e.use&&ITEMS[e.use.id]&&ITEMS[e.use.id].kind!=='buff'&&en&&ai.seen>0&&e.use.t>.6&&Math.hypot(en.pos.x-e.pos.x,en.pos.z-e.pos.z)<30){c.cancel=true;ai.healing=false;ai.healCd=this.t+4}
   this.move(e,inp,dt);this.tickWeapon(e,c,dt);
   e.wi=(e.inv[e.cur]&&e.inv[e.cur].k==='w')?e.inv[e.cur].w*10+e.inv[e.cur].r:-1;e.flags=this.packFlags(e);
  },
@@ -497,15 +540,17 @@ export const botMethods={
   }
   // ---- healing (only when it's safe to stand still)
   const quiet=!best||bd>45&&!hitRecent;
-  if(!ai.healing&&!e.use&&quiet&&ai.mode!=='fight'&&(ai.mode!=='flee')){
+  if(!ai.healing&&!e.use&&quiet&&t>(ai.healCd||0)&&ai.mode!=='fight'&&(ai.mode!=='flee')){
    let slot=-1;const th=pe.quirks.has('medic')?12:20;
-   if(e.hp<e.maxHp-th)for(let i=1;i<6;i++){const s=e.inv[i];if(s&&s.k==='i'&&(ITEMS[s.id].kind==='heal'&&e.hp<ITEMS[s.id].cap-5||s.id==='chug'))slot=i}
+   if(e.hp<e.maxHp-th)slot=this.bestHealSlot(e);
    if(slot<0&&e.sh<50)for(let i=1;i<6;i++){const s=e.inv[i];if(s&&s.k==='i'&&ITEMS[s.id].kind==='shield'&&e.sh<ITEMS[s.id].cap-10)slot=i}
    // when hurt and the last threat is fresh, break line of sight first (handled by hide mode)
    if(slot>0&&(ai.mode!=='hide'||!ai.goal||t-ai.lastSeenT>5)){this.swapTo(e,slot);ai.healing=true;ai.healT=t}}
   if(ai.healing){
    const inUse=e.inv[e.cur]&&e.inv[e.cur].k==='i';
-   if(!inUse||t-ai.healT>9||best&&bd<30){ai.healing=false;if(!(e.inv[e.cur]&&e.inv[e.cur].k==='w'))this.swapTo(e,this.firstWeaponSlot(e))}}
+   // v47: stop once the held heal or shield would do nothing (startUseItem refuses at the cap, so the press was wasted)
+   const hi=inUse?ITEMS[e.inv[e.cur].id]:null;const full=!!hi&&(hi.kind==='heal'&&e.hp>=hi.cap||hi.kind==='shield'&&e.sh>=hi.cap);
+   if(!inUse||full||t-ai.healT>9||best&&bd<30){ai.healing=false;if(!(e.inv[e.cur]&&e.inv[e.cur].k==='w'))this.swapTo(e,this.firstWeaponSlot(e))}}
   // ---- pick a loot target when we're not busy
   if(ai.mode==='loot'||ai.mode==='roam'){
    if((!ai.lootT||!this.loot.has(ai.lootT.id))&&!ai.healing){ai.lootT=this.pickLootTarget(e);if(ai.lootT&&ai.mode==='roam'){this.setMode(e,'loot',0);this.setGoal(e,ai.lootT.x,ai.lootT.z,1.6,'loot')}}}
@@ -534,10 +579,16 @@ export const botMethods={
    if(!this.inZoneAt(l.x,l.z,5))continue;
    let v=0;
    if(l.chest)v=(l.supply?90:55)*pe.greed;else if(l.ammobox)v=Object.values(need).some(n=>n>0)?28:8;
-   else{const it=l.item;if(it.k==='w'){const wd=WEAPONS[it.w];if(wd.melee)continue;const have=e.inv.some(s=>s&&s.k==='w'&&s.w===it.w&&s.r>=it.r);if(have)continue;v=(wc<3?40:12)+it.r*14;if(wc>=3){const worst=Math.min(...e.inv.filter(s=>s&&s.k==='w'&&s.w>0).map(s=>s.r));if(it.r<=worst)continue}}
+   else{const it=l.item;if(it.by===e.id)continue; // v47: never go back for a weapon or item this bot just dropped (swap ping-pong)
+    if(it.k==='w'){const wd=WEAPONS[it.w];if(wd.melee)continue;const have=e.inv.some(s=>s&&s.k==='w'&&s.w===it.w&&s.r>=it.r);if(have)continue;v=(wc<3?40:12)+it.r*14;if(wc>=3){const worst=Math.min(...e.inv.filter(s=>s&&s.k==='w'&&s.w>0).map(s=>s.r));if(it.r<=worst)continue}}
     else if(it.k==='a'){if(!(need[it.t]>0))continue;v=25}
     else if(it.k==='m'){v=20}
-    else{const d2_=ITEMS[it.id];v=d2_.kind==='heal'||d2_.kind==='shield'||d2_.kind==='chug'?(hc<4?22:6):(hc<5?12:3);if(it.id==='chug')v=30}}
+    else{ // v47: value an item by whether the bot uses it (botItems and healing): heals and shields rise when hurt
+     const id=it.id,kd=ITEMS[id];
+     if(kd.kind==='heal'||kd.kind==='shield')v=(hc<4?26:8)+(e.hp<e.maxHp*.7?14:0);
+     else if(id==='chug')v=hc<5?(e.hp<e.maxHp*.6?34:20):6;
+     else if(kd.kind==='throw'||id==='banana'||id==='energy'||id==='pepper'||id==='cloak')v=hc<4?18:6;
+     else v=4}} // grapple, pad, jet, drone, strike, shock: the bot does not use these yet
    const sc=v-d*.55;if(sc>bs){bs=sc;best=l}}
   return best}
 };
