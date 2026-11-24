@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import {shopMethods} from './shop.js';
 import {passMethods} from './pass.js';
-import {cosAppMethods} from './cosmetics.js';
+import {cosAppMethods,LOCKER_TABS} from './cosmetics.js';
+import {applyNp,npCls,npVars,SHOP_TRAILS} from './shopcos.js';
 import {CHAR_PRICES} from './emote.js';
 import {CHARS,ACTIONS,DEFAULT_SETTINGS,keyLabel,clamp,WEAPONS,RARITY} from './data.js';
 import {Game} from './game.js';
@@ -20,6 +21,7 @@ import {buildEntrants,MODES,MODE_KEYS,GM,GM_KEYS} from './teams.js';
 const $=id=>document.getElementById(id);
 const BOTNAMES=['Noodle','Sir Quacks','Turbo Toast','Pixel Pete','Captain Crunch','Waffle','Sneaky Sam','Big Chungus','Lil Bandit','Dr. Pickle','Banana Joe','Zoomer','Gizmo','Cheese Wiz','Ninja Nan','Boop','Chad','Meatball','Fuzzy','Rocket Raccoon','Grumpy','Sassy','Taco Tim','Doodle','Blip','Moonpie','Toaster','Yeet','Mr. Bean','Gremlin','Skibidi','Potato','Wobbly','Kevin','Bongo','Pancake'];
 const COLORS=['#ffffff','#ffd84a','#6ec6ff','#ff7ab8','#7aff9a','#ff9a3c','#c08aff','#ff5a5a'];
+const COLOR_NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];
 const EMOTES=['Flip-Flop','Victory Hop','Spin Cycle'];
 const h=(html)=>{const t=document.createElement('template');t.innerHTML=html.trim();return t.content.firstChild};
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -105,7 +107,7 @@ class App{
  updateNav(name){
   const nav=$('nav');if(!nav)return;nav.querySelector('#navTok b').textContent=this.profile.tokens||0;nav.classList.toggle('show',!['lobby','loading','pause'].includes(name));
   const act={chars:'locker'}[name]||name;for(const b of $('navTabs').children)b.classList.toggle('on',b.dataset.go===act);
-  const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[artKey(c.id,this.cos)].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor;sp.classList.toggle('np-spore',this.nameplateOn());this.updatePassDot()}
+  const c=CHARS.find(x=>x.id===this.profile.char)||CHARS[0];nav.querySelector('.nav-me img').src=IMG[artKey(c.id,this.cos)].front;const sp=nav.querySelector('.nav-me span');sp.textContent=this.profile.name;sp.style.color=this.profile.nameColor;applyNp(sp,this.nameplateOn());this.updatePassDot()}
 buildTitle(){
   const t=$('title');
   t.innerHTML=`<div class="lb-bg"></div>
@@ -202,29 +204,57 @@ buildTitle(){
  refreshChips(box,val){for(const c of box.children)c.classList.toggle('sel',c.textContent===val)}
  buildLocker(){
   const p=$('locker');p.innerHTML=`<div class="pg"><div class="pg-head"><h2>Locker</h2><div id="lkBack"></div></div>
-  <div class="lk-body"><div class="lk-prev"><div class="cart" id="lkArt"></div><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div></div>
+  <div class="lk-body"><div class="lk-prev"><div class="cart" id="lkArt"></div><div id="lkStage"><div class="pad"></div><img id="lkImg" alt=""></div><div id="lkName"></div><div class="sub" id="lkRole"></div><div id="lkInfo"></div><div id="lkLoad"></div></div>
   <div class="lk-side"><div class="lk-cats" id="lkCats"></div><div id="lkGrid"></div><div class="tip">Cosmetics are saved on this device and visible to other players in multiplayer.</div></div></div></div>`;
   $('lkBack').appendChild(this.back());this.lkTab=this.lkTab||'Outfit';
-  for(const c of ['Outfit','Name Color','Sprint Trail','Emote','Cosmetics']){const b=h(`<button class="cat">${c}</button>`);b.onclick=()=>{this.lkTab=c;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
+  for(const t of LOCKER_TABS){const b=h(`<button class="cat" data-tab="${t.id}"><i>${t.ic}</i>${t.id}</button>`);b.onclick=()=>{this.lkTab=t.id;this.sfx('ui');this.enter_locker()};$('lkCats').appendChild(b)}
  }
  enter_locker(){
-  const P=this.profile,g=$('lkGrid');for(const b of $('lkCats').children)b.classList.toggle('on',b.textContent===this.lkTab);
-  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;n.classList.toggle('np-spore',this.nameplateOn());$('lkRole').textContent=cd.name+' · '+cd.role;
+  const P=this.profile,g=$('lkGrid');if(!LOCKER_TABS.some(t=>t.id===this.lkTab))this.lkTab='Outfit';for(const b of $('lkCats').children)b.classList.toggle('on',b.dataset.tab===this.lkTab);
+  const cd=CHARS.find(x=>x.id===P.char);$('lkImg').src=IMG[artKey(P.char,this.cos)].front;$('lkArt').style.backgroundImage=`url('${charArt(P.char)}')`;const n=$('lkName');n.textContent=P.name;n.style.color=P.nameColor;applyNp(n,this.nameplateOn());$('lkRole').textContent=cd.name+' · '+cd.role;
   $('lkInfo').innerHTML=`<div class="stat">HP <i style="width:${cd.hp*1.2}px"></i> ${cd.hp}</div>`+(cd.passive?`<div class="abl pass"><img src="${ICON[cd.passive.ic]}" alt=""><div><b>${cd.passive.n}</b> <small>(passive)</small><br>${cd.passive.d}</div></div>`:'')+cd.ab.map(a=>`<div class="abl">${a.ic?`<img src="${abilityIcon(a)}" alt="">`:''}<div><b>${a.n}</b> <small>(${a.cd}s cooldown)</small><br>${a.d}</div></div>`).join('');
-  g.innerHTML='';const tab=this.lkTab;
-  const NAMES=['White','Gold','Sky','Pink','Mint','Orange','Violet','Red'];const rc=i=>RARITY[Math.min(5,i%6)].c;
-  const set=(k,v)=>{P[k]=v;this.saveProfile();this.enter_locker()};
+  this.lockerLoadout($('lkLoad'));g.innerHTML='';const tab=this.lkTab;
   if(tab==='Emote'){g.appendChild(this.emotePicker());return}
-  if(tab==='Cosmetics'){g.appendChild(this.cosmeticsPicker());return}
   if(tab==='Outfit'){g.appendChild(this.charPicker(()=>P.char,id=>{P.char=id;this.saveProfile();this.enter_locker()}));g.appendChild(this.skinPicker());return}
+  g.appendChild(this.lockerTab(tab))}
+ // Nameplate tab, under the nameplates: the colour of your name
+ nameColorPicker(){
+  const P=this.profile,wrap=document.createElement('div');wrap.className='lk-sec';
+  wrap.appendChild(h(`<div class="lk-sech"><div class="k lk-sub">Name colour</div></div>`));
+  const box=h(`<div class="tiles small"></div>`);
+  COLORS.forEach((c,i)=>box.appendChild(this.mkTile({rc:RARITY[Math.min(5,i%6)].c,pic:`<span class="swb" style="background:${c}"></span>`,label:COLOR_NAMES[i],sel:P.nameColor===c,fn:()=>{P.nameColor=c;this.saveProfile();this.enter_locker()}})));
+  wrap.appendChild(box);return wrap}
+ // Effects tab, under landing and elimination effects: sprint trails (colours, Battle Pass trails and Item Shop trails)
+ trailPicker(){
+  const P=this.profile,wrap=document.createElement('div');wrap.className='lk-sec';
+  const shop=SHOP_TRAILS,ownedShop=shop.filter(t=>(P.ownedCos||[]).includes(t.id));
+  wrap.appendChild(h(`<div class="lk-sech"><div class="k lk-sub">Sprint trail</div><span class="lk-count">${COLORS.length-1+P.ownedTrails.length+ownedShop.length} unlocked</span>${ownedShop.length<shop.length?'<button class="lk-get" type="button">Item Shop &rsaquo;</button>':''}</div>`));
+  const get=wrap.querySelector('.lk-get');if(get)get.onclick=()=>{this.sfx('ui');this.shopFocus='tr';this.go('shop')};
   const box=h(`<div class="tiles"></div>`);
-  if(tab==='Name Color')COLORS.forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i),pic:`<span class="swb" style="background:${c}"></span>`,label:NAMES[i],sel:P.nameColor===c,fn:()=>set('nameColor',c)})));
-  if(tab==='Sprint Trail'){box.appendChild(this.mkTile({rc:rc(0),pic:`<span class="swb none">&#8709;</span>`,label:'None',sel:!P.trail,fn:()=>set('trail','')}));COLORS.slice(1).forEach((c,i)=>box.appendChild(this.mkTile({rc:rc(i+1),pic:`<span class="trl" style="--tc:${c}"></span>`,label:NAMES[i+1],sel:P.trail===c,fn:()=>set('trail',c)})));this.trailTiles(box)}
-  g.appendChild(box)}
+  const set=v=>{P.trail=v;this.saveProfile();this.enter_locker()};
+  box.appendChild(this.mkTile({rc:RARITY[0].c,pic:`<span class="swb none">&#8709;</span>`,label:'None',sel:!P.trail,fn:()=>set('')}));
+  COLORS.slice(1).forEach((c,i)=>box.appendChild(this.mkTile({rc:RARITY[Math.min(5,(i+1)%6)].c,pic:`<span class="trl" style="--tc:${c}"></span>`,label:COLOR_NAMES[i+1],sel:P.trail===c,fn:()=>set(c)})));
+  this.trailTiles(box);
+  for(const t of shop){
+   const have=(P.ownedCos||[]).includes(t.id);
+   const tile=this.mkTile({rc:RARITY[Math.min(5,t.rar)].c,pic:`<span class="bp-trl sm" style="--c1:${t.c1};--c2:${t.c2}"><i></i><i></i><i></i><i></i></span>`,label:t.name+(have?'':`<small class="tg">&#9670; ${t.price}</small>`),sel:P.trail===t.id,fn:()=>{
+    if(!have){this.toast('Buy it in the Item Shop (\u25C6 '+t.price+')');this.sfx('empty');return}
+    this.equipTrail(P.trail===t.id?'':t.id);this.enter_locker()}});
+   if(!have)tile.classList.add('locked');tile.title=t.desc;box.appendChild(tile)}
+  wrap.appendChild(box);return wrap}
  buildUpdateLog(){
   const root=$('updates');
   root.innerHTML=`<div class="panel"><div class="head"><h2>Update Log</h2><div id="upBack"></div></div>
    <div class="update-list">
+    <section class="update-entry"><div class="date">NOVEMBER 24, 2026 · VERSION 2.2</div><h3>Previews</h3><ul>
+     <li><b>See before you buy</b>: hats, backpacks, gliders and weapon finishes show a 3D picture of the real item. Landing and elimination effects play a short loop. Emotes show your own character doing the move, Best Weapon plays its video while you hover, and Bart shows his art. Looks only, nothing changes stats.</li>
+    </ul></section>
+    <section class="update-entry"><div class="date">NOVEMBER 24, 2026 · VERSION 2.1</div><h3>Bigger Item Shop, tidier Locker</h3><ul>
+     <li><b>37 new Item Shop items</b>, bought with Swag Tokens: 7 nameplates, 6 gliders, 5 backpacks, 6 hats, 4 landing effects, 4 elimination effects and 5 sprint trails. All of them are looks only.</li>
+     <li><b>Daily Featured row</b>: four items at 20% off that change every day. A filter bar at the top of the shop jumps to any kind of item, and you can equip what you own right from the shop.</li>
+     <li><b>Locker, reorganised</b>: tabs are now Outfit, Accessories, Glider, Nameplate, Effects, Weapons and Emote. Every row shows how many you own, owned items come first, and locked ones show their price or Battle Pass level. An Equipped list under your hero jumps to the right tab, with Unequip all.</li>
+     <li>Name colour moved into the Nameplate tab. Sprint trails, landing and elimination effects are together in Effects.</li>
+    </ul></section>
     <section class="update-entry"><div class="date">NOVEMBER 23, 2026 · VERSION 2.0</div><h3>Season 2: The Fungus</h3><ul>
      <li><b>Battle Pass</b>: a free 20-level pass in its own lobby tab. You earn Battle Pass XP from the same things that earn Swag Tokens: playing a match, eliminations, time survived, the top 10 and wins.</li>
      <li><b>Fungus skins</b>: Fungus Jay at level 10 and Mycelium Zach at level 20. Skins change how a character looks, never their abilities or stats. Equip them in the Locker.</li>
@@ -530,7 +560,7 @@ lobbyUpdate(noBroadcast,full){
   $('lbCount').textContent=L.players.length+' / 8';
   const n=L.players.length+(L.bots?1:0);
   let html=L.players.map(p=>{const host=p.pid==='host',col=(p.cos&&p.cos.nameColor)||'#fff';
-   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn${p.cos&&p.cos.fx&&p.cos.fx.fr?' np-spore':''}" style="color:${esc(col)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
+   return `<div class="pl-slot${host?' host':''}"><img src="${IMG[p.char]?IMG[artKey(p.char,p.cos)].front:''}" alt=""><div class="pl-who"><div class="pn${npCls(p.cos&&p.cos.fx&&p.cos.fx.fr)}" style="color:${esc(col)};${npVars(p.cos&&p.cos.fx&&p.cos.fx.fr)}">${esc(p.name)}</div><div class="ps">${host?'Party leader':'Party member'}</div></div>${host?'<span class="badge">HOST</span>':''}</div>`}).join('');
   if(L.bots)html+=`<div class="pl-slot"><span class="bi">&#129302;</span><div class="pl-who"><div class="pn">${L.bots} bot${L.bots>1?'s':''}</div><div class="ps">${esc(L.diff)} bots</div></div></div>`;
   for(let i=n;i<4;i++)html+=`<div class="pl-slot empty"><span class="bi">+</span><div class="pl-who"><div class="pn">Open slot</div><div class="ps">Invite a friend</div></div></div>`;
   $('lbPlayers').innerHTML=html;
